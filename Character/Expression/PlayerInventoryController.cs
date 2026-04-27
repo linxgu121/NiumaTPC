@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.RuntimeData;
-using NiumaTPC.Item.Core;
-using NiumaTPC.Item.Data.Base;
-using NiumaTPC.Item.Storage;
+using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.Core;
+using NiumaTPC.Character.Data.Base;
+using NiumaTPC.Character.Storage;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Expression
+namespace NiumaTPC.Character.Expression
 {
     // 物品栏管理器
     public class PlayerInventoryController

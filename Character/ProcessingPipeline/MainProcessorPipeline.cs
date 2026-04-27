@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.ProcessingPipeline.Intent;
-using NiumaTPC.Item.ProcessingPipeline.Parameter;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.ProcessingPipeline.Intent;
+using NiumaTPC.Character.ProcessingPipeline.Parameter;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline
+namespace NiumaTPC.Character.ProcessingPipeline
 {
     // 核心后处理管线
     // 将后处理的输入数据转为角色意图

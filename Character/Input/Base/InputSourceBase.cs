@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Input.Base
+namespace NiumaTPC.Character.Input.Base
 {
     /// <summary>
     /// 输入源基类
@@ -32,5 +32,15 @@ namespace NiumaTPC.Item.Input.Base
         public abstract void FetchRawInput(ref RawInputData rawDate);
 
         public bool IsBlocked => _runtimeData !=null && _runtimeData.Arbitration.BlockInput;
+
+        /// <summary>
+        /// 外部强制设置输入阻塞（如对话系统接管时）
+        /// 会覆盖仲裁器的 BlockInput 标志
+        /// </summary>
+        public void SetBlocked(bool blocked)
+        {
+            if (_runtimeData != null)
+                _runtimeData.Arbitration.BlockInput = blocked;
+        }
     }
 }

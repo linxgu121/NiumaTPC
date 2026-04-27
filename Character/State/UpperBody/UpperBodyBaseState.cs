@@ -1,14 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Expression;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Expression;
+using NiumaTPC.Character.RuntimeData;
 using NiumaTPC.Core.StateMachine;
 using UnityEditor;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.UpperBody
+namespace NiumaTPC.Character.State.UpperBody
 {
     /// <summary>
     /// 上半身基础状态抽象类 

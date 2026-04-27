@@ -1,15 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.State.Base;
-using NiumaTPC.Item.State.FullBody.Base.UpperBody;
-using NiumaTPC.Item.State.FullBody.Enum;
-using NiumaTPC.Item.State.Enum;
+using NiumaTPC.Character.State.Base;
+using NiumaTPC.Character.State.Core.Base.UpperBody;
+using NiumaTPC.Character.State.Core.Enum;
+using NiumaTPC.Character.State.Enum;
 using UnityEngine;
 
 
-namespace NiumaTPC.Item.State
+namespace NiumaTPC.Character.State
 {
-    [CreateAssetMenu(fileName ="PlayerBrain_Default", menuName = "NiumaTCP/Player/Modules/Player Brain")]
+    [CreateAssetMenu(fileName ="PlayerBrain_Default", menuName = "NiumaTPC/Player/Modules/Player Brain")]
     public class PlayerBrainSO : ScriptableObject
     {
         [Header("状态装载")]

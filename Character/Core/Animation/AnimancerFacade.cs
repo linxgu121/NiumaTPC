@@ -2,11 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Core.Animation.Base;
+using NiumaTPC.Character.Core.Animation.Base;
 using UnityEditor.Animations;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.Animation
+namespace NiumaTPC.Character.Core.Animation
 {
     /// <summary>
     /// animancer动画转接器

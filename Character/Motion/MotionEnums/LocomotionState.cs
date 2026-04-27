@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Motion.MotionEnums
+namespace NiumaTPC.Character.Motion.MotionEnums
 {
     /// <summary>
     /// 下半身的运动状态分类 控制动画混合树的输入源

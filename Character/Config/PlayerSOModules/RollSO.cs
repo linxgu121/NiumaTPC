@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Core.Animation;
+using NiumaTPC.Character.Core.Animation;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     /// <summary>
     /// 翻滚系统配置模块

@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.State.FullBody.Locomotion;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.State.Core.Locomotion;
 using NiumaTPC.Core.StateMachine;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Aiming
+namespace NiumaTPC.Character.State.Core.Aiming
 {
     public class PlayerAimMoveState : PlayerBaseState
     {

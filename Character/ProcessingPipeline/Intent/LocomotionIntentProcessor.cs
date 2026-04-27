@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Intent
+namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
     /// 基础移动意图处理器

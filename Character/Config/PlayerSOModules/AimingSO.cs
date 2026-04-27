@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Animancer;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     
     public class AimingSO : ScriptableObject

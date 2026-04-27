@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Event;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.State.FullBody.Aiming;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Event;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.State.Core.Aiming;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Locomotion
+namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家落地状态 

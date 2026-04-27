@@ -1,11 +1,11 @@
 using Animancer;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Event;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Event;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Expression
+namespace NiumaTPC.Character.Expression
 {
     /// <summary>
     /// 表情控制器 - 管理面部表情的播放、混合与生命周期

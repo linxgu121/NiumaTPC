@@ -1,7 +1,7 @@
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 
 
-namespace NiumaTPC.Item.ProcessingPipeline.Intent
+namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
     /// 快捷栏意图处理器 将数字按键转为装备切换意图写入黑板

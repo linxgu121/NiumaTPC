@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.UpperBody
+namespace NiumaTPC.Character.State.UpperBody
 {
     /// <summary>
     /// 上半身空闲状态

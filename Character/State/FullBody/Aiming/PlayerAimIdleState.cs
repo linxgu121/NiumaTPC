@@ -1,9 +1,9 @@
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.State.FullBody.Locomotion;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.State.Core.Locomotion;
 
 
-namespace NiumaTPC.Item.State.FullBody.Aiming
+namespace NiumaTPC.Character.State.Core.Aiming
 {
     /// <summary>
     /// 玩家瞄准空闲状态 

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.Animation.Base
+namespace NiumaTPC.Character.Core.Animation.Base
 {
     public interface IAnimationFacade
     {

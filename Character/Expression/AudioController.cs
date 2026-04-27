@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Expression
+namespace NiumaTPC.Character.Expression
 {
     /// <summary>
     /// Audio 控制器：消费黑板上的音频事件意图队列 并委托给 AudioDriver 播放 

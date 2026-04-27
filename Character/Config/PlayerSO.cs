@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config.PlayerSOModules;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.State;
+using NiumaTPC.Character.Config.PlayerSOModules;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.State;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config
+namespace NiumaTPC.Character.Config
 {
     [CreateAssetMenu(fileName = "PlayerConfig_Main", menuName = "NiumaTPC/Player/PlayerConfig(Main)")]
     public class PlayerSO : ScriptableObject

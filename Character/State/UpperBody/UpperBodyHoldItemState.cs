@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Base.Core;
-using NiumaTPC.Item.Core;
+using NiumaTPC.Character.Base.Core;
+using NiumaTPC.Character.Core;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.UpperBody
+namespace NiumaTPC.Character.State.UpperBody
 {
     /// <summary>
     /// 上半身持有物品状态

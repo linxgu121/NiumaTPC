@@ -1,9 +1,9 @@
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Core.IK.Source.Base;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Core.IK.Source.Base;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Expression
+namespace NiumaTPC.Character.Expression
 {
     // IK 结算控制器
     // 负责处理左手/右手的 IK 权重 平滑追踪 Aim IK 与 Warp IK 的拦截逻辑

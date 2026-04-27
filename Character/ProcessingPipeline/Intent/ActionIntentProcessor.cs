@@ -1,6 +1,6 @@
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Intent
+namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
     /// Action 意图处理器：把输入快照里的 ActionPressed 写入黑板。

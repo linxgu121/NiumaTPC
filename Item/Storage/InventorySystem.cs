@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using NiumaTPC.Item.Data;
-using NiumaTPC.Item.Core;
+using NiumaTPC.Character.Data;
+using NiumaTPC.Character.Core;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Storage
+namespace NiumaTPC.Character.Storage
 {
     // 通用背包系统 管理物品的存储 堆叠 查询 
     // 支持自动堆叠 自动分割 单独操作等特性 

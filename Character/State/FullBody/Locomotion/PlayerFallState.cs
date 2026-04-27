@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Locomotion
+namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家下落状态 

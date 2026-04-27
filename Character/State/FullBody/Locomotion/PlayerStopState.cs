@@ -1,9 +1,9 @@
 using Animancer;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Motion.MotionEnums;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Motion.MotionEnums;
 
 
-namespace NiumaTPC.Item.State.FullBody.Locomotion
+namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家停止状态 

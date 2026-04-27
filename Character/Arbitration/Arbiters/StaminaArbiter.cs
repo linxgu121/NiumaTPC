@@ -1,10 +1,13 @@
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Arbitration.Arbiters
+namespace NiumaTPC.Character.Arbitration.Arbiters
 {
+    /// <summary>
+    /// 精力仲裁器
+    /// </summary>
     public sealed class StaminaArbiter
     {
         private readonly PlayerRuntimeData _data;

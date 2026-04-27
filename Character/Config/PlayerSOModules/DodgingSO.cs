@@ -1,7 +1,7 @@
-using NiumaTPC.Item.Core.Animation;
+using NiumaTPC.Character.Core.Animation;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     /// <summary>
     /// 闪避系统配置模块 它统一管理所有8方向闪避的根运动与体力消耗 

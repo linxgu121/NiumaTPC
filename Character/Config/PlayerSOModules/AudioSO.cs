@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using NiumaTPC.Item.Event;
+using NiumaTPC.Character.Event;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     /// <summary>
     /// 角色音频配置（开源版极简框架）：

@@ -1,14 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Event;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item;
-using NiumaTPC.Item.Core;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Event;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character;
+using NiumaTPC.Character.Core;
 using UnityEngine;
 
-namespace NiumaTPC.Item.RuntimeData
+namespace NiumaTPC.Character.RuntimeData
 {
     /// <summary>
     /// 玩家数据黑板

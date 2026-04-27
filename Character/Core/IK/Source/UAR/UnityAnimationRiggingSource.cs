@@ -1,4 +1,4 @@
-using NiumaTPC.Item.Core.IK.Source.Base;
+using NiumaTPC.Character.Core.IK.Source.Base;
 using UnityEngine;
 #if NiumaTPC_HAS_UAR
 using UnityEngine.Animations.Rigging;

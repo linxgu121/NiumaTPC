@@ -1,6 +1,6 @@
 using System;
 
-namespace NiumaTPC.Item.Core.Animation
+namespace NiumaTPC.Character.Core.Animation
 {
 
     /// <summary>

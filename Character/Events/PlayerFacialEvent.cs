@@ -1,4 +1,4 @@
-namespace NiumaTPC.Item.Event
+namespace NiumaTPC.Character.Event
 {
     /// <summary>
     /// 角色面部表情反馈事件

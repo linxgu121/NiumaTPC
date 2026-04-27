@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     /// <summary>
     /// Action 模块：提供 8 个全身动作动画

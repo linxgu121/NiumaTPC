@@ -1,13 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using NiumaTPC.Core.Object;
-using NiumaTPC.Item;
-using NiumaTPC.Item.Base.Core;
-using NiumaTPC.Item.Core;
-using NiumaTPC.Item.Data.Base;
+using NiumaTPC.Character;
+using NiumaTPC.Character.Base.Core;
+using NiumaTPC.Character.Core;
+using NiumaTPC.Character.Data.Base;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.Driver
+namespace NiumaTPC.Character.Core.Driver
 {
     /// <summary>
     /// 装备驱动器

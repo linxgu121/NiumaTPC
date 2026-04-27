@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Enum
+namespace NiumaTPC.Character.State.Core.Enum
 {
     public enum UpperBodyStateType
 {

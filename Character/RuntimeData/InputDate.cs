@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.RuntimeData
+namespace NiumaTPC.Character.RuntimeData
 {
     /// <summary>
     /// 原始输入数据（只记录硬件输入）

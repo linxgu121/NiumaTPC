@@ -2,10 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Event;
+using NiumaTPC.Character.Event;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     /// <summary>
     /// 表情系统配置模块（开源版极简框架）：

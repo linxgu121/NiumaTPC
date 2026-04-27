@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Data.Base.Weapon
+namespace NiumaTPC.Character.Data.Base.Weapon
 {
     /// <summary>
     /// 近战武器基类：定义近战武器的基础属性和动画配置。

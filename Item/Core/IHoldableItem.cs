@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item;
-using NiumaTPC.Item.Core;
+using NiumaTPC.Character;
+using NiumaTPC.Character.Core;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Base.Core
+namespace NiumaTPC.Character.Base.Core
 {
     /// <summary>
     /// 定义所有装备物品必须实现的生命周期与逻辑接口

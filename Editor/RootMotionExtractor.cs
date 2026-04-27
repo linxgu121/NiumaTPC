@@ -1,7 +1,7 @@
 using Stopwatch = System.Diagnostics.Stopwatch;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Motion.MotionEnums;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Motion.MotionEnums;
 using UnityEditor;
 using UnityEngine;
 using System.Reflection;

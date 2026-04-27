@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Motion.MotionEnums
+namespace NiumaTPC.Character.Motion.MotionEnums
 {
     /// <summary>
     /// 动画驱动类型

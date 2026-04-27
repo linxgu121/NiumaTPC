@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Input.Base;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Input.Base;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline
+namespace NiumaTPC.Character.ProcessingPipeline
 {
     /// <summary>
     /// 系统流转的第一道关卡 唯一的数据生产者

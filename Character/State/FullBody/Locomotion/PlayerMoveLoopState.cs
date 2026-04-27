@@ -1,9 +1,9 @@
 using Animancer;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Motion.MotionEnums;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Motion.MotionEnums;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Locomotion
+namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家持续移动循环状态

@@ -1,13 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Arbitration.ArbitrationRequest;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Config.PlayerSOModules;
-using NiumaTPC.Item.ProcessingPipeline;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Arbitration.ArbitrationRequest;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Config.PlayerSOModules;
+using NiumaTPC.Character.ProcessingPipeline;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Expression
+namespace NiumaTPC.Character.Expression
 {
     /// <summary>
     /// Action 控制器：响应黑板 WantsToAction 意图 循环提交“接管动作请求”

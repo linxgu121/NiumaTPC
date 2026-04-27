@@ -1,9 +1,7 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Arbitration.ArbitrationRequest
+namespace NiumaTPC.Character.Arbitration.ArbitrationRequest
 {
     /// <summary>
     /// 动作请求结构

@@ -1,6 +1,6 @@
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
-using NiumaTPC.Item;
+using NiumaTPC.Character;
 
 
 namespace NiumaTPC.Cameras

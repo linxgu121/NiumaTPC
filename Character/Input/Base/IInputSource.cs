@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Input.Base
+namespace NiumaTPC.Character.Input.Base
 {
     /// <summary>
     /// 输入源接口 所有输入来源都要实现接口

@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Data
+namespace NiumaTPC.Character.Data
 {
     /// <summary>
     /// 静态物品图纸基类

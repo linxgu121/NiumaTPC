@@ -1,10 +1,10 @@
 using System;
-using NiumaTPC.Item.Event;
-using NiumaTPC.Item.State.FullBody;
+using NiumaTPC.Character.Event;
+using NiumaTPC.Character.State.Core;
 using NiumaTPC.Core.Object;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.Override
+namespace NiumaTPC.Character.State.Override
 {
     /// <summary>
     /// 处理玩家死亡流程

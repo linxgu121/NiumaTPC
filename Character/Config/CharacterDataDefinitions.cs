@@ -2,10 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Motion.MotionEnums;
+using NiumaTPC.Character.Motion.MotionEnums;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config
+namespace NiumaTPC.Character.Config
 {
     /// <summary>
     /// 适用于标准、曲线驱动的运动动画片段数据

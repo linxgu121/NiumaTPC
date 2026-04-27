@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Data;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Data;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Data.Base
+namespace NiumaTPC.Character.Data.Base
 {
     /// <summary>
     /// 可装备物品图纸基类：包含了实例化所需的外壳 Prefab 和基础通用动画。

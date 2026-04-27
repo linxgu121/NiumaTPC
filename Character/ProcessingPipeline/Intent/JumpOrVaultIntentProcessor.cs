@@ -1,9 +1,9 @@
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Intent
+namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
     /// 跳跃与翻越意图处理器

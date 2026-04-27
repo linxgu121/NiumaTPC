@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Arbitration.Arbiters
+namespace NiumaTPC.Character.Arbitration.Arbiters
 {
     /// <summary>
     /// LOD 性能仲裁器 

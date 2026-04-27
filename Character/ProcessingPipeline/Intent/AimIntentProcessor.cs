@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Intent
+namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
     /// 瞄准与开火意图处理器

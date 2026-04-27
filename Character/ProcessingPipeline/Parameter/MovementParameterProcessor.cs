@@ -1,8 +1,8 @@
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Parameter
+namespace NiumaTPC.Character.ProcessingPipeline.Parameter
 {
     // 动画参数处理器
     public class MovementParameterProcessor

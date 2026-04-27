@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.IK.Source.Base
+namespace NiumaTPC.Character.Core.IK.Source.Base
 {
     public abstract class PlayerIKSourceBase : MonoBehaviour, IPlayerIKSource
     {

@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.Enum
+namespace NiumaTPC.Character.State.Enum
 {
     /// <summary>
     /// 玩家下半身状态类型

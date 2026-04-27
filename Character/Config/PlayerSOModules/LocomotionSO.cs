@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Core.Animation;
+using NiumaTPC.Character.Core.Animation;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Config.PlayerSOModules
+namespace NiumaTPC.Character.Config.PlayerSOModules
 {
     /// <summary>
     /// 动画集合配置模块 它存储所有移动状态的动画与过渡参数 

@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.Driver
+namespace NiumaTPC.Character.Core.Driver
 {
     /*CalculateInputDrivenVelocity()  （主分支）
     ├── CalculateFreeLookVelocity()    [自由视角模式]

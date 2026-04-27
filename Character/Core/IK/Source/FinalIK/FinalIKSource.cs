@@ -1,11 +1,11 @@
-using NiumaTPC.Item.Core.IK.Source.Base;
+using NiumaTPC.Character.Core.IK.Source.Base;
 using UnityEngine;
 
 #if NiumaTPC_HAS_FINALIK
 using RootMotion.FinalIK;
 #endif
 
-namespace NiumaTPC.Item.Core.IK.Source.FinalIK
+namespace NiumaTPC.Character.Core.IK.Source.FinalIK
 {
     // Final IK 插件适配器 负责将抽象的 IK 意图转化为具体的插件指令
     public class FinalIKSource : PlayerIKSourceBase
@@ -57,9 +57,9 @@ namespace NiumaTPC.Item.Core.IK.Source.FinalIK
         }
 
         // 映射变换目标 将黑板中的引用直接注入求解器端点
-        public override void SetIKTarget(IKTarget target, Transform targetTransform, float weight)
+        public override void SetIKTarget(Base.IKTarget target, Transform targetTransform, float weight)
         {
-            switch (target)
+             switch (target)
             {
                 case IKTarget.LeftHand:
                     if (_fbbik != null)
@@ -110,6 +110,7 @@ namespace NiumaTPC.Item.Core.IK.Source.FinalIK
                     break;
             }
         }
+        
 
         // 映射空间坐标 适用于翻越系统或视线追踪等动态计算场景
         public override void SetIKTarget(IKTarget target, Vector3 position, Quaternion rotation, float weight)

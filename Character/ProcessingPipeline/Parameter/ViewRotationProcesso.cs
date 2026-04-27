@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Parameter
+namespace NiumaTPC.Character.ProcessingPipeline.Parameter
 {
     /// <summary>
     /// 视角旋转处理器 负责维护视觉朝向的权威方向

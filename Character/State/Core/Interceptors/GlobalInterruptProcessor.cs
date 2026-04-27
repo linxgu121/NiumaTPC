@@ -1,10 +1,6 @@
-using System.Collections;
-using System.Collections.Generic;
-using NiumaTPC.Item.State.FullBody;
-using Unity.VisualScripting;
-using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Interceptors
+
+namespace NiumaTPC.Character.State.Core.Interceptors
 {
     /// <summary>
     /// 全局拦截处理器，负责在意图管线之后执行全局优先级的状态转移

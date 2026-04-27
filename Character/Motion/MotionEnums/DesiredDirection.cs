@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Motion.MotionEnums
+namespace NiumaTPC.Character.Motion.MotionEnums
 {
     /// <summary>
     /// 离散化的角色意图方向（8方向） 

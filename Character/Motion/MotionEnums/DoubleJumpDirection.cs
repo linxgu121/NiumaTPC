@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Motion.MotionEnums
+namespace NiumaTPC.Character.Motion.MotionEnums
 {
     /// <summary>
     /// 二段跳的方向 决定空中第二次起跳的轨迹

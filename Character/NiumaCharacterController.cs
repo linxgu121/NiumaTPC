@@ -1,28 +1,28 @@
 using System;
 using Animancer;
-using NiumaTPC.Item.Arbitration;
-using NiumaTPC.Item.Arbitration.Arbiters;
-using NiumaTPC.Item.Arbitration.ArbitrationRequest;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Core.Animation.Base;
-using NiumaTPC.Item.Core.Driver;
-using NiumaTPC.Item.Core.IK.Source.Base;
-using NiumaTPC.Item.Core.States;
-using NiumaTPC.Item.Expression;
-using NiumaTPC.Item.Input.Base;
-using NiumaTPC.Item.ProcessingPipeline;
-using NiumaTPC.Item.RuntimeData;
-using NiumaTPC.Item.State.FullBody;
-using NiumaTPC.Item.State.FullBody.Interceptors;
+using NiumaTPC.Character.Arbitration;
+using NiumaTPC.Character.Arbitration.Arbiters;
+using NiumaTPC.Character.Arbitration.ArbitrationRequest;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Core.Animation.Base;
+using NiumaTPC.Character.Core.Driver;
+using NiumaTPC.Character.Core.IK.Source.Base;
+using NiumaTPC.Character.Core.States;
+using NiumaTPC.Character.Expression;
+using NiumaTPC.Character.Input.Base;
+using NiumaTPC.Character.ProcessingPipeline;
+using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.State.Core;
+using NiumaTPC.Character.State.Core.Interceptors;
 using NiumaTPC.Core.Combat;
 using NiumaTPC.Core.Object.Base;
 using NiumaTPC.Core.StateMachine;
-using NiumaTPC.Item.Core;
-using NiumaTPC.Item.Data.Base;
+using NiumaTPC.Character.Core;
+using NiumaTPC.Character.Data.Base;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
-namespace NiumaTPC.Item
+namespace NiumaTPC.Character
 {
     public class NiumaCharacterController : MonoBehaviour, IDamageable, IPoolable
     {

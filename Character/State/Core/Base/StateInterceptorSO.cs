@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.State.FullBody;
+using NiumaTPC.Character.State.Core;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.Base
+namespace NiumaTPC.Character.State.Base
 {
     /// <summary>
     /// 状态拦截器（全局拦截器的父类）

@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Arbitration.Arbiters;
+using NiumaTPC.Character.Arbitration.Arbiters;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Arbitration
+namespace NiumaTPC.Character.Arbitration
 {
     public class ArbiterPipeline
     {

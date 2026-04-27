@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Event;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Event;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.ProcessingPipeline.Intent
+namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
     /// 表情意图处理器 - 监听按键输入并将表情请求写入黑板

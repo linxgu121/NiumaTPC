@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Event
+namespace NiumaTPC.Character.Event
 {
     /// <summary>
     /// 角色的SFX事件

@@ -1,14 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
 using Animancer;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Core.Animation.Base;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Core.Animation.Base;
+using NiumaTPC.Character.RuntimeData;
 using NiumaTPC.Core.StateMachine;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody
+namespace NiumaTPC.Character.State.Core
 {
     /// <summary>
     /// 玩家基础状态抽象类

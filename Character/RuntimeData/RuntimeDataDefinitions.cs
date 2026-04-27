@@ -2,11 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using NiumaTPC.Core.StateMachine;
-using NiumaTPC.Item.Arbitration.ArbitrationRequest;
+using NiumaTPC.Character.Arbitration.ArbitrationRequest;
 using System;
-using NiumaTPC.Item.Event;
+using NiumaTPC.Character.Event;
 
-namespace NiumaTPC.Item.RuntimeData
+namespace NiumaTPC.Character.RuntimeData
 {
     /// <summary>
     /// 人物细节层次

@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Input.Base;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Input.Base;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace NiumaTPC.Item.Input.Player
+namespace NiumaTPC.Character.Input.Player
 {
     public class PlayerInputSource : InputSourceBase
     {
@@ -37,6 +37,7 @@ namespace NiumaTPC.Item.Input.Player
         public InputActionReference number3Action;
         public InputActionReference number4Action;
         public InputActionReference number5Action;
+        [Header("表情输入")]
         public InputActionReference expression1Action;
         public InputActionReference expression2Action;
         public InputActionReference expression3Action;

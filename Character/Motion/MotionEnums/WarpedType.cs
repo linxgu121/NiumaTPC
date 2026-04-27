@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Motion.MotionEnums
+namespace NiumaTPC.Character.Motion.MotionEnums
 {
     /// <summary>
     /// 扭曲动作类型，用于自动烘焙特征点

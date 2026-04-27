@@ -1,12 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.State;
-using NiumaTPC.Item.State.FullBody.Enum;
-using NiumaTPC.Item.State.UpperBody;
+using NiumaTPC.Character.State;
+using NiumaTPC.Character.State.Core.Enum;
+using NiumaTPC.Character.State.UpperBody;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.States
+namespace NiumaTPC.Character.Core.States
 {
     /// <summary>
     /// 上半身状态注册表

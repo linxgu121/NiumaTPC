@@ -1,10 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Core.Animation.Base;
+using NiumaTPC.Character.Core.Animation.Base;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.Animation.Base
+namespace NiumaTPC.Character.Core.Animation.Base
 {
     /// <summary>
     /// 动画外观基类 - 所有动画外观类的抽象基类

@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Core.Animation;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.RuntimeData;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Locomotion
+namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家翻越状态 

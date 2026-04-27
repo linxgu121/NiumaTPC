@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config;
-using NiumaTPC.Item.Event;
-using NiumaTPC.Item.Motion.MotionEnums;
+using NiumaTPC.Character.Config;
+using NiumaTPC.Character.Event;
+using NiumaTPC.Character.Motion.MotionEnums;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Locomotion
+namespace NiumaTPC.Character.State.Core.Locomotion
 {
     public class PlayerJumpState : PlayerBaseState
     {

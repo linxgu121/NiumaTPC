@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.RuntimeData;
-using NiumaTPC.Item.State.FullBody.Locomotion;
-using NiumaTPC.Item.State.Override;
+using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.State.Core.Locomotion;
+using NiumaTPC.Character.State.Override;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Arbitration.Arbiters
+namespace NiumaTPC.Character.Arbitration.Arbiters
 {
     public class ActionArbiter
     {

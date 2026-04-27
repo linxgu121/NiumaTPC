@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Core.States;
-using NiumaTPC.Item.State.FullBody.Interceptors;
+using NiumaTPC.Character.Core.States;
+using NiumaTPC.Character.State.Core.Interceptors;
 using NiumaTPC.Core.StateMachine;
 using RootMotion.Demos;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Expression
+namespace NiumaTPC.Character.Expression
 {
     /// <summary>
     /// 上半身分层控制器

@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
-using NiumaTPC.Item.State;
-using NiumaTPC.Item.State.FullBody;
-using NiumaTPC.Item.State.Enum;
+using NiumaTPC.Character.State;
+using NiumaTPC.Character.State.Core;
+using NiumaTPC.Character.State.Enum;
 using UnityEngine;
-using NiumaTPC.Item.State.FullBody.Locomotion;
-using NiumaTPC.Item.State.FullBody.Aiming;
-using NiumaTPC.Item.State.Override;
+using NiumaTPC.Character.State.Core.Locomotion;
+using NiumaTPC.Character.State.Core.Aiming;
+using NiumaTPC.Character.State.Override;
 
-namespace NiumaTPC.Item.Core.States
+namespace NiumaTPC.Character.Core.States
 {
     /// <summary>
     /// 状态机注册器

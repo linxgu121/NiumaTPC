@@ -1,12 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Motion.MotionEnums;
-using NiumaTPC.Item.State.FullBody;
-using NiumaTPC.Item.State.FullBody.Locomotion;
+using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.State.Core;
+using NiumaTPC.Character.State.Core.Locomotion;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.Override
+namespace NiumaTPC.Character.State.Override
 {
     /// <summary>
     /// 处理强制全身动画播放的代理状态

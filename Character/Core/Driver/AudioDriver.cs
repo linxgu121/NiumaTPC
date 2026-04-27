@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.Config.PlayerSOModules;
-using NiumaTPC.Item.Event;
+using NiumaTPC.Character.Config.PlayerSOModules;
+using NiumaTPC.Character.Event;
 using UnityEngine;
 
-namespace NiumaTPC.Item.Core.Driver
+namespace NiumaTPC.Character.Core.Driver
 {
     /// <summary>
     /// 音频驱动器

@@ -1,10 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
-using NiumaTPC.Item.Expression;
-using NiumaTPC.Item.State.UpperBody;
-using UnityEngine;
+using NiumaTPC.Character.Expression;
+using NiumaTPC.Character.State.UpperBody;
 
-namespace NiumaTPC.Item.State.FullBody.Interceptors
+namespace NiumaTPC.Character.State.Core.Interceptors
 {
     /// <summary>
     /// 上半身拦截处理器 

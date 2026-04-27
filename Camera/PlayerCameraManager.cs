@@ -1,4 +1,4 @@
-using NiumaTPC.Item;
+using NiumaTPC.Character;
 using UnityEngine;
 #if NiumaTPC_HAS_CINEMACHINE
 using Cinemachine;

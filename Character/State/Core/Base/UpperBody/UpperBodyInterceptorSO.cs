@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
-using NiumaTPC.Item.State.UpperBody;
+using NiumaTPC.Character.State.UpperBody;
 using UnityEngine;
 
-namespace NiumaTPC.Item.State.FullBody.Base.UpperBody
+namespace NiumaTPC.Character.State.Core.Base.UpperBody
 {
     public abstract class UpperBodyInterceptorSO : ScriptableObject
     {
