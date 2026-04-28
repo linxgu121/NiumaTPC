@@ -1,0 +1,21 @@
+{
+  "name": "NiumaTPC.Runtime",
+  "references": [
+    "Kybernetik.Animancer",
+    "Unity.InputSystem",
+    "Cinemachine",
+    "Unity.Animation.Rigging",
+    "RootMotion.FinalIK",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": []
+  
+  
+}

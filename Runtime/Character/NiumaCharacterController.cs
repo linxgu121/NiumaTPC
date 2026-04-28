@@ -20,17 +20,31 @@ using NiumaTPC.Core.StateMachine;
 using NiumaTPC.Character.Core;
 using NiumaTPC.Character.Data.Base;
 using UnityEngine;
-using UnityEngine.Rendering.Universal;
+using NiumaTPC.Character.Core.Animation;
 
 namespace NiumaTPC.Character
 {
+    /// <summary>
+    /// 整个BBBNexus系统的 Root 节点唯一的 Monobehaviour 驱动源 
+    /// 不包含任何具体游戏逻辑 仅负责组件整合、内存分配与严格的时序指令分发 
+    /// 
+    /// - Awake: 只做一次性分配/依赖注入（对象池复用时不会重复调用）
+    /// - OnSpawned: 每次从池取出时做“帧状态复位 + 重启”
+    /// - OnDespawned: 每次回收时做“回调/引用清理”
+    /// </summary>
+    [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(AnimancerComponent))]
+    [RequireComponent(typeof(AnimancerFacade))]
+    [RequireComponent(typeof(Animator))]
+    [RequireComponent(typeof(AudioSource))]
+    [DefaultExecutionOrder(-300)]
     public class NiumaCharacterController : MonoBehaviour, IDamageable, IPoolable
     {
         [Header("输入与表现源")]
         [Tooltip("可拖拽赋值任何继承 IInputSourceBase 的组件")]
         public InputSourceBase InputSourceRef;
         [Tooltip("动画转接器 - 可拖拽赋值任何继承 AnimationFacadeBase 的组件")]
-        public AnimationFacadeBase AnimationFacaeRef;
+        public AnimationFacadeBase AnimationFacadeRef;
         [Tooltip("IK 目标源 - 可拖拽赋值任何继承 PlayerIKSourceBase 的组件")]
         public PlayerIKSourceBase IKSource;
         [Tooltip("用于播放角色音效的 AudioSource 建议关闭 Loop")]
@@ -132,7 +146,7 @@ namespace NiumaTPC.Character
 
             try
             {
-                AnimationFacade = AnimationFacade;
+                AnimationFacade = AnimationFacadeRef;
                 if (AnimationFacade == null)
                 {
                     throw new System.Exception("动画源未配置 请检查面板 AnimationFacadeRef 赋值");

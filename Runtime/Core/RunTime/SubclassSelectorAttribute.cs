@@ -4,4 +4,4 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [AttributeUsage(AttributeTargets.Field)]
-public sealed class SubclassPickerAttribute : PropertyAttribute {}
+public sealed class SubclassSelectorAttribute : PropertyAttribute {}

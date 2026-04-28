@@ -1,0 +1,11 @@
+{
+  "name": "NiumaTPC.Editor",
+  "references": [
+    "NiumaTPC.Runtime",
+    "Kybernetik.Animancer"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": []
+}
