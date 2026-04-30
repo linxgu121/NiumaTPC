@@ -360,6 +360,25 @@ namespace NiumaTPC.Character
             OnEquipmentChanged?.Invoke();
         }
 
+        public bool IsInputBlocked => InputPipeline != null && InputPipeline.IsBlocked;
+
+        public void SetInputBlocked(bool blocked, bool clearBufferedInput = true)
+        {
+            if (RuntimeData != null)
+                RuntimeData.Arbitration.BlockInput = blocked;
+
+            InputPipeline?.SetBlocked(blocked, clearBufferedInput);
+
+            if (blocked && RuntimeData != null)
+                RuntimeData.ResetIntetnt();
+        }
+
+        public void ClearInputBuffer()
+        {
+            InputPipeline?.ClearBufferedInput();
+            RuntimeData?.ResetIntetnt();
+        }
+
 
         public void RequestOverride(in ActionRequest request, bool flushImmediately = true)
         {

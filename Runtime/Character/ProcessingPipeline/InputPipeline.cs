@@ -32,12 +32,19 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
         // 全局物理帧计数器
         private ulong _frameIndex;
+        
+        private bool _isBlocked;
 
         /// <summary>
         /// 对外暴露的当前输入快照
         /// 其他系统只能读取此引用 绝对禁止直接修改内部字段
         /// </summary>
         public InputData Current => _inputData;
+
+        /// <summary>
+        /// 输入阻塞状态 供外部系统查询当前输入是否被管线阻塞
+        /// </summary>
+        public bool IsBlocked => _isBlocked;
 
         // 构造函数只接受 InputSourceBase 其他配置从 inputSource 注入；如果 inputSource 未配置则使用其字段的默认值
         public InputPipeline(InputSourceBase inputSource)
@@ -55,6 +62,41 @@ namespace NiumaTPC.Character.ProcessingPipeline
             _bufferedMove = Vector2.zero;
             _lastNonZeroMoveTime = Time.time;
             _frameIndex = 0;
+            _isBlocked = false;
+        }
+
+        /// <summary>
+        /// 输入阻塞接口 供外部系统调用以临时禁用玩家输入
+        /// </summary>
+        public void SetBlocked(bool blocked, bool clearBufferedInput = true)
+        {
+            if (_isBlocked == blocked)
+                return;
+
+            _isBlocked = blocked;
+
+            if (blocked && clearBufferedInput)
+                ClearBufferedInput();
+        }
+
+        /// <summary>
+        /// 清空输入缓存 供外部系统调用以在特定事件（如场景切换、角色复活）后重置输入状态
+        /// </summary>
+        public void ClearBufferedInput()
+        {
+            _rawData = default;
+            _bufferedMove = Vector2.zero;
+            _lastNonZeroMoveTime = float.NegativeInfinity;
+
+            var frame = new FrameInputData
+            {
+                FrameIndex = _frameIndex,
+                Raw = default,
+                Processed = default
+            };
+
+            _inputData.lastFrameData = frame;
+            _inputData.currentFrameData = frame;
         }
 
         /// <summary>
@@ -66,9 +108,11 @@ namespace NiumaTPC.Character.ProcessingPipeline
             // 推进历史帧
             _inputData.lastFrameData = _inputData.currentFrameData;
 
-            if (_inputSource != null && _inputSource.IsBlocked)
+            if (_isBlocked || (_inputSource != null && _inputSource.IsBlocked))
             {
-                _rawData = default;
+                ClearBufferedInput();
+                _frameIndex++;
+                return;
             }
             else
             {

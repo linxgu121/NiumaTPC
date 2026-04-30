@@ -6,7 +6,8 @@
     "Cinemachine",
     "Unity.Animation.Rigging",
     "RootMotion.FinalIK",
-    "Unity.RenderPipelines.Universal.Runtime"
+    "Unity.RenderPipelines.Universal.Runtime",
+    "NiumaCore.Runtime"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
@@ -16,6 +17,4 @@
   "autoReferenced": true,
   "defineConstraints": [],
   "versionDefines": []
-  
-  
 }
