@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace NiumaTPC.Character.Config.PlayerSOModules
 {
-    
+    [CreateAssetMenu(fileName = "AimingSO", menuName = "NiumaTPC/Player/Modules/AimingSO")]
     public class AimingSO : ScriptableObject
     {
         [Header("灵敏度")]
