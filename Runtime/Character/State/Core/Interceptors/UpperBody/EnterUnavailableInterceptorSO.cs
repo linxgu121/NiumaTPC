@@ -5,6 +5,9 @@ using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Interceptors
 {
+    // 上半身进入不可用拦截器 
+    // 当下半身处于翻越 下落 翻滚等状态时 强制上半身进入不可用状态 禁用控制权
+    [CreateAssetMenu(fileName = "EnterUnavailableInterceptor", menuName = "NiumaTPC/Player/Interceptors/UpperBody/EnterUnavailable")]
     public class EnterUnavailableInterceptorSO : UpperBodyInterceptorSO
     {
         public override bool TryIntercept(NiumaCharacterController player, UpperBodyBaseState currentState, out UpperBodyBaseState nextState)
