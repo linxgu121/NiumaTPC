@@ -1,9 +1,13 @@
 using NiumaTPC.Character.State.Core.Base.UpperBody;
 using NiumaTPC.Character.State.Core.Locomotion;
 using NiumaTPC.Character.State.UpperBody;
+using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Interceptors
 {
+    // 上半身退出不可用拦截器 
+    // 当下半身脱离翻越 下落 翻滚等状态后 恢复上半身的控制权 回到正常状态
+    [CreateAssetMenu(fileName = "ExitUnavailableInterceptor", menuName = "NiumaTPC/Player/Interceptors/UpperBody/ExitUnavailable")]
     public class ExitUnavailableInterceptorSO : UpperBodyInterceptorSO
     {
         public override bool TryIntercept(NiumaCharacterController player, UpperBodyBaseState currentState, out UpperBodyBaseState nextState)
