@@ -20,7 +20,7 @@ namespace NiumaTPC.Character.State.Core.Interceptors
 
             if(data == null || config == null) return false;
 
-            if(!data.WantsDoubleJump) return false;
+            if(!data.WantsToJump) return false;
 
             //判断无法进行跳跃动作的特殊动作
             if(currentState is PlayerJumpState || currentState is PlayerDoubleJumpState ||
