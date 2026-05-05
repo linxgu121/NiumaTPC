@@ -130,7 +130,7 @@ namespace NiumaTPC
         private List<TransitionResult> _topResults = new List<TransitionResult>();
         #endregion
 
-        [MenuItem("Tools/BBB-Nexus/Accel. Deviation Analyzer (v7.5 - Kinematic)")]
+        [MenuItem("Tools/NiumaTPC/Accel. Deviation Analyzer (v7.5 - Kinematic)")]
         public static void ShowWindow() => GetWindow<AccelDeviationAnalyzerWindowV7_5>("Kinematic Analyzer v7.5");
 
         // 窗口显示时加载上次保存的配置 

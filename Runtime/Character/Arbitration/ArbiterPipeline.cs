@@ -18,6 +18,7 @@ namespace NiumaTPC.Character.Arbitration
         {
             _player  = player;
             LOD = new LODArbiter(player);
+            Health = new HealthArbiter(player);
             Action = new ActionArbiter(player);
             Stamina = new StaminaArbiter(player);
         }
