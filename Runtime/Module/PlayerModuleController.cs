@@ -59,12 +59,30 @@ namespace NiumaTPC.Module
 
         public void Teleport(Vector3 position, Quaternion rotation)
         {
-            if (character == null) return;
+            var targetTransform = PlayerTransform;
+            if (targetTransform == null) return;
 
-            var cc = character.GetComponent<CharacterController>();
+            var cc = targetTransform.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
 
-            character.transform.SetPositionAndRotation(position, rotation);
+            var rb = targetTransform.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                // 传送时清理刚体残留速度，避免读档或复活后被上一帧物理速度带走。
+                if (!rb.isKinematic)
+                {
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                    rb.Sleep();
+                }
+
+                rb.position = position;
+                rb.rotation = rotation;
+            }
+            else
+            {
+                targetTransform.SetPositionAndRotation(position, rotation);
+            }
 
             if (cc != null) cc.enabled = true;
         }
