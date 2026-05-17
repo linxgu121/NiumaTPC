@@ -30,6 +30,14 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 状态逻辑 检测停止 翻越 跳跃 运动状态切换等
         protected override void UpdateStateLogic()
         {
+            if (data.WantsToVault)
+            {
+                // 翻越意图优先于急停，避免玩家松开移动键同帧按跳跃时被 Stop 状态抢走。
+                data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
+                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
+                return;
+            }
+
             if (data.CurrentLocomotionState == LocomotionState.Idle)
             {
                 // 在从 MoveLoop 退出到 Stop 前，根据动画骨骼判断当前哪只脚在前
@@ -75,13 +83,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                         break;
                 }
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerStopState>());
-                return;
-            }
-
-            if (data.WantsToVault)
-            {
-                data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
-                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
                 return;
             }
 

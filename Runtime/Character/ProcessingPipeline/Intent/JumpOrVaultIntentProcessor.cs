@@ -13,14 +13,14 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
         private readonly PlayerRuntimeData _data;
         private readonly PlayerSO _config;
         private readonly Transform _playerTransform;
-        private readonly LayerMask _obstacleMask;
+        private bool _warnedMissingObstacleMask;
+        private bool _warnedMissingGroundMask;
 
         public JumpOrVaultIntentProcessor(PlayerRuntimeData data, PlayerSO config, Transform playerTransform)
         {
             _data = data;
             _config = config;
             _playerTransform = playerTransform;
-            _obstacleMask = _config.Vaulting.ObstacleLayers;
         }
 
         // 注： 彻底移除了早期版本每帧空转的射线探测缓存机制
@@ -89,13 +89,15 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
 
             Transform root = _playerTransform;
 
-            Vector3 rayStart = root.position + Vector3.up * _config.Vaulting.VaultForwardRayHeight;
-            // 从角色上方偏移 VaultForwardRayHeight 作为前方探测的起点
+            // 先确认前方墙面，再用地面层检测墙顶与落点，避免地面不在障碍层时检测失败。
 
             Vector3 forward = root.forward;
             // forward = 角色面向 用于朝前的射线方向
 
-            if (Physics.Raycast(rayStart, forward, out RaycastHit wallHit, _config.Vaulting.VaultForwardRayLength, _obstacleMask))
+            int obstacleMask = ResolveObstacleMask();
+            int groundMask = ResolveGroundMask();
+
+            if (TryFindWall(root, forward, minHeight, maxHeight, obstacleMask, out RaycastHit wallHit))
             {
                 // 命中前方物体 wallHit 包含击中点与法线
 
@@ -105,7 +107,7 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
                 Vector3 downRayStart = wallHit.point + Vector3.up * _config.Vaulting.VaultDownwardRayLength + forward * _config.Vaulting.VaultDownwardRayOffset;
                 // 在墙面点上方并向前偏移 作为向下搜索 ledge 的起点
 
-                if (Physics.Raycast(downRayStart, Vector3.down, out RaycastHit ledgeHit, _config.Vaulting.VaultDownwardRayLength, _obstacleMask))
+                if (Physics.Raycast(downRayStart, Vector3.down, out RaycastHit ledgeHit, _config.Vaulting.VaultDownwardRayLength, groundMask, QueryTriggerInteraction.Ignore))
                 {
                     // 找到墙顶或台阶的顶面 ledgeHit
 
@@ -127,7 +129,7 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
                     Vector3 finalLandPoint = Vector3.zero;
                     bool foundGround = false;
 
-                    if (Physics.Raycast(landRayStart, Vector3.down, out RaycastHit landHit, _config.Vaulting.VaultLandRayLength, _obstacleMask))
+                    if (Physics.Raycast(landRayStart, Vector3.down, out RaycastHit landHit, _config.Vaulting.VaultLandRayLength, groundMask, QueryTriggerInteraction.Ignore))
                     {
                         // 向下检测墙后地面
                         if (Vector3.Dot(landHit.normal, Vector3.up) >= 0.7f)
@@ -190,6 +192,81 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
                 }
             }
             return false;
+        }
+
+        private bool TryFindWall(Transform root, Vector3 forward, float minHeight, float maxHeight, int obstacleMask, out RaycastHit wallHit)
+        {
+            // 低矮障碍可能低于统一的前向射线高度，所以按当前翻越高度段补充两条探测射线。
+            float configuredHeight = Mathf.Max(0.05f, _config.Vaulting.VaultForwardRayHeight);
+            if (TryRaycastWallAtHeight(root, forward, configuredHeight, obstacleMask, out wallHit))
+            {
+                return true;
+            }
+
+            float middleHeight = Mathf.Clamp((minHeight + maxHeight) * 0.5f, 0.05f, Mathf.Max(0.05f, maxHeight - 0.05f));
+            if (!Mathf.Approximately(middleHeight, configuredHeight) &&
+                TryRaycastWallAtHeight(root, forward, middleHeight, obstacleMask, out wallHit))
+            {
+                return true;
+            }
+
+            float lowHeight = Mathf.Clamp(minHeight + 0.1f, 0.05f, Mathf.Max(0.05f, maxHeight - 0.05f));
+            if (!Mathf.Approximately(lowHeight, configuredHeight) &&
+                !Mathf.Approximately(lowHeight, middleHeight) &&
+                TryRaycastWallAtHeight(root, forward, lowHeight, obstacleMask, out wallHit))
+            {
+                return true;
+            }
+
+            wallHit = default;
+            return false;
+        }
+
+        private bool TryRaycastWallAtHeight(Transform root, Vector3 forward, float height, int obstacleMask, out RaycastHit wallHit)
+        {
+            Vector3 rayStart = root.position + Vector3.up * height;
+
+            if (!Physics.Raycast(rayStart, forward, out wallHit, _config.Vaulting.VaultForwardRayLength, obstacleMask, QueryTriggerInteraction.Ignore))
+            {
+                return false;
+            }
+
+            // 如果命中面的法线接近上向，说明打到的是地面或缓坡，不作为可翻越墙面。
+            return Vector3.Dot(wallHit.normal, Vector3.up) <= 0.1f;
+        }
+
+        private int ResolveObstacleMask()
+        {
+            int mask = _config.Vaulting.ObstacleLayers.value;
+            if (mask != 0)
+            {
+                return mask;
+            }
+
+            if (!_warnedMissingObstacleMask)
+            {
+                Debug.LogWarning("[JumpOrVaultIntentProcessor] VaultingSO.ObstacleLayers 未配置，临时使用 Physics.DefaultRaycastLayers。建议在配置中明确设置障碍物层级。");
+                _warnedMissingObstacleMask = true;
+            }
+
+            return Physics.DefaultRaycastLayers;
+        }
+
+        private int ResolveGroundMask()
+        {
+            int mask = _config.Vaulting.GroundLayers.value;
+            if (mask != 0)
+            {
+                return mask;
+            }
+
+            if (!_warnedMissingGroundMask)
+            {
+                Debug.LogWarning("[JumpOrVaultIntentProcessor] VaultingSO.GroundLayers 未配置，临时使用 Physics.DefaultRaycastLayers。建议在配置中明确设置可站立地面层级。");
+                _warnedMissingGroundMask = true;
+            }
+
+            return Physics.DefaultRaycastLayers;
         }
     }
 }
