@@ -40,6 +40,9 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         [Tooltip("落脚点搜索距离")]
         public float VaultLandDistance = 1.5f;
 
+        [Tooltip("落脚点额外前推距离。角色总是卡在墙顶或方块边缘时调大；如果落点太靠后会滑下去，建议从 0.25 到 0.5 之间调。")]
+        public float VaultLandForwardPadding = 0.35f;
+
         [Tooltip("落脚点射线长度")]
         public float VaultLandRayLength = 3.0f;
 

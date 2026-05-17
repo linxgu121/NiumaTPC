@@ -123,8 +123,9 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
                     Vector3 vaultForwardDir = -wallHit.normal;
                     // 翻越的前向为墙法线的反方向（远离墙）
 
-                    Vector3 landRayStart = ledgeHit.point + vaultForwardDir * _config.Vaulting.VaultLandDistance + Vector3.up * 0.5f;
-                    // 从 ledge 前方偏移 VaultLandDistance 并上移 0.5m 作为落点检测起点
+                    float landForwardDistance = _config.Vaulting.VaultLandDistance + Mathf.Max(0f, _config.Vaulting.VaultLandForwardPadding);
+                    Vector3 landRayStart = ledgeHit.point + vaultForwardDir * landForwardDistance + Vector3.up * 0.5f;
+                    // 从 ledge 前方偏移落点距离并额外前推，避免最终落点贴在方块边缘导致角色滑落
 
                     Vector3 finalLandPoint = Vector3.zero;
                     bool foundGround = false;
