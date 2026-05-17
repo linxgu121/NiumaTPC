@@ -23,6 +23,14 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 跳跃由全局拦截器统一处理，避免各状态重复判断
         protected override void UpdateStateLogic()
         {
+            if (data.WantsToVault)
+            {
+                // 兜底处理：即使 Brain 没挂 VaultInterceptor，待机状态也能响应翻越意图。
+                data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
+                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
+                return;
+            }
+
             if (data.CurrentLocomotionState != LocomotionState.Idle)
             {
                 switch (data.CurrentLocomotionState)

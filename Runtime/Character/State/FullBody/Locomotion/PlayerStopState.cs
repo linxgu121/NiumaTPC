@@ -30,6 +30,14 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         protected override void UpdateStateLogic()
         {
             // 停止时检测输入 重新开始移动
+            if (data.WantsToVault)
+            {
+                // 兜底处理：停止动画期间按下跳跃触发翻越时，不依赖全局拦截器也能切入翻越。
+                data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
+                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
+                return;
+            }
+
             if (data.CurrentLocomotionState != LocomotionState.Idle)
             {
                 data.NextStatePlayOptions = new AnimPlayOptions { FadeDuration = 0.4f };

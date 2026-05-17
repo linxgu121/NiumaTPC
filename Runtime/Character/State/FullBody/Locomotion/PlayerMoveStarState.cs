@@ -57,6 +57,14 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 跳跃由全局拦截器统一处理，避免状态内重复判断
         protected override void UpdateStateLogic()
         {
+            if (data.WantsToVault)
+            {
+                // 兜底处理：起步动画期间触发翻越时，直接切入翻越状态。
+                data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
+                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
+                return;
+            }
+
             if (data.IsAiming)
             {
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerAimMoveState>());

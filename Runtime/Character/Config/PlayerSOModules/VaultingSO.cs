@@ -16,7 +16,10 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         [Header("翻越检测")]
         
         [Tooltip("障碍物层级")]
-        public LayerMask ObstacleLayers;
+        public LayerMask ObstacleLayers = ~0;
+
+        [Tooltip("可站立地面层级。用于检测墙顶和翻越后的落点；地面不在障碍层时必须配置，否则翻越会找不到落点。")]
+        public LayerMask GroundLayers = ~0;
 
         [Tooltip("前向射线长度")]
         public float VaultForwardRayLength = 1.5f;
