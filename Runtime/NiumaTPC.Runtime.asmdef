@@ -3,7 +3,7 @@
   "references": [
     "Kybernetik.Animancer",
     "Unity.InputSystem",
-    "Cinemachine",
+    "Unity.Cinemachine",
     "Unity.Animation.Rigging",
     "RootMotion.FinalIK",
     "Unity.RenderPipelines.Universal.Runtime",
