@@ -71,7 +71,7 @@ namespace NiumaTPC.Module
                 // 传送时清理刚体残留速度，避免读档或复活后被上一帧物理速度带走。
                 if (!rb.isKinematic)
                 {
-                    rb.linearVelocity = Vector3.zero;
+                    rb.velocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
                     rb.Sleep();
                 }
