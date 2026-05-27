@@ -59,7 +59,7 @@ namespace NiumaTPC.SaveBridge
         /// TPC 存档段修订号。
         /// 玩家移动每帧都在变化，这里不把位置变化当作自动脏标记来源，避免存档系统每帧 dirty。
         /// </summary>
-        public int Revision => _revision;
+        public long Revision => _revision;
 
         /// <summary>
         /// 是否存在等待场景加载完成后应用的玩家位姿快照。
