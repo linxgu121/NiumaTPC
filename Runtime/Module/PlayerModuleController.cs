@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NiumaCore.Module;
 using NiumaCore.Player;
 using UnityEngine;
@@ -20,6 +21,8 @@ namespace NiumaTPC.Module
         /// 当前控制状态，true表示玩家可以控制角色，false表示控制被禁用（如在菜单界面或角色死亡时）
         /// </summary>
         public bool IsControlEnabled { get; private set; } = true;
+
+        private readonly HashSet<string> _disableReasons = new HashSet<string>();
 
         /// <summary>
         /// 玩家角色的Transform组件，供其他模块或系统访问角色位置和旋转信息
@@ -47,14 +50,27 @@ namespace NiumaTPC.Module
 
         public void EnableControl()
         {
-            IsControlEnabled = true;
-            character?.SetInputBlocked(false, true);
+            EnableControl(null);
+        }
+
+        public void EnableControl(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                _disableReasons.Clear();
+            }
+            else
+            {
+                _disableReasons.Remove(reason);
+            }
+
+            RefreshControlState();
         }
 
         public void DisableControl(string reason)
         {
-            IsControlEnabled = false;
-            character?.SetInputBlocked(true, true);
+            _disableReasons.Add(string.IsNullOrWhiteSpace(reason) ? "Unknown" : reason);
+            RefreshControlState();
         }
 
         public void Teleport(Vector3 position, Quaternion rotation)
@@ -90,6 +106,13 @@ namespace NiumaTPC.Module
         public void Kill(string reason)
         {
             // 后续接入死亡状态或派发 PlayerDiedEvent
+        }
+
+        private void RefreshControlState()
+        {
+            var shouldEnable = _disableReasons.Count == 0;
+            IsControlEnabled = shouldEnable;
+            character?.SetInputBlocked(!shouldEnable, true);
         }
 
     }
