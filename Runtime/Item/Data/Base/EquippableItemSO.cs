@@ -13,7 +13,7 @@ namespace NiumaTPC.Character.Data.Base
     public abstract class EquippableItemSO : ItemDefinitionSO
     {
         [Header("物理表现")]
-        [Tooltip("实例化到玩家手里的游戏对象 (必须包含实现了 IHoldableItem 的脚本)")]
+        [Tooltip("实例化到玩家手里的预制体。武器、工具等请挂团队制作的持握物脚本；该脚本负责被角色拿起、放下和驱动表现。")]
         public GameObject Prefab;
 
         public Vector3 HoldPositionOffset;
