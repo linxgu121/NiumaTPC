@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using NiumaTPC.Character.Event;
 using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
@@ -30,13 +31,16 @@ namespace NiumaTPC.Character.Expression
                 return;
             }
             
-            if (_player.AudioDriver == null) { _data.SfxQueue.Clear(); return; }
-
             int count = _data.SfxQueue.Count;
             for (int i = 0; i < count; i++)
             {
                 var evt = _data.SfxQueue.GetSfxEvent(i);
-                _player.AudioDriver.Play(evt);
+                if (!_player.UseExternalSfxBridge)
+                {
+                    _player.AudioDriver?.Play(evt);
+                }
+
+                _player.NotifySfxEvent(evt);
             }
 
             _data.SfxQueue.Clear();

@@ -19,6 +19,7 @@ using NiumaTPC.Core.Object.Base;
 using NiumaTPC.Core.StateMachine;
 using NiumaTPC.Character.Core;
 using NiumaTPC.Character.Data.Base;
+using NiumaTPC.Character.Event;
 using UnityEngine;
 using NiumaTPC.Character.Core.Animation;
 
@@ -64,6 +65,10 @@ namespace NiumaTPC.Character
         public Transform RightHandBone { get; private set; }
         public Transform LeftFootBone { get; private set; }
         public Transform RightFootBone { get; private set; }
+
+        [Header("音频桥接")]
+        [Tooltip("是否把角色音效交给外部桥接播放。开启后 AudioController 只广播 PlayerSfxEvent，不再调用本地 AudioDriver.PlayOneShot；挂了 TPCAudioBridge 时建议开启，避免重复播放。")]
+        public bool UseExternalSfxBridge;
 
         [Header("调试选项")]
         public EquippableItemSO DefaultEquipment1;
@@ -114,6 +119,7 @@ namespace NiumaTPC.Character
         //调试用缓存
         private PlayerBaseState _lastState;
         public event Action OnEquipmentChanged;
+        public event Action<PlayerSfxEvent> OnSfxEventRequested;
 
         private bool _booted;
 
@@ -358,6 +364,20 @@ namespace NiumaTPC.Character
         public void NotifyEquipmentChanged()
         {
             OnEquipmentChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// 通知角色音效事件已产生。
+        /// 该出口只广播 PlayerSfxEvent，不直接依赖 NiumaAudio，方便外部桥接层统一播放全局音频。
+        /// </summary>
+        public void NotifySfxEvent(PlayerSfxEvent sfxEvent)
+        {
+            if (sfxEvent == PlayerSfxEvent.None)
+            {
+                return;
+            }
+
+            OnSfxEventRequested?.Invoke(sfxEvent);
         }
 
         public bool IsInputBlocked => InputPipeline != null && InputPipeline.IsBlocked;
