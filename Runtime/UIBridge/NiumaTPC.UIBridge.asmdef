@@ -1,0 +1,16 @@
+{
+  "name": "NiumaTPC.UIBridge",
+  "references": [
+    "NiumaTPC.Runtime",
+    "NiumaUI.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
