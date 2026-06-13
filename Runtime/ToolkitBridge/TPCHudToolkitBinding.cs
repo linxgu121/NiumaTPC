@@ -113,7 +113,7 @@ namespace NiumaTPC.ToolkitBridge
             SetElementVisible(_promptRoot, !string.IsNullOrWhiteSpace(panel?.ControlPromptText));
             SetText(_prompt, panel?.ControlPromptText);
             ToolkitElementUtility.SetClass(_crosshairCenter, _highlightedClass, panel?.CrosshairHighlighted ?? false);
-            _hints.ReplaceAll(vm?.HintRows ?? Array.Empty<ToolkitTextRowData>());
+            _hints.ReplaceAll(vm != null ? vm.HintRows : Array.Empty<ToolkitTextRowData>());
         }
     }
 }
