@@ -1,13 +1,13 @@
-using NiumaTPC.Module;
-using NiumaUI.Core.Interface;
+﻿using NiumaTPC.Module;
 using NiumaUI.Enum;
+using NiumaUI.Toolkit;
 using UnityEngine;
 
 namespace NiumaTPC.UIBridge
 {
     /// <summary>
-    /// UI 到 TPC 的玩法输入阻塞桥接。
-    /// UIManager 进入 Menu / Dialogue / Cinematic 时通过它禁用玩家控制，回到 Gameplay 时恢复 UI 添加的阻塞。
+    /// UI Toolkit 到 TPC 的玩法输入阻塞桥接。
+    /// UIToolkitUIManager 打开会阻塞玩法输入的面板时，通过本桥接禁用玩家控制；关闭面板后释放 UI 添加的阻塞。
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TPCGameplayInputBlocker : MonoBehaviour, IGameplayInputBlocker
