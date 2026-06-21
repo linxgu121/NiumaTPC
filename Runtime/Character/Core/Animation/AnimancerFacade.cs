@@ -295,12 +295,12 @@ namespace NiumaTPC.Character.Core.Animation
             state.Events(this).Add(normalizedTime, callback);
         }
 
-         public override void PlayFullBodyAction(AnimationClip clip, float fadeDuration = 0.2f)
+         public override void PlayFullBodyAction(AnimationClip clip, float fadeDuration = 0.2f, bool applyRootMotion = true)
         {
             if (clip == null) return;
 
-            _fullBodyRootMotionEnabled = true;
-            _animancer.Animator.applyRootMotion = true;
+            _fullBodyRootMotionEnabled = applyRootMotion;
+            _animancer.Animator.applyRootMotion = applyRootMotion;
 
             // 全身动作切换时 清理 layer0 的通用回调槽 
             ClearOnEndCallback(0);

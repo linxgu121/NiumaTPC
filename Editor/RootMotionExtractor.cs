@@ -307,9 +307,13 @@ namespace NiumaTPC
         // 利用反射机制深度扫描 寻找所有配置注入的动画数据 保证离线数据完整覆盖 
         private void ScanMotionClipDataWithFieldInfo(object target, Action<MotionClipData, FieldInfo, object> onFound)
         {
-            if (target == null) return;
+            ScanMotionClipDataWithFieldInfo(target, onFound, new HashSet<int>());
+        }
+
+        private void ScanMotionClipDataWithFieldInfo(object target, Action<MotionClipData, FieldInfo, object> onFound, HashSet<int> visited)
+        {
+            if (!CanScanNestedObject(target, visited)) return;
             var type = target.GetType();
-            if (!typeof(UnityEngine.Object).IsAssignableFrom(type) && !type.IsClass) return;
 
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (var field in fields)
@@ -323,7 +327,7 @@ namespace NiumaTPC
                 }
                 else if (value is ScriptableObject so)
                 {
-                    ScanMotionClipDataWithFieldInfo(so, onFound);
+                    ScanMotionClipDataWithFieldInfo(so, onFound, visited);
                 }
                 else if (value is System.Collections.IEnumerable enumerable && !(value is string))
                 {
@@ -336,9 +340,17 @@ namespace NiumaTPC
                         }
                         else if (item is ScriptableObject itemSo)
                         {
-                            ScanMotionClipDataWithFieldInfo(itemSo, onFound);
+                            ScanMotionClipDataWithFieldInfo(itemSo, onFound, visited);
+                        }
+                        else if (ShouldScanPlainObject(item))
+                        {
+                            ScanMotionClipDataWithFieldInfo(item, onFound, visited);
                         }
                     }
+                }
+                else if (ShouldScanPlainObject(value))
+                {
+                    ScanMotionClipDataWithFieldInfo(value, onFound, visited);
                 }
             }
         }
@@ -547,25 +559,52 @@ namespace NiumaTPC
         // 批量模式递归扫描配置注入节点 
         private void ScanMotionClipDataRecursive(object target, Action<MotionClipData> onFound)
         {
-            if (target == null) return;
+            ScanMotionClipDataRecursive(target, onFound, new HashSet<int>());
+        }
+
+        private void ScanMotionClipDataRecursive(object target, Action<MotionClipData> onFound, HashSet<int> visited)
+        {
+            if (!CanScanNestedObject(target, visited)) return;
             var type = target.GetType();
-            if (!typeof(UnityEngine.Object).IsAssignableFrom(type) && !type.IsClass) return;
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (var field in fields)
             {
                 var value = field.GetValue(target);
                 if (value == null) continue;
                 if (field.FieldType == typeof(MotionClipData) || value is MotionClipData mcd) onFound((MotionClipData)value);
-                else if (value is ScriptableObject so) ScanMotionClipDataRecursive(so, onFound);
+                else if (value is ScriptableObject so) ScanMotionClipDataRecursive(so, onFound, visited);
                 else if (value is System.Collections.IEnumerable enumerable && !(value is string))
                 {
                     foreach (var item in enumerable)
                     {
                         if (item is MotionClipData itemMcd) onFound(itemMcd);
-                        else if (item is ScriptableObject itemSo) ScanMotionClipDataRecursive(itemSo, onFound);
+                        else if (item is ScriptableObject itemSo) ScanMotionClipDataRecursive(itemSo, onFound, visited);
+                        else if (ShouldScanPlainObject(item)) ScanMotionClipDataRecursive(item, onFound, visited);
                     }
                 }
+                else if (ShouldScanPlainObject(value)) ScanMotionClipDataRecursive(value, onFound, visited);
             }
+        }
+
+        private static bool CanScanNestedObject(object target, HashSet<int> visited)
+        {
+            if (target == null) return false;
+            var type = target.GetType();
+            if (!typeof(UnityEngine.Object).IsAssignableFrom(type) && !type.IsClass) return false;
+
+            var key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(target);
+            return visited == null || visited.Add(key);
+        }
+
+        private static bool ShouldScanPlainObject(object value)
+        {
+            if (value == null || value is string || value is UnityEngine.Object) return false;
+
+            var type = value.GetType();
+            if (!type.IsClass) return false;
+
+            var ns = type.Namespace ?? string.Empty;
+            return ns.StartsWith("NiumaTPC", StringComparison.Ordinal);
         }
 
         // 执行批量配置注入 同步所有数据实例的参数 

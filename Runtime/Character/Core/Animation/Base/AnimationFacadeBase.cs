@@ -85,7 +85,7 @@ namespace NiumaTPC.Character.Core.Animation.Base
         /// <summary>
         /// 强行播放全身动画
         /// </summary>
-        public abstract void PlayFullBodyAction(AnimationClip clip, float fadeDuration = 0.2f);
+        public abstract void PlayFullBodyAction(AnimationClip clip, float fadeDuration = 0.2f, bool applyRootMotion = true);
 
         /// <summary>
         /// 停止全身动画

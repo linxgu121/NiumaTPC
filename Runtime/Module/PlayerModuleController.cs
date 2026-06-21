@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using NiumaTPC.Character.Arbitration.ArbitrationRequest;
+using NiumaTPC.CombatReaction;
 using NiumaCore.Module;
 using NiumaCore.Player;
 using UnityEngine;
@@ -12,6 +14,11 @@ namespace NiumaTPC.Module
         /// </summary>
         [SerializeField] private NiumaTPC.Character.NiumaCharacterController character;
 
+        [Header("战斗表现")]
+        [InspectorName("战斗表现配置")]
+        [Tooltip("战斗表现配置。拖 TPCCombatReactionProfile；为空时 TryPlayCombatReaction 返回 false，不播放受击/死亡表现。")]
+        [SerializeField] private TPCCombatReactionProfile combatReactionProfile;
+
         /// <summary>
         /// 模块名称，需唯一且符合命名规范
         /// </summary>
@@ -23,11 +30,13 @@ namespace NiumaTPC.Module
         public bool IsControlEnabled { get; private set; } = true;
 
         private readonly HashSet<string> _disableReasons = new HashSet<string>();
+        private const string CombatReactionDisableReason = "CombatReaction";
 
         /// <summary>
         /// 玩家角色的Transform组件，供其他模块或系统访问角色位置和旋转信息
         /// </summary>
         public Transform PlayerTransform => character != null ? character.transform : transform;
+        public TPCCombatReactionProfile CombatReactionProfile => combatReactionProfile;
 
         public void Initialize(GameContext context)
         {
@@ -105,7 +114,61 @@ namespace NiumaTPC.Module
 
         public void Kill(string reason)
         {
-            // 后续接入死亡状态或派发 PlayerDiedEvent
+            var request = TPCCombatReactionRequest.ForType(TPCCombatReactionType.Death, reason);
+            request.OverrideBlockInput = true;
+            request.BlockInput = true;
+            TryPlayCombatReaction(request);
+        }
+
+        public void SetCombatReactionProfile(TPCCombatReactionProfile profile)
+        {
+            combatReactionProfile = profile;
+        }
+
+        public bool TryPlayCombatReaction(TPCCombatReactionRequest request)
+        {
+            if (request.ReactionType == TPCCombatReactionType.None)
+            {
+                return false;
+            }
+
+            if (character == null)
+            {
+                Debug.LogWarning($"[NiumaTPC] 无法播放战斗表现：PlayerModuleController 未绑定 NiumaCharacterController。RequestId={request.RequestId}", this);
+                return false;
+            }
+
+            if (combatReactionProfile == null)
+            {
+                Debug.LogWarning($"[NiumaTPC] 无法播放战斗表现：未配置 TPCCombatReactionProfile。RequestId={request.RequestId}, Reaction={request.ReactionType}", this);
+                return false;
+            }
+
+            if (!combatReactionProfile.TryGetAnimation(request.ReactionType, out var animation) || animation == null || !animation.IsUsable)
+            {
+                Debug.LogWarning($"[NiumaTPC] 无法播放战斗表现：Reaction={request.ReactionType} 没有可用 MotionClipData。RequestId={request.RequestId}", this);
+                return false;
+            }
+
+            var priority = request.PriorityOverride > 0 ? request.PriorityOverride : animation.Priority;
+            var fadeDuration = Mathf.Max(0f, animation.FadeDuration);
+            var applyGravity = request.OverrideApplyGravity ? request.ApplyGravity : animation.ApplyGravity;
+            var blockInput = request.OverrideBlockInput ? request.BlockInput : animation.BlockInput;
+            var flushImmediately = request.OverrideFlushImmediately ? request.FlushImmediately : animation.FlushImmediately;
+
+            if (blockInput)
+            {
+                DisableControl(CombatReactionDisableReason);
+            }
+
+            var action = new ActionRequest(animation.MotionData, priority, fadeDuration, applyGravity);
+            character.RequestOverride(in action, flushImmediately);
+            return true;
+        }
+
+        public void ReleaseCombatReactionControl()
+        {
+            EnableControl(CombatReactionDisableReason);
         }
 
         private void RefreshControlState()

@@ -53,7 +53,14 @@ namespace NiumaTPC.Character.State.Override
         {
             if (!data.Override.IsActive) return;
 
-            if (data.Override.Request.ApplyGravity)
+            var req = data.Override.Request;
+            if (req.MotionData != null)
+            {
+                player.MotionDriver.UpdateMotion(req.MotionData, AnimationFacade.CurrentTime, req.ApplyGravity);
+                return;
+            }
+
+            if (req.ApplyGravity)
                 player.MotionDriver.UpdateGravityOnly();
         }
 
@@ -72,7 +79,7 @@ namespace NiumaTPC.Character.State.Override
 
             var req = data.Override.Request;
 
-            AnimationFacade.PlayFullBodyAction(req.Clip, req.FadeDuration);
+            AnimationFacade.PlayFullBodyAction(req.Clip, req.FadeDuration, req.MotionData == null);
 
             // 关键：全身Override的结束回调注册到 -1 通道 避免与物品/其他系统抢占 layer0 的 OnEnd 槽位
             AnimationFacade.SetOverrideOnEndCallback(OnClipEnd);

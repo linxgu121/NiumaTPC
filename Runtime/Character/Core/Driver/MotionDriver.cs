@@ -161,7 +161,7 @@ namespace NiumaTPC.Character.Core.Driver
         /// <summary>
         /// 根据动画数据自动选择 曲线驱动/输入驱动
         /// </summary>
-        public void UpdateMotion(MotionClipData clipData, float stateTime)
+        public void UpdateMotion(MotionClipData clipData, float stateTime, bool applyGravity = true)
         {
             HandleAimModeTransitionIfNeeded();
             AutoHandleCurveDrivenEnter(clipData, stateTime);
@@ -170,7 +170,7 @@ namespace NiumaTPC.Character.Core.Driver
                 ? CalculateInputDrivenVelocity(1f)
                 : CalculateClipDrivenVelocity(clipData, stateTime);
 
-            ExecuteMovement(hv);
+            ExecuteMovement(hv, applyGravity);
         }
 
         /// <summary>
@@ -298,9 +298,9 @@ namespace NiumaTPC.Character.Core.Driver
         /// <summary>
         /// 执行最终移动（水平速度 + 重力）
         /// </summary>
-        private void ExecuteMovement(Vector3 horizontalVelocity)
+        private void ExecuteMovement(Vector3 horizontalVelocity, bool applyGravity = true)
         {
-            Vector3 vv = GetGravityThisFrame();
+            Vector3 vv = applyGravity ? GetGravityThisFrame() : Vector3.zero;
             _cc.Move((horizontalVelocity + vv) * Time.deltaTime);
             _data.CurrentSpeed = _cc.velocity.magnitude;
         }

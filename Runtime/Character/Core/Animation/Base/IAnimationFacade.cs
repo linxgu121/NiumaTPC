@@ -84,7 +84,7 @@ namespace NiumaTPC.Character.Core.Animation.Base
         /// </summary>
         /// <param name="clip">动画片段</param>
         /// <param name="fadeDuration">过度时间</param>
-        void PlayFullBodyAction(AnimationClip clip, float fadeDuration = 0.2f);
+        void PlayFullBodyAction(AnimationClip clip, float fadeDuration = 0.2f, bool applyRootMotion = true);
         /// <summary>
         /// 停止全身强制动作
         /// </summary>
