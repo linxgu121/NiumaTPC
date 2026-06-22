@@ -10,9 +10,11 @@ using NiumaTPC.Character.Core.IK.Source.Base;
 using NiumaTPC.Character.Core.States;
 using NiumaTPC.Character.Expression;
 using NiumaTPC.Character.Input.Base;
+using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.ProcessingPipeline;
 using NiumaTPC.Character.RuntimeData;
 using NiumaTPC.Character.State.Core;
+using NiumaTPC.Character.State.Core.Locomotion;
 using NiumaTPC.Character.State.Core.Interceptors;
 using NiumaTPC.Core.Combat;
 using NiumaTPC.Core.Object.Base;
@@ -407,6 +409,61 @@ namespace NiumaTPC.Character
             // 如果要求立即刷新 则直接跑一次仲裁(一般情况下不用 如果有严格同步需求才请求)
             if (flushImmediately)
                 ArbiterPipeline?.Action?.Arbitrate();
+        }
+
+        public bool TryCancelCurrentOverride(in ActionRequest request, string reason = null)
+        {
+            if (RuntimeData == null || !RuntimeData.Override.IsActive)
+            {
+                return false;
+            }
+
+            if (!IsSameOverrideRequest(in RuntimeData.Override.Request, in request))
+            {
+                return false;
+            }
+
+            // 取消动作必须走 TPC 自己的出口，否则 Action 逻辑结束了，角色动画还会继续播放。
+            AnimationFacade?.ClearOverrideOnEndCallback();
+            AnimationFacade?.StopFullBodyAction();
+
+            var returnState = RuntimeData.Override.ReturnState;
+            RuntimeData.Override.Clear();
+            RuntimeData.Arbitration.BlockInventory = false;
+
+            if (returnState != null)
+            {
+                StateMachine.ChangeState(returnState);
+                return true;
+            }
+
+            if (RuntimeData.CurrentLocomotionState != LocomotionState.Idle)
+            {
+                StateMachine.ChangeState(StateRegistry.GetState<PlayerMoveLoopState>());
+            }
+            else
+            {
+                StateMachine.ChangeState(StateRegistry.GetState<PlayerIdleState>());
+            }
+
+            return true;
+        }
+
+        public bool IsCurrentOverride(in ActionRequest request)
+        {
+            return RuntimeData != null &&
+                   RuntimeData.Override.IsActive &&
+                   IsSameOverrideRequest(in RuntimeData.Override.Request, in request);
+        }
+
+        private static bool IsSameOverrideRequest(in ActionRequest current, in ActionRequest request)
+        {
+            // ActionRequest 目前没有 RequestId，只能用播放字段组合做第一版匹配。
+            return current.Clip == request.Clip &&
+                   current.MotionData == request.MotionData &&
+                   current.Priority == request.Priority &&
+                   Mathf.Approximately(current.FadeDuration, request.FadeDuration) &&
+                   current.ApplyGravity == request.ApplyGravity;
         }
 
         private const string WeaponContainerName = "WeaponContainer";
