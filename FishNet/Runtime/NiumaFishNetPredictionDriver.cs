@@ -55,6 +55,13 @@ namespace NiumaTPC.FishNet
         private bool _networkSimulationActive;
 
         /// <summary>
+        /// 网络接管前，角色是否已经处于外部状态驱动模式。
+        /// 释放网络控制时需要恢复。
+        /// </summary>
+        private bool _externalStateDrivenBeforeNetwork;
+        private bool _networkAppliedExternalStateDrive;
+
+        /// <summary>
         /// 网络层是否已经为该角色应用本地输入所有权规则。
         /// </summary>
         private bool _inputOwnershipApplied;
@@ -134,6 +141,8 @@ namespace NiumaTPC.FishNet
 
         #region Input Ownership(输入所有权)
 
+
+
         /// <summary>
         /// 只有本地拥有者可以让 NiumaTPC 从设备采集输入。
         /// 服务器副本和观察者副本只消费 FishNet 提供的 Replicate 数据。
@@ -146,14 +155,23 @@ namespace NiumaTPC.FishNet
             }
 
             _inputWasBlockedBeforeNetwork = _player.IsInputBlocked;
+            _externalStateDrivenBeforeNetwork = _player.IsExternalSimulationStateDriven;
 
             bool hasLocalInputAuthority = Owner.IsLocalClient;
 
             _networkBlockedInput = !hasLocalInputAuthority;
 
+            _networkAppliedExternalStateDrive = !hasLocalInputAuthority;
+
             if (_networkBlockedInput)
             {
                 _player.SetInputBlocked(true, clearBufferedInput: true);
+
+                /*
+                 * 远端副本不运行本地输入翻译器，
+                 * 其移动黑板由 FishNet 模拟结果写入。
+                 */
+                _player.SetExternalSimulationStateDriven(true,clearLocalIntent: false);
             }
 
             _inputOwnershipApplied = true;
@@ -162,7 +180,9 @@ namespace NiumaTPC.FishNet
                 $"[NiumaFishNet] 输入所有权：" +
                 $"ObjectId={ObjectId}, " +
                 $"LocalOwner={hasLocalInputAuthority}, " +
-                $"InputBlocked={_player.IsInputBlocked}",
+                $"InputBlocked={_player.IsInputBlocked},"+
+                $"ExternalStateDriven=" +
+                $"{_player.IsExternalSimulationStateDriven}",
                 this);
         }
 
@@ -175,6 +195,12 @@ namespace NiumaTPC.FishNet
 
             if (_player != null && _networkBlockedInput)
             {
+                if (_player != null && _networkAppliedExternalStateDrive)
+                {
+                    _player.SetExternalSimulationStateDriven(
+                        _externalStateDrivenBeforeNetwork,
+                        clearLocalIntent: false);
+                }
                 // 仅撤销网络层施加的状态，保留进入网络前已有的阻断。
                 _player.SetInputBlocked(
                     _inputWasBlockedBeforeNetwork,
@@ -184,6 +210,8 @@ namespace NiumaTPC.FishNet
             _inputOwnershipApplied = false;
             _inputWasBlockedBeforeNetwork = false;
             _networkBlockedInput = false;
+            _externalStateDrivenBeforeNetwork = false;
+            _networkAppliedExternalStateDrive = false;
         }
 
         #endregion
@@ -474,8 +502,7 @@ namespace NiumaTPC.FishNet
             data.SimulationMotionPhase = state.MotionPhase;
             data.SimulationMotionPhaseTick = state.MotionPhaseTick;
             data.SimulationStartDirection = state.StartDirection;
-            data.SimulationStartLocomotionState =
-                state.StartLocomotionState;
+            data.SimulationStartLocomotionState = state.StartLocomotionState;
         }
 
         #endregion

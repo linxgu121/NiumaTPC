@@ -25,7 +25,7 @@ using NiumaTPC.Character.Core.Animation;
 namespace NiumaTPC.Character
 {
     /// <summary>
-    /// 整个BBBNexus系统的 Root 节点唯一的 Monobehaviour 驱动源 
+    /// 整个第三人称系统的 Root 节点唯一的 Monobehaviour 驱动源 
     /// 不包含任何具体游戏逻辑 仅负责组件整合、内存分配与严格的时序指令分发 
     /// 
     /// - Awake: 只做一次性分配/依赖注入（对象池复用时不会重复调用）
@@ -117,7 +117,15 @@ namespace NiumaTPC.Character
 
         private bool _booted;
 
-         // Awake 负责内存分配、找组件、依赖注入 
+        //网络同步
+
+        /// <summary>
+        /// 为 true 时，移动状态由固定 Tick 模拟器或网络层写入。
+        /// 本地帧输入处理器不得再覆盖这些状态。
+        /// </summary>
+        private bool _externalSimulationStateDriven;
+
+        // Awake 负责内存分配、找组件、依赖注入 
         private void Awake()
         {
             Animator = GetComponent<Animator>();
@@ -303,13 +311,28 @@ namespace NiumaTPC.Character
 
             ArbiterPipeline.ProcessUpdateArbiters();
 
-            InputPipeline.Update();
+            /*
+             * 本地拥有者：
+             * 读取设备输入，并将输入翻译成角色意图。
+             *
+             * 远端网络副本：
+             * 直接消费 FishNet 固定 Tick 写入的状态，
+             * 禁止本地空输入覆盖网络状态。
+             */
 
-            MainProcessorPipeline.UpdateIntentProcessors();
+            if (!_externalSimulationStateDriven)
+            {
+                InputPipeline.Update();
+
+                MainProcessorPipeline.UpdateIntentProcessors();
+            }
 
             InventoryController.Update();
 
-            MainProcessorPipeline.UpdateParameterProcessors();
+            if (!_externalSimulationStateDriven)
+            {
+                MainProcessorPipeline.UpdateParameterProcessors();
+            }
 
             StateMachine.CurrentState.LogicUpdate();
 
@@ -360,6 +383,33 @@ namespace NiumaTPC.Character
             OnEquipmentChanged?.Invoke();
         }
 
+        #region External Simulation State(外部模拟状态)
+        /// <summary>
+        /// 当前角色的表现数据是否由外部固定 Tick 模拟器驱动。
+        /// </summary>
+        public bool IsExternalSimulationStateDriven => _externalSimulationStateDriven;
+
+        /// <summary>
+        /// 切换外部模拟状态驱动模式。
+        /// 远端网络副本启用，本地拥有者保持关闭。
+        /// </summary>
+        public void SetExternalSimulationStateDriven(bool enabled,bool clearLocalIntent = true)
+        {
+            if (_externalSimulationStateDriven == enabled)
+            {
+                return;
+            }
+
+            _externalSimulationStateDriven = enabled;
+
+            if (enabled && clearLocalIntent)
+            {
+                InputPipeline?.ClearBufferedInput();
+                RuntimeData?.ResetIntent();
+            }
+        }
+        #endregion
+        
         public bool IsInputBlocked => InputPipeline != null && InputPipeline.IsBlocked;
 
         public void SetInputBlocked(bool blocked, bool clearBufferedInput = true)
