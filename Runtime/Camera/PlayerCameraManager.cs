@@ -56,6 +56,9 @@ namespace NiumaTPC.Cameras
         [Tooltip("准星在屏幕上的像素大小（正方形）")]
         public float CrosshairSize = 32f;
 
+        [Header("运行时")]
+        public NiumaCharacterController BoundPlayer => _player;
+
         // 缓存目标 FOV 与速度 以实现平滑过渡
         private float _targetFov;
         private float _fovVelocity;
@@ -142,6 +145,45 @@ namespace NiumaTPC.Cameras
             }
         }
 
+        #region Player Binding(玩家绑定)
+        /// <summary>
+        /// 将本客户端唯一的摄像机系统绑定到本地拥有者
+        /// </summary>
+        public void BindPlayer(NiumaCharacterController player)
+        {
+            if(player == null)
+            {
+                return;
+            }
+
+            _player = player;
+            
+            //重新绑定时重置 FOV 平滑，避免继承上一个观察目标的速度
+            if(_freeLookCam != null)
+            {
+                _targetFov = _freeLookCam.m_Lens.FieldOfView;
+                _fovVelocity = 0f;
+            }
+
+            _wasAiming = _player.RuntimeData != null && _player.RuntimeData.IsAiming;
+        }
+
+        /// <summary>
+        /// 仅允许当前绑定角色解除自己，防止远端角色误清空本地摄像机
+        /// </summary>
+        public void UnbindPlayer(NiumaCharacterController player)
+        {
+            if(_player != player)
+            {
+                return;
+            }
+
+            _player = null;
+            _wasAiming = false;
+        }
+
+        #endregion
+
         #region Cursor Control
 
         /// <summary>
@@ -187,6 +229,8 @@ namespace NiumaTPC.Cameras
         // 在 Game 窗口绘制简单的准星 HUD（仅运行时）
         private void OnGUI()
         {
+            if (_player == null) return;
+
             if (!ShowCrosshair) return;
             if (CrosshairTexture == null) return;
             if (!Application.isPlaying) return; // 仅在运行时绘制（编辑器场景视图也会触发 OnGUI）

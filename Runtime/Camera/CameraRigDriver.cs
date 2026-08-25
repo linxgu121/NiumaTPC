@@ -41,6 +41,9 @@ namespace NiumaTPC.Cameras
 
         private Camera _mainCamera;
 
+        [Header("网络同步")]
+        public NiumaCharacterController BoundPlayer => _player;
+
 
         private readonly RaycastHit[] _raycastHits = new RaycastHit[1];
 
@@ -53,6 +56,27 @@ namespace NiumaTPC.Cameras
                 Debug.LogWarning("[BBBNexus] CameraRigDriver场景中未找到 MainCamera！瞄准点计算将失效。");
             }
         }
+
+        #region Player Binding(玩家绑定)
+        /// <summary>
+        /// 让 CameraRig 跟随并读取指定本地玩家的黑板
+        /// </summary>
+        public void BindPlayer(NiumaCharacterController player)
+        {
+            _player = player;
+        }
+
+        public void UnbindPlayer(NiumaCharacterController player)
+        {
+            if(_player != player)
+            {
+                return;
+            }
+
+            _player = null;
+        }
+
+        #endregion
 
         private void LateUpdate()
         {
