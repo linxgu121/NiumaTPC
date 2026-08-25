@@ -28,7 +28,7 @@ namespace NiumaTPC.Character.Core.Driver
     └── 混合段阶段（Mixed） → 切回 CalculateInputDrivenVelocity()
         ├── 1. 对齐速度/旋转状态
         └── 2. 恢复输入驱动*/
-    
+
     /// <summary>
     /// 角色运动的核心驱动器 负责将输入、动画曲线、物理参数
     /// 转换为实际的 CharacterController.Move()调用 驱动角色在场景中的实际位移
@@ -41,6 +41,14 @@ namespace NiumaTPC.Character.Core.Driver
         private readonly PlayerRuntimeData _data;
         private readonly PlayerSO _config;
         private readonly Transform _transform;
+        #endregion
+
+        #region 运行时
+        /// <summary>
+        /// 是否由新的固定 Tick 模拟系统负责角色位移。
+        /// 启用后，旧 MotionDriver 不再调用 CharacterController.Move。
+        /// </summary>
+        public bool IsExternalSimulationActive {get; private set;}
         #endregion
 
         #region 上下文缓存
@@ -147,12 +155,44 @@ namespace NiumaTPC.Character.Core.Driver
         }
 
         #region 外部调用接口API
-        
+
+        /// <summary>
+        /// 切换角色位移的唯一执行者。
+        /// false：旧 MotionDriver 驱动。
+        /// true：CharacterSimulationRunner 驱动。
+        /// </summary>
+        public void SetExternalSimulationActive(bool active)
+        {
+            if(IsExternalSimulationActive == active)
+            {
+                return;
+            }
+
+            IsExternalSimulationActive = active;
+
+            if (!active)
+            {
+                return;
+            }
+
+            _loco.ResetSpeed();
+
+            _gravityFrame = -1;
+            _cachedGravity = Vector3.zero;
+
+            InterruptClipDrivenMotion();
+            ClearWarpData();
+        }
+
         /// <summary>
         /// 仅更新重力
         /// </summary>
         public void UpdateGravityOnly()
         {
+            if (IsExternalSimulationActive)
+            {
+                return;
+            }
             Vector3 vv = GetGravityThisFrame();
             _cc.Move(vv * Time.deltaTime);
             _data.CurrentSpeed = _cc.velocity.magnitude;
@@ -163,6 +203,10 @@ namespace NiumaTPC.Character.Core.Driver
         /// </summary>
         public void UpdateMotion(MotionClipData clipData, float stateTime)
         {
+            if (IsExternalSimulationActive)
+            {
+                return;
+            }
             HandleAimModeTransitionIfNeeded();
             AutoHandleCurveDrivenEnter(clipData, stateTime);
 
@@ -178,6 +222,10 @@ namespace NiumaTPC.Character.Core.Driver
         /// </summary>
         public void UpdateLocomotionFromInput(float speedMult = 1f)
         {
+            if (IsExternalSimulationActive)
+            {
+                return;
+            }
             HandleAimModeTransitionIfNeeded();
             ExecuteMovement(CalculateInputDrivenVelocity(speedMult));
         }
@@ -185,7 +233,15 @@ namespace NiumaTPC.Character.Core.Driver
         /// <summary>
         /// 无输入原地不动
         /// </summary>
-        public void UpdateMotion() => ExecuteMovement(Vector3.zero);
+        public void UpdateMotion()
+        {
+            if (IsExternalSimulationActive)
+            {
+                return;
+            }
+
+            ExecuteMovement(Vector3.zero);
+        }
 
         /// <summary>
         /// 中断动画曲线驱动的运动（技能/闪避强制停止）
@@ -198,7 +254,7 @@ namespace NiumaTPC.Character.Core.Driver
         }
 
         #endregion
-        
+
         #region 位移扭曲API(技能冲刺/强制位移)
 
         /// <summary>
@@ -244,12 +300,16 @@ namespace NiumaTPC.Character.Core.Driver
 
             InitializeWarpData(data, targets);
         }
-        
+
         /// <summary>
         /// 更新扭曲运动（按动画进度执行位移）
         /// </summary>
          public void UpdateWarpMotion(float normalizedTime)
         {
+            if (IsExternalSimulationActive)
+            {
+                return;
+            }
             if (!_warp.IsActive) return;
 
             // warp 期间不使用普通平滑(直接读当前水平速度只是为了保持数据一致)
@@ -292,7 +352,7 @@ namespace NiumaTPC.Character.Core.Driver
         public void ClearWarpData() => _warp.Clear();
 
         #endregion
-        
+
         #region 核心移动逻辑
 
         /// <summary>
@@ -300,6 +360,11 @@ namespace NiumaTPC.Character.Core.Driver
         /// </summary>
         private void ExecuteMovement(Vector3 horizontalVelocity)
         {
+            if (IsExternalSimulationActive)
+            {
+                return;
+            }
+
             Vector3 vv = GetGravityThisFrame();
             _cc.Move((horizontalVelocity + vv) * Time.deltaTime);
             _data.CurrentSpeed = _cc.velocity.magnitude;
@@ -361,7 +426,7 @@ namespace NiumaTPC.Character.Core.Driver
 
             return CalculateSmoothedVelocity(moveDir, isAiming: false, speedMult);
         }
-        
+
         /// <summary>
         /// 瞄准模式移动
         /// </summary>
@@ -605,7 +670,7 @@ namespace NiumaTPC.Character.Core.Driver
         #endregion
     }
 
-    
+
 
     /// <summary>
     /// 扩展方法：快速设置 Vector3.y
@@ -615,7 +680,7 @@ namespace NiumaTPC.Character.Core.Driver
             public static Vector3 SetY(this Vector3 vector, float y)
             {
                vector.y = y;
-               return vector; 
+               return vector;
             }
         }
 }

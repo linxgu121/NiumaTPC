@@ -1,6 +1,7 @@
 using Animancer;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.Simulation;
 using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Locomotion
@@ -35,6 +36,29 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 // 翻越意图优先于急停，避免玩家松开移动键同帧按跳跃时被 Stop 状态抢走。
                 data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
+                return;
+            }
+
+            if (player.MotionDriver.IsExternalSimulationActive &&
+                data.SimulationMotionPhase == CharacterMotionPhase.Starting &&
+                data.SimulationMotionPhaseTick <= 1u)
+            {
+                // 移动中突然反向时，固定 Tick 模拟会开启新一轮起步。
+                // 循环动画必须跟随这个权威阶段重新进入 MoveStart。
+                data.NextStatePlayOptions =
+                    data.SimulationStartLocomotionState switch
+                    {
+                        LocomotionState.Walk =>
+                            config.LocomotionAnims.FadeInWalkStartOptions,
+                        LocomotionState.Jog =>
+                            config.LocomotionAnims.FadeInRunStartOptions,
+                        LocomotionState.Sprint =>
+                            config.LocomotionAnims.FadeInSprintStartOptions,
+                        _ => AnimPlayOptions.Default
+                    };
+
+                player.StateMachine.ChangeState(
+                    player.StateRegistry.GetState<PlayerMoveStartState>());
                 return;
             }
 

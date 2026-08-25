@@ -1,6 +1,7 @@
 using NiumaTPC.Character;
 using UnityEngine;
 using Cinemachine;
+using UnityEngine.InputSystem;
 
 
 namespace NiumaTPC.Cameras
@@ -19,7 +20,16 @@ namespace NiumaTPC.Cameras
 
 
         [Header("探索模式缩放 (鼠标滚轮)")]
-        [Tooltip("是否允许探索模式使用鼠标滚轮拉近拉远")] 
+        [Tooltip("新输入系统中的滚轮缩放动作，应绑定对应按键")]
+        public InputActionReference ZoomAction;
+        [Tooltip("鼠标捕获切换动作，推荐绑定 Player/ToggleCursor")]
+        public InputActionReference CursorToggleAction;
+        [Tooltip("鼠标滚轮一次标准刻度产生的输入值，用于将新输入系统的原始滚轮值换算成缩放步数")]
+        [Min(1f)]
+        public float _scrollUnitsPerStep = 120f;
+        [Tooltip("是否允许使用快捷键释放或重新捕获鼠标")]
+        public bool AllowCursorToggle = true;
+        [Tooltip("是否允许探索模式使用鼠标滚轮拉近拉远")]
         public bool EnableFreeLookZoom = true;
         [Tooltip("滚轮缩放速度（每次滚轮增量影响的 FOV 值）")]
         public float FreeLookZoomSpeed = 8f;
@@ -33,8 +43,10 @@ namespace NiumaTPC.Cameras
         [Header("鼠标控制 (运行时)")]
         [Tooltip("进入运行模式时是否隐藏并锁定鼠标 退出时会自动恢复")]
         public bool HideCursorOnPlay = true;
-        [Tooltip("锁定模式:Locked 会锁在窗口中心 Confined 限制在窗口内 None 不锁定")] 
+        [Tooltip("锁定模式:Locked 会锁在窗口中心 Confined 限制在窗口内 None 不锁定")]
         public CursorLockMode CursorLock = CursorLockMode.Locked;
+        [Tooltip("鼠标是否被捕获")]
+        public bool _isCursorCaptured;
 
         [Header("准星 (Screen HUD)")]
         [Tooltip("在屏幕中央显示的准星贴图 仅在运行时绘制 可为空以隐藏")]
@@ -49,14 +61,24 @@ namespace NiumaTPC.Cameras
         private float _fovVelocity;
         private bool _wasAiming = false;
 
+        private void OnEnable()
+        {
+            if(ZoomAction != null)
+            {
+                ZoomAction.action.Enable();
+            }
+
+            if(CursorToggleAction != null)
+            {
+                CursorToggleAction.action.Enable();
+            }
+        }
+
         private void Start()
         {
-            // 进入运行时根据配置隐藏并锁定鼠标
-            if (HideCursorOnPlay)
-            {
-                Cursor.visible = false;
-                Cursor.lockState = CursorLock;
-            }
+
+            // 进入运行时根据配置隐鼠标
+            SetCursorCaptured(HideCursorOnPlay);
 
 
             // 初始化平滑缩放的目标值为当前相机 FOV
@@ -72,6 +94,8 @@ namespace NiumaTPC.Cameras
 
         private void Update()
         {
+            HandleCursorToggle();
+
             if (_player == null) return;
 
             // 检测瞄准状态切换：进入/退出瞄准时重置目标 FOV 避免瞬移
@@ -89,7 +113,9 @@ namespace NiumaTPC.Cameras
             // 仅在非瞄准状态启用 避免与瞄准镜/开火视角冲突
             if (EnableFreeLookZoom && !isAiming && _freeLookCam != null)
             {
-                float scroll = Input.GetAxis("Mouse ScrollWheel");
+                Vector2 rawScroll = ZoomAction != null ? ZoomAction.action.ReadValue<Vector2>() : Vector2.zero;
+                float scroll = rawScroll.y / Mathf.Max(1f,_scrollUnitsPerStep);
+
                 if (Mathf.Abs(scroll) > 0.0001f)
                 {
                     _targetFov -= scroll * FreeLookZoomSpeed;
@@ -116,6 +142,48 @@ namespace NiumaTPC.Cameras
             }
         }
 
+        #region Cursor Control
+
+        /// <summary>
+        /// 检查本帧是否按下鼠标捕获切换键
+        /// </summary>
+        private void HandleCursorToggle()
+        {
+            if(!AllowCursorToggle || CursorToggleAction == null)
+            {
+                return;
+            }
+
+            if (CursorToggleAction.action.WasPressedThisFrame())
+            {
+                SetCursorCaptured(!_isCursorCaptured);
+            }
+        }
+
+        /// <summary>
+        ///  统一设置鼠标的显示与锁定状态
+        /// </summary>
+        /// <param name="captured"></param>
+        private void SetCursorCaptured(bool captured)
+        {
+            _isCursorCaptured = captured;
+
+            if (captured)
+            {
+                // 返回游戏控制状态。
+                Cursor.lockState = CursorLock;
+                Cursor.visible = false;
+            }
+            else
+            {
+                // 释放鼠标，允许操作菜单和编辑器窗口。
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+        }
+
+        #endregion
+
         // 在 Game 窗口绘制简单的准星 HUD（仅运行时）
         private void OnGUI()
         {
@@ -135,6 +203,16 @@ namespace NiumaTPC.Cameras
         // 确保在脚本停用或应用退出时恢复鼠标状态 避免编辑器或系统丢失光标
         private void OnDisable()
         {
+            if(ZoomAction != null)
+            {
+                ZoomAction.action.Disable();
+            }
+
+            if(CursorToggleAction != null)
+            {
+                CursorToggleAction.action.Disable();
+            }
+
             if (HideCursorOnPlay)
             {
                 Cursor.visible = true;
@@ -146,8 +224,7 @@ namespace NiumaTPC.Cameras
         {
             if (HideCursorOnPlay)
             {
-                Cursor.visible = true;
-                Cursor.lockState = CursorLockMode.None;
+                SetCursorCaptured(false);
             }
         }
     }

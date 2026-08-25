@@ -6,6 +6,7 @@ using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character;
 using NiumaTPC.Character.Core;
+using NiumaTPC.Character.Simulation;
 using UnityEngine;
 
 namespace NiumaTPC.Character.RuntimeData
@@ -82,6 +83,24 @@ namespace NiumaTPC.Character.RuntimeData
         public float DesiredLocalMoveAngle;
         /// <summary>当前水平速度(m/s)</summary>
         public float CurrentSpeed;
+
+        /// <summary>
+        /// 固定 Tick 模拟当前所处的移动阶段。
+        /// 动画表现层只读取该值，不参与权威位移计算。
+        /// </summary>
+        public CharacterMotionPhase SimulationMotionPhase =
+            CharacterMotionPhase.Idle;
+
+        /// <summary>当前移动阶段已经执行的 Tick 数。</summary>
+        public uint SimulationMotionPhaseTick;
+
+        /// <summary>本轮起步锁定的八方向。</summary>
+        public CharacterStartDirection SimulationStartDirection =
+            CharacterStartDirection.Forward;
+
+        /// <summary>本轮起步锁定的 Walk/Jog/Sprint 档位。</summary>
+        public LocomotionState SimulationStartLocomotionState =
+            LocomotionState.Idle;
 
         #endregion
 

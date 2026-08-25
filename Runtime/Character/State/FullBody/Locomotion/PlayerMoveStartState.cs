@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.Simulation;
 using NiumaTPC.Character.State.Core.Aiming;
 using UnityEngine;
 
@@ -17,24 +18,27 @@ namespace NiumaTPC.Character.State.Core.Locomotion
     {
         public MotionClipData _currentClipData;
         public LocomotionState _startLocomotionState;
-
-        private const float SectorAngle = 45f;
-        private const float HalfSectorAngle = SectorAngle / 2f;
+        private CharacterStartDirection _startDirection;
 
         public PlayerMoveStartState(NiumaCharacterController player) : base(player) { }
 
         // 进入状态 选择对应方向的起步动画并注册结束回调
         public override void Enter()
         {
-            _startLocomotionState = data.CurrentLocomotionState;
+            bool usesFixedTickSimulation =
+                player.MotionDriver.IsExternalSimulationActive;
 
-            // 根据当前运动状态和移动方向选择起步动画
-            _currentClipData = SelectClipForLocomotionState(data.DesiredLocalMoveAngle, data.CurrentLocomotionState);
+            _startLocomotionState = usesFixedTickSimulation
+                ? data.SimulationStartLocomotionState
+                : data.CurrentLocomotionState;
 
-            ChooseOptionsAndPlay(_currentClipData.Clip);
+            _startDirection = usesFixedTickSimulation
+                ? data.SimulationStartDirection
+                : CharacterStartDirectionResolver.ResolveLocalAngle(
+                    data.DesiredLocalMoveAngle);
 
-            // 末相位用于 Loop Stop 的左右脚选择
-            data.ExpectedFootPhase = _currentClipData.EndPhase;
+            // 固定 Tick 模式下，动画和位移曲线必须使用同一方向、同一速度档位。
+            PlayStartAnimation(_startDirection, _startLocomotionState);
 
             // End 回调 切换到 MoveLoop
             AnimationFacade.SetOnEndCallback(() =>
@@ -72,6 +76,21 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             else if (data.CurrentLocomotionState == LocomotionState.Idle)
             {
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerIdleState>());
+            }
+            else if (player.MotionDriver.IsExternalSimulationActive &&
+                     data.SimulationMotionPhase == CharacterMotionPhase.Starting &&
+                     (data.SimulationStartDirection != _startDirection ||
+                      data.SimulationStartLocomotionState != _startLocomotionState))
+            {
+                // 起步过程中突然反向时，模拟器会开启新一轮 Starting。
+                // 表现层立即改播新的锁定方向，不能继续播放旧起步动画。
+                _startDirection = data.SimulationStartDirection;
+                _startLocomotionState =
+                    data.SimulationStartLocomotionState;
+
+                PlayStartAnimation(
+                    _startDirection,
+                    _startLocomotionState);
             }
             // 如果运动状态在起步中途改变 切到循环状态让其处理状态转换
             else if (data.CurrentLocomotionState != _startLocomotionState)
@@ -111,13 +130,37 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             data.CurrentAnimBlendY = targetY;
         }
 
-         // 根据运动状态和本地移动角度 选择对应的起步动画
-        private MotionClipData SelectClipForLocomotionState(float angle, LocomotionState locomotionState)
+        private void PlayStartAnimation(
+            CharacterStartDirection direction,
+            LocomotionState locomotionState)
+        {
+            _currentClipData =
+                SelectClipForLocomotionState(direction, locomotionState);
+
+            if (_currentClipData == null || _currentClipData.Clip == null)
+            {
+                Debug.LogError(
+                    $"[PlayerMoveStartState] 起步动画未配置：" +
+                    $"Locomotion={locomotionState}, Direction={direction}。",
+                    player);
+                return;
+            }
+
+            ChooseOptionsAndPlay(_currentClipData.Clip);
+
+            // 末相位用于后续循环与停止动画的左右脚选择。
+            data.ExpectedFootPhase = _currentClipData.EndPhase;
+        }
+
+        // 根据固定 Tick 锁定的速度档位和八方向选择起步动画。
+        private MotionClipData SelectClipForLocomotionState(
+            CharacterStartDirection direction,
+            LocomotionState locomotionState)
         {
             // 首先根据方向选择基础方向的动画
-            MotionClipData walkClip = SelectDirectionClip(angle, isWalk: true);
-            MotionClipData jogClip = SelectDirectionClip(angle, isWalk: false);
-            MotionClipData sprintClip = SelectDirectionClip(angle, isSprint: true);
+            MotionClipData walkClip = SelectDirectionClip(direction, isWalk: true);
+            MotionClipData jogClip = SelectDirectionClip(direction, isWalk: false);
+            MotionClipData sprintClip = SelectDirectionClip(direction, isSprint: true);
 
             // 然后根据运动状态返回对应的动画
             return locomotionState switch
@@ -129,71 +172,56 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             };
         }
 
-        // 根据输入角度选择8个方向中的一个动画
-        private MotionClipData SelectDirectionClip(float angle, bool isWalk = false, bool isSprint = false)
+        // 根据已经量化的八方向选择动画，不再重复计算角度边界。
+        private MotionClipData SelectDirectionClip(
+            CharacterStartDirection direction,
+            bool isWalk = false,
+            bool isSprint = false)
         {
-            // 8方向量化选择 根据角度落在哪个45度扇区来决定方向
-            if (angle > -HalfSectorAngle && angle <= HalfSectorAngle)
+            return direction switch
             {
-                if (isWalk) return config.LocomotionAnims.WalkStartFwd;
-                if (isSprint) return config.LocomotionAnims.SprintStartFwd;
-                return config.LocomotionAnims.RunStartFwd;
-            }
+                CharacterStartDirection.Forward =>
+                    isWalk ? config.LocomotionAnims.WalkStartFwd :
+                    isSprint ? config.LocomotionAnims.SprintStartFwd :
+                    config.LocomotionAnims.RunStartFwd,
 
-            if (angle > HalfSectorAngle && angle <= HalfSectorAngle + SectorAngle)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartFwdRight;
-                if (isSprint) return config.LocomotionAnims.SprintStartFwdRight;
-                return config.LocomotionAnims.RunStartFwdRight;
-            }
+                CharacterStartDirection.ForwardRight =>
+                    isWalk ? config.LocomotionAnims.WalkStartFwdRight :
+                    isSprint ? config.LocomotionAnims.SprintStartFwdRight :
+                    config.LocomotionAnims.RunStartFwdRight,
 
-            if (angle > HalfSectorAngle + SectorAngle && angle <= HalfSectorAngle + SectorAngle * 2)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartRight;
-                if (isSprint) return config.LocomotionAnims.SprintStartRight;
-                return config.LocomotionAnims.RunStartRight;
-            }
+                CharacterStartDirection.Right =>
+                    isWalk ? config.LocomotionAnims.WalkStartRight :
+                    isSprint ? config.LocomotionAnims.SprintStartRight :
+                    config.LocomotionAnims.RunStartRight,
 
-            if (angle > HalfSectorAngle + SectorAngle * 2 && angle <= 180f - HalfSectorAngle)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartBackRight;
-                if (isSprint) return config.LocomotionAnims.SprintStartBackRight;
-                return config.LocomotionAnims.RunStartBackRight;
-            }
+                CharacterStartDirection.BackRight =>
+                    isWalk ? config.LocomotionAnims.WalkStartBackRight :
+                    isSprint ? config.LocomotionAnims.SprintStartBackRight :
+                    config.LocomotionAnims.RunStartBackRight,
 
-            // Back 覆盖 157.5 到 180 和 -180 到 -157.5
-            if (angle > 180f - HalfSectorAngle || angle <= -180f + HalfSectorAngle)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartBack;
-                if (isSprint) return config.LocomotionAnims.SprintStartBack;
-                return config.LocomotionAnims.RunStartBack;
-            }
+                CharacterStartDirection.Back =>
+                    isWalk ? config.LocomotionAnims.WalkStartBack :
+                    isSprint ? config.LocomotionAnims.SprintStartBack :
+                    config.LocomotionAnims.RunStartBack,
 
-            if (angle > -180f + HalfSectorAngle && angle <= -HalfSectorAngle - SectorAngle * 2)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartBackLeft;
-                if (isSprint) return config.LocomotionAnims.SprintStartBackLeft;
-                return config.LocomotionAnims.RunStartBackLeft;
-            }
+                CharacterStartDirection.BackLeft =>
+                    isWalk ? config.LocomotionAnims.WalkStartBackLeft :
+                    isSprint ? config.LocomotionAnims.SprintStartBackLeft :
+                    config.LocomotionAnims.RunStartBackLeft,
 
-            if (angle > -HalfSectorAngle - SectorAngle * 2 && angle <= -HalfSectorAngle - SectorAngle)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartLeft;
-                if (isSprint) return config.LocomotionAnims.SprintStartLeft;
-                return config.LocomotionAnims.RunStartLeft;
-            }
+                CharacterStartDirection.Left =>
+                    isWalk ? config.LocomotionAnims.WalkStartLeft :
+                    isSprint ? config.LocomotionAnims.SprintStartLeft :
+                    config.LocomotionAnims.RunStartLeft,
 
-            if (angle > -HalfSectorAngle - SectorAngle && angle <= -HalfSectorAngle)
-            {
-                if (isWalk) return config.LocomotionAnims.WalkStartFwdLeft;
-                if (isSprint) return config.LocomotionAnims.SprintStartFwdLeft;
-                return config.LocomotionAnims.RunStartFwdLeft;
-            }
+                CharacterStartDirection.ForwardLeft =>
+                    isWalk ? config.LocomotionAnims.WalkStartFwdLeft :
+                    isSprint ? config.LocomotionAnims.SprintStartFwdLeft :
+                    config.LocomotionAnims.RunStartFwdLeft,
 
-            // 兜底 默认向前起步
-            if (isWalk) return config.LocomotionAnims.WalkStartFwd;
-            if (isSprint) return config.LocomotionAnims.SprintStartFwd;
-            return config.LocomotionAnims.RunStartFwd;
+                _ => config.LocomotionAnims.RunStartFwd
+            };
         }
     }
 
