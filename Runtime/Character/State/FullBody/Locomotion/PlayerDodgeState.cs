@@ -28,7 +28,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 进入状态 选择对应方向的闪避动画 初始化运动变形
         public override void Enter()
         {
-            data.IsDodgeing = true;
+            data.IsDodging = true;
             data.WantsToDodge = false;
 
             // 写入音频意图（由 AudioController 统一消费）
@@ -90,7 +90,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 退出状态 清理Warp数据和回调
         public override void Exit()
         {
-            data.IsDodgeing = false;
+            data.IsDodging = false;
             data.WantsToDodge = false;
 
             player.MotionDriver.ClearWarpData();

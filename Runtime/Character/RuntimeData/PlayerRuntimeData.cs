@@ -58,7 +58,7 @@ namespace NiumaTPC.Character.RuntimeData
         /// <summary>是否接地</summary>
         public bool IsGrounded;
         /// <summary>是否处于闪避中</summary>
-        public bool IsDodgeing;
+        public bool IsDodging;
         /// <summary>竖直速度(m/s)</summary>
         public float VerticalVelocity;
         /// <summary>刚着陆的瞬间(仅一帧)</summary>
@@ -253,7 +253,7 @@ namespace NiumaTPC.Character.RuntimeData
         }
 
         /// <summary>
-        /// 构造函数——将初始状态设置为Idea
+        /// 构造函数——将初始状态设置为Idle
         /// </summary>
         public PlayerRuntimeData()
         {
@@ -263,7 +263,7 @@ namespace NiumaTPC.Character.RuntimeData
         /// <summary>
         /// 清除所有帧级意图标志
         /// </summary>
-        public void ResetIntetnt()
+        public void ResetIntent()
         {
             WantsToVault = false;
             WantToRun = false;
@@ -288,7 +288,7 @@ namespace NiumaTPC.Character.RuntimeData
             ActionArbitration.Clear();
 
             // 注意 音频事件不在这里清理
-            // AudioController 在 Update 消费（而 ResetIntetnt 在 LateUpdate）
+            // AudioController 在 Update 消费（而 ResetIntent 在 LateUpdate）
             // 若在此清理，会导致本帧刚写入的音频事件在消费前丢失
         }
     }

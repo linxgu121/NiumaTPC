@@ -237,7 +237,7 @@ namespace NiumaTPC.Character
             BootIfNeeded();
 
             // 复位帧级意图，防止复用时继承上一轮输入/仲裁结果。
-            RuntimeData.ResetIntetnt();
+            RuntimeData.ResetIntent();
 
             // 恢复 root motion 受控状态（某些 full-body override 可能改过它）
             if (Animancer != null && Animancer.Animator != null)
@@ -281,7 +281,7 @@ namespace NiumaTPC.Character
                 RuntimeData.CurrentAimReference = null;
                 RuntimeData.WantsLookAtIK = false;
                 RuntimeData.WantsToFire = false;
-                RuntimeData.ResetIntetnt();
+                RuntimeData.ResetIntent();
             }
         }
 
@@ -349,7 +349,7 @@ namespace NiumaTPC.Character
 
             ArbiterPipeline?.ProcessLateUpdateArbiters();
 
-            RuntimeData.ResetIntetnt();
+            RuntimeData.ResetIntent();
         }
 
         /// <summary>
@@ -370,13 +370,13 @@ namespace NiumaTPC.Character
             InputPipeline?.SetBlocked(blocked, clearBufferedInput);
 
             if (blocked && RuntimeData != null)
-                RuntimeData.ResetIntetnt();
+                RuntimeData.ResetIntent();
         }
 
         public void ClearInputBuffer()
         {
             InputPipeline?.ClearBufferedInput();
-            RuntimeData?.ResetIntetnt();
+            RuntimeData?.ResetIntent();
         }
 
 
