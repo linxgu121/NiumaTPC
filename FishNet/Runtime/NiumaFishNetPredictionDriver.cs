@@ -358,8 +358,16 @@ namespace NiumaTPC.FishNet
 
             CharacterSimulationState state = _runner.Simulate(in command, canSprint, tickDeltaTime);
 
-            WriteInputToRuntimeData(in command);
-            WriteStateToRuntimeData(in state);
+            /*
+             * 纯观察客户端仍需执行 FishNet 的远端模拟，
+             * 但不能用默认或推测的 Replicate 数据覆盖服务器表现快照。
+             * Owner 与服务器继续使用模拟结果驱动自己的表现黑板。
+             */
+            if (!IsPureObserverClient)
+            {
+                WriteInputToRuntimeData(in command);
+                WriteStateToRuntimeData(in state);
+            }
         }
 
         #endregion
@@ -400,7 +408,14 @@ namespace NiumaTPC.FishNet
 
             _runner.ApplyState(in state);
 
-            WriteStateToRuntimeData(in state);
+            /*
+             * Reconcile 始终恢复模拟器状态；
+             * 纯观察客户端的表现黑板只接受服务器表现快照。
+             */
+            if (!IsPureObserverClient)
+            {
+                WriteStateToRuntimeData(in state);
+            }
         }
 
         #endregion
