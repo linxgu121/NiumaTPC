@@ -4,7 +4,9 @@ using UnityEngine;
 
 namespace NiumaTPC.Character.ProcessingPipeline.Parameter
 {
-    // 动画参数处理器
+    /// <summary>
+    /// 动画参数处理器
+    /// </summary>
     public class MovementParameterProcessor
     {
         private readonly PlayerRuntimeData _data;
@@ -44,14 +46,28 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             _airborneTime = 0f;
         }
 
-        public void Update()
+        /// <summary>
+        /// 更新纯表现参数。
+        /// 本地拥有者和远端观察副本都需要执行。
+        /// 这些数据只影响动画方向与混合，不决定权威玩法结果。
+        /// </summary>
+        public void UpdatePresentation()
         {
             UpdateDesiredLocalMoveAngleFromWorldDir();
             UpdateDirectionBlend();
+        }
+
+        public void UpdateGameplay()
+        {
             UpdateFallHeight();
             UpdateFallIntent();
         }
 
+        /// <summary>
+        /// 计算移动方向角
+        /// 把世界空间期望移动方向，转换成角色局部 Y 轴旋转角度DesiredLocalMoveAngle
+        /// 用于 Aim‑Move 分离，角色转向 / 动画的左右偏移角度
+        /// </summary>
         private void UpdateDesiredLocalMoveAngleFromWorldDir()
         {
             Vector3 worldDir = _data.DesiredWorldMoveDir;
@@ -76,7 +92,10 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             float angle = Vector3.SignedAngle(forward, worldDir, Vector3.up);
             _data.DesiredLocalMoveAngle = angle;
         }
-
+        
+        /// <summary>
+        /// 动画XY方向平滑混合
+        /// </summary>
         private void UpdateDirectionBlend()
         {
             Vector2 input = _data.MoveInput;
@@ -109,6 +128,9 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             _data.CurrentAnimBlendY = _currentAnimBlendY;
         }
 
+        /// <summary>
+        /// 下落高度、落地/离地标记
+        /// </summary>
         private void UpdateFallHeight()
         {
             bool isGrounded = _data.IsGrounded;
@@ -140,6 +162,9 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             _wasGroundedLastFrame = isGrounded;
         }
 
+        /// <summary>
+        /// 空中时间，判断是否播放下落动画
+        /// </summary>
         private void UpdateFallIntent()
         {
             bool isGrounded = _data.IsGrounded;

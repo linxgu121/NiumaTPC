@@ -67,9 +67,23 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
         // 参数降维与混合树驱动运算
         // 此阶段已彻底脱离 Input 快照 纯粹基于黑板中的 Intent 意图 进行数学运算
-        public void UpdateParameterProcessors()
+        
+        /// <summary>
+        /// 更新动画、IK等纯表现参数。
+        /// 本地地角色和远端角色都必须执行。
+        /// </summary>
+        public void UpdatePresentationProcessors()
         {
-            _movementParameterProcessor.Update();
+            _movementParameterProcessor.UpdatePresentation();
+        }
+
+        /// <summary>
+        /// 更新可能改变玩法状态的参数。
+        /// 远端网络副本不能执行这一部分。
+        /// </summary>
+        public void UpdateGameplayParameterProcessors()
+        {
+            _movementParameterProcessor.UpdateGameplay();
         }
     }
 }

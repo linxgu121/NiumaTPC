@@ -322,6 +322,7 @@ namespace NiumaTPC.Character
 
             if (!_externalSimulationStateDriven)
             {
+                //只有本地输入拥有者才能读取设备输入并产生玩法意图
                 InputPipeline.Update();
 
                 MainProcessorPipeline.UpdateIntentProcessors();
@@ -329,12 +330,17 @@ namespace NiumaTPC.Character
 
             InventoryController.Update();
 
+            // 动画方向、混合参数属于表现数据。
+            // 无论是本地拥有者还是远端观察副本，都需要每个渲染帧更新。
+            MainProcessorPipeline.UpdatePresentationProcessors();
+
             if (!_externalSimulationStateDriven)
             {
-                MainProcessorPipeline.UpdateParameterProcessors();
+                // 下落、落地等参数会改变玩法状态，远端副本不能自行判断。
+                MainProcessorPipeline.UpdateGameplayParameterProcessors();
             }
 
-            StateMachine.CurrentState.LogicUpdate();
+StateMachine.CurrentState.LogicUpdate();
 
             UpperBodyController.Update();
 
