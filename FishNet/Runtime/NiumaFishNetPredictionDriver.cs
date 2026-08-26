@@ -7,6 +7,7 @@ using NiumaTPC.Character.RuntimeData;
 using FishNet.Object.Prediction;
 using FishNet.Transporting;
 using FishNet.Connection;
+using FishNet.Object;
 
 namespace NiumaTPC.FishNet
 {
@@ -33,13 +34,24 @@ namespace NiumaTPC.FishNet
         private NiumaCharacterController _player;
         
         [SerializeField]
-        [Tooltip("离线固定 Tick 驱动；网络启动时会自动禁用，" +"防止离线驱动和 FishNet 同时移动角色。")]
+        [Tooltip("离线固定 Tick 驱动；网络启动时会自动禁用,防止离线驱动和 FishNet 同时移动角色。")]
         private OfflineCharacterSimulationDriver _offlineDriver;
+
+        [Header("观察者表现同步")]
+        [SerializeField]
+        [Min(1)]
+        [Tooltip("服务器每隔多少个网络 Tick 发送一次表现快照,推荐值为 2:当 Tick Rate 为 60 时，相当于每秒发送 30 次。")]
+        private int _presentationSendIntervalTicks = 2;
+
 
         [Header("诊断")]
         [Tooltip("启用后每秒打印一次 FishNet Tick 和网络身份。")]
         [SerializeField]
         private bool _logTickHeartbeat = true;
+
+        [SerializeField]
+        [Tooltip("启用后，观察客户端会在表现状态变化时打印快照,稳定状态下最多每秒打印一次。")]
+        private bool _logPresentationSnapshots;
 
         #endregion
 
@@ -68,6 +80,31 @@ namespace NiumaTPC.FishNet
 
         private bool _inputWasBlockedBeforeNetwork;
         private bool _networkBlockedInput;
+
+        //远端观察者
+
+        /// <summary>
+        /// 纯观察客户端最后接受的服务器表现快照 Tick
+        /// </summary>
+        private uint _lastReceivedPresentationTick;
+
+        /// <summary>
+        ///  是否已经接受过第一份服务器表现快照。
+        ///  第一份快照不能直接与默认 Tick 0 比较。
+        /// </summary>
+        private bool _hasReceivedPresentationSnapshot;
+
+        //日志
+        /// <summary>
+        /// 表现快照诊断使用的上一次状态
+        /// 只负责限制日志频率，不参与玩法和网络判断
+        /// </summary>
+        private CharacterPresentationState _lastPresentationDiagnosticSnapshot;
+
+        //是否已经输出过一次表现诊断快照
+        private bool _hasPresentationDiagnosticSnapshot;
+        //下一次允许打印诊断日志的时间戳
+        private float _nextPresentationDiagnosticTime;
 
         #endregion
 
@@ -101,6 +138,8 @@ namespace NiumaTPC.FishNet
 
         public override void OnStartNetwork()
         {
+            ResetPresentationSnapshotTracking();
+
             if (!TryTakeSimulationOwnership())
             {
                 return;
@@ -122,6 +161,7 @@ namespace NiumaTPC.FishNet
         {
             ReleaseInputOwnership();
             ReleaseSimulationOwnership();
+            ResetPresentationSnapshotTracking();
         }
 
         public override void OnOwnershipClient(NetworkConnection prevOwner)
@@ -131,8 +171,10 @@ namespace NiumaTPC.FishNet
                 return;
             }
 
-            // 换角色、观战接管等场景可能在对象存活期间转移 Owner。
-            // 重新计算输入门，避免旧拥有者继续采集本机输入。
+            // 所有权变化后，当前对象可能从 Owner 变成观察者
+            // 或从观察者变成 Owner，因此重新开始快照序列
+            ResetPresentationSnapshotTracking();
+
             ReleaseInputOwnership();
             ApplyInputOwnership();
         }
@@ -140,8 +182,6 @@ namespace NiumaTPC.FishNet
         #endregion
 
         #region Input Ownership(输入所有权)
-
-
 
         /// <summary>
         /// 只有本地拥有者可以让 NiumaTPC 从设备采集输入。
@@ -248,10 +288,12 @@ namespace NiumaTPC.FishNet
             }
             
             /*
-             * 在这里调用 CreateReconcile，
-             * 把服务器权威状态交给拥有者客户端。
+             * Reconcile 负责修正拥有者的预测模拟
+             * PresentationState 负责告诉观察者应该播放什么表现
+             * 两者都是服务器 Tick 完成后的结果，但用途不同
              */
             CreateReconcile();
+            TrySendPresentationState();
         }
         #endregion
 
@@ -362,6 +404,107 @@ namespace NiumaTPC.FishNet
         }
 
         #endregion
+
+        #region Observer Presentation(观察者表现同步)
+
+        /// <summary>
+        /// 当前实例是否只是一个远端角色观察副本
+        /// </summary>
+        private bool IsPureObserverClient => IsClientInitialized && !IsServerInitialized && !Owner.IsLocalClient;
+
+        /// <summary>
+        /// 判断 candidate Tick 是否比 current Tick 更新。
+        /// 使用 uint 环形序列比较，能够正确处理最大值回绕到 0
+        /// </summary>
+        private static bool IsTickNewer(uint candidate, uint current)
+        {
+            const uint halfRange = 0x80000000u;
+
+            uint forwardDistance = unchecked(candidate - current);
+
+            return forwardDistance != 0u && forwardDistance < halfRange;
+        }
+
+        /// <summary>
+        /// 服务器按照配置的 Tick 间隔发送表现快照。
+        /// 这里只发送高层状态，不发送动画片段或动画时间
+        /// </summary>
+        private void TrySendPresentationState()
+        {
+            if(!IsServerInitialized || _runner == null)
+            {
+                return;
+            }
+
+            int intervalTicks = Mathf.Max(1, _presentationSendIntervalTicks);
+
+            CharacterSimulationState simulationState = _runner.State;
+
+            if(simulationState.Tick % (uint)intervalTicks != 0u)
+            {
+                return;
+            }
+
+            var presentationState = new CharacterPresentationState(in simulationState);
+
+            /*
+             * 表现快照可以被更新的快照替代，
+             * 因此使用 Unreliable，不要求旧快照重传。
+             */
+            ObserversReceivePresentationState(presentationState, Channel.Unreliable);
+        }
+
+        /// <summary>
+        /// 由服务器发送给该 NetworkObject 的观察者
+        /// 本阶段只验证快照是否正确到达
+        /// 下一步才会把状态应用到 PlayerRuntimeData
+        /// </summary>
+        [ObserversRpc(ExcludeOwner = true, ExcludeServer = true, BufferLast = true)]
+        private void ObserversReceivePresentationState(CharacterPresentationState presentationState, Channel channel = Channel.Unreliable)
+        {
+            /*
+             * 纯观察客户端：
+             * 1. 已经初始化客户端身份；
+             * 2. 不是服务器或 Host 的服务器实例；
+             * 3. 本机不是该角色的 Owner。
+             */
+            if(!IsPureObserverClient || _player == null || _player.RuntimeData == null)
+            {
+                return;
+            }
+
+            /*
+             * Unreliable 可能发生乱序。
+             * 已接受过快照后，只允许更新的 Tick 继续进入。
+             */
+            if(_hasReceivedPresentationSnapshot && !IsTickNewer(presentationState.Tick, _lastReceivedPresentationTick))
+            {
+                return;
+            }
+
+            _lastReceivedPresentationTick = presentationState.Tick;
+            _hasPresentationDiagnosticSnapshot = true;
+
+            ApplyPresentationState(in presentationState);
+
+            PrintPresentationSnapshotDiagnostic(in presentationState,channel);
+        }
+
+        /// <summary>
+        /// 重置表现快照
+        /// </summary>
+        private void ResetPresentationSnapshotTracking()
+        {
+            _lastReceivedPresentationTick = 0u;
+            _hasReceivedPresentationSnapshot = false;
+
+            _lastPresentationDiagnosticSnapshot = default;
+            _hasPresentationDiagnosticSnapshot = false;
+            _nextPresentationDiagnosticTime = 0f;
+        }
+
+        #endregion
+
 
         #region Simulation Ownership(模拟执行者)
 
@@ -520,6 +663,80 @@ namespace NiumaTPC.FishNet
 
         }
 
+        /// <summary>
+        /// 把服务器世界移动方向转换成角色局部二维输入。
+        /// MovementParameterProcessor 会使用它更新动画混合参数。
+        /// </summary>
+        private static Vector2 ConvertWorldDirectionToMoveInput(Vector3 worldDirection, float characterYaw)
+        {
+            if(worldDirection.sqrMagnitude < 0.0001f)
+            {
+                return Vector2.zero;
+            }
+
+            Quaternion inverseYaw = Quaternion.Euler(0f, -characterYaw, 0f);
+
+            Vector3 localDirection = inverseYaw * worldDirection;
+
+            return Vector2.ClampMagnitude(new Vector2(localDirection.x,localDirection.y),1f);
+        }
+
+        /// <summary>
+        /// 把服务器表现快照写入纯观察客户端的角色黑板。
+        /// 这里只更新表现数据，不修改预测模拟器状态和角色位置
+        /// </summary>
+        private void ApplyPresentationState(in CharacterPresentationState presentationState)
+        {
+            PlayerRuntimeData data = _player.RuntimeData;
+
+            /*
+             * 记录上一个速度档位。
+             * PlayerStopState 会使用它选择对应的停止动画。
+             */
+            if (data.CurrentLocomotionState != presentationState.LocomotionState)
+            {
+                data.LastLocomotionState = data.CurrentLocomotionState;
+            }
+
+            data.CurrentYaw = presentationState.Yaw;
+            data.VerticalVelocity = presentationState.VerticalVelocity;
+            data.CurrentLocomotionState = presentationState.LocomotionState;
+            data.CurrentSpeed = presentationState.Speed;
+            data.IsGrounded = presentationState.IsGrounded;
+            data.SimulationMotionPhase = presentationState.MotionPhase;
+            data.SimulationMotionPhaseTick = presentationState.MotionPhaseTick;
+            data.SimulationStartDirection = presentationState.StartDirection;
+            data.SimulationStartLocomotionState = presentationState.StartLocomotionState;
+
+            Vector3 worldDirection = presentationState.MoveDirection;
+
+            worldDirection.y = 0f;
+
+            if(worldDirection.sqrMagnitude > 0.0001f)
+            {
+                worldDirection.Normalize();
+            }
+            else
+            {
+                worldDirection = Vector3.zero;
+            }
+
+            /*
+             * Stopping 阶段仍保留上一移动方向
+             * 让停止动画知道角色原来朝哪里移动
+             */
+            data.DesiredWorldMoveDir = presentationState.MotionPhase == CharacterMotionPhase.Idle? Vector3.zero : worldDirection;
+
+            /*
+             * Starting/Moving 才表示玩家仍有移动输入
+             * Stopping 虽然还有惯性速度，但输入已经松开
+             */
+            bool hasMoveInput = presentationState.MotionPhase == CharacterMotionPhase.Starting ||
+                                presentationState.MotionPhase == CharacterMotionPhase.Moving;
+
+            data.MoveInput = hasMoveInput ? ConvertWorldDirectionToMoveInput( worldDirection, presentationState.Yaw) : Vector2.zero;
+        }
+
         #endregion
 
         #region Diagnostics(诊断)
@@ -553,6 +770,48 @@ namespace NiumaTPC.FishNet
                 this
             );
         }
+
+        private void PrintPresentationSnapshotDiagnostic(
+            in CharacterPresentationState presentationState,
+            Channel channel)
+        {
+            if (!_logPresentationSnapshots)
+            {
+                return;
+            }
+
+            bool stateChanged = !_hasPresentationDiagnosticSnapshot ||
+                                presentationState.MotionPhase != _lastPresentationDiagnosticSnapshot.MotionPhase ||
+                                presentationState.LocomotionState != _lastPresentationDiagnosticSnapshot.LocomotionState;
+
+            bool heartbeatDue =
+                Time.unscaledTime >=
+                _nextPresentationDiagnosticTime;
+
+            if (!stateChanged && !heartbeatDue)
+            {
+                return;
+            }
+
+            _lastPresentationDiagnosticSnapshot = presentationState;
+
+            _hasPresentationDiagnosticSnapshot = true;
+
+            _nextPresentationDiagnosticTime = Time.unscaledTime + 1f;
+
+            Debug.Log(
+                $"[NiumaFishNet表现快照] 已应用：" +
+                $"ObjectId={ObjectId}, " +
+                $"Tick={presentationState.Tick}, " +
+                $"Locomotion={presentationState.LocomotionState}, " +
+                $"Phase={presentationState.MotionPhase}, " +
+                $"PhaseTick={presentationState.MotionPhaseTick}, " +
+                $"Direction={presentationState.StartDirection}, " +
+                $"Speed={presentationState.Speed:F3}, " +
+                $"Grounded={presentationState.IsGrounded}, " +
+                $"Channel={channel}",
+                this);
+       }
 
         #endregion
 
