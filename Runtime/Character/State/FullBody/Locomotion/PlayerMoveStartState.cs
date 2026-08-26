@@ -40,21 +40,25 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             // 固定 Tick 模式下，动画和位移曲线必须使用同一方向、同一速度档位。
             PlayStartAnimation(_startDirection, _startLocomotionState);
 
-            // End 回调 切换到 MoveLoop
-            AnimationFacade.SetOnEndCallback(() =>
+            if(!usesFixedTickSimulation)
             {
-                // 应用自定义淡入时间
-                var nextOptions = data.CurrentLocomotionState switch
+                // End 回调 切换到 MoveLoop
+                AnimationFacade.SetOnEndCallback(() =>
                 {
-                    LocomotionState.Walk => config.LocomotionAnims.FadeInWalkLoopOptions,
-                    LocomotionState.Jog => config.LocomotionAnims.FadeInRunLoopOptions,
-                    LocomotionState.Sprint => config.LocomotionAnims.FadeInSprintLoopOptions,
-                    _ => AnimPlayOptions.Default
-                };
+                    // 应用自定义淡入时间
+                    var nextOptions = data.CurrentLocomotionState switch
+                    {
+                        LocomotionState.Walk => config.LocomotionAnims.FadeInWalkLoopOptions,
+                        LocomotionState.Jog => config.LocomotionAnims.FadeInRunLoopOptions,
+                        LocomotionState.Sprint => config.LocomotionAnims.FadeInSprintLoopOptions,
+                        _ => AnimPlayOptions.Default
+                    };
                 data.NextStatePlayOptions = nextOptions;
 
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerMoveLoopState>());
             });
+            }
+            
         }
 
          // 状态逻辑 检测瞄准 空闲等打断条件
@@ -66,6 +70,26 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 // 兜底处理：起步动画期间触发翻越时，直接切入翻越状态。
                 data.NextStatePlayOptions = config.LocomotionAnims.FadeInVaultOptions;
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerVaultState>());
+                return;
+            }
+
+            if(player.MotionDriver.IsExternalSimulationActive && data.SimulationMotionPhase == CharacterMotionPhase.Moving)
+            {
+                data.NextStatePlayOptions =
+                   data.CurrentLocomotionState switch
+                   {
+                    LocomotionState.Walk => config.LocomotionAnims.FadeInWalkLoopOptions,
+
+                    LocomotionState.Jog => config.LocomotionAnims.FadeInRunLoopOptions,
+
+                    LocomotionState.Sprint => config.LocomotionAnims.FadeInSprintLoopOptions,
+
+                    _ => AnimPlayOptions.Default
+                     
+                   };
+
+                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerMoveLoopState>());
+
                 return;
             }
 

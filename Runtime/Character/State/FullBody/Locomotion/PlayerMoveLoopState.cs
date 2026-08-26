@@ -39,9 +39,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            if (player.MotionDriver.IsExternalSimulationActive &&
-                data.SimulationMotionPhase == CharacterMotionPhase.Starting &&
-                data.SimulationMotionPhaseTick <= 1u)
+            if (player.MotionDriver.IsExternalSimulationActive && data.SimulationMotionPhase == CharacterMotionPhase.Starting)
             {
                 // 移动中突然反向时，固定 Tick 模拟会开启新一轮起步。
                 // 循环动画必须跟随这个权威阶段重新进入 MoveStart。

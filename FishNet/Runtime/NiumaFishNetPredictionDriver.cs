@@ -491,18 +491,33 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            /*
+             * 远端副本不会运行 LocomotionIntentProcessor，
+             * 因此必须由网络桥记录上一个运动档位。
+             * PlayerStopState 会根据它选择走路、慢跑或冲刺停止动画。
+            */
+            if(data.CurrentLocomotionState != state.LocomotionState)
+            {
+                data.LastLocomotionState = data.CurrentLocomotionState;
+            }
+
             data.CurrentYaw = state.Yaw;
-
             data.VerticalVelocity = state.VerticalVelocity;
-
             data.CurrentLocomotionState = state.LocomotionState;
-
             data.CurrentSpeed = state.SmoothSpeed;
             data.IsGrounded = state.IsGrounded;
+
             data.SimulationMotionPhase = state.MotionPhase;
             data.SimulationMotionPhaseTick = state.MotionPhaseTick;
             data.SimulationStartDirection = state.StartDirection;
             data.SimulationStartLocomotionState = state.StartLocomotionState;
+
+            /*
+             * 远端不运行本地意图处理器，
+             * 这里补上表现层可能使用的世界移动方向。
+             */
+            data.DesiredWorldMoveDir = state.MotionPhase == CharacterMotionPhase.Idle ? Vector3.zero : state.LastMoveDirection;
+
         }
 
         #endregion
