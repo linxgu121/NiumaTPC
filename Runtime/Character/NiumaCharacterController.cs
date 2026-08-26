@@ -52,6 +52,8 @@ namespace NiumaTPC.Character
         [Tooltip("aniamncercomponet也要引用角色animator")]
         public Animator Animator;
 
+        // 临时动画诊断：使用未缩放时间，方便检查 Time.timeScale 是否异常。
+        private float _nextAnimationDiagnosticTime;
 
 
         [Header("核心配置")]
@@ -340,7 +342,7 @@ namespace NiumaTPC.Character
                 MainProcessorPipeline.UpdateGameplayParameterProcessors();
             }
 
-StateMachine.CurrentState.LogicUpdate();
+           StateMachine.CurrentState.LogicUpdate();
 
             UpperBodyController.Update();
 
@@ -358,6 +360,9 @@ StateMachine.CurrentState.LogicUpdate();
                     Debug.Log($"[State] {_lastState.GetType().Name} -> {StateMachine.CurrentState.GetType().Name}");
                 }
             }
+
+            PrintAnimationDiagnostics();
+
         }
 
         // 一些设计说明.......
@@ -520,5 +525,79 @@ StateMachine.CurrentState.LogicUpdate();
 
         #endregion
 
+        #region Animation Diagnostics(临时动画诊断)
+
+private void PrintAnimationDiagnostics()
+{
+    if (Time.unscaledTime < _nextAnimationDiagnosticTime)
+    {
+        return;
     }
+
+    _nextAnimationDiagnosticTime = Time.unscaledTime + 1f;
+
+    if (Animancer == null)
+    {
+        Debug.LogWarning(
+            $"[动画诊断] Instance={GetInstanceID()}, Animancer为空。",
+            this);
+
+        return;
+    }
+
+    AnimancerState animationState =
+        Animancer.Layers[0].CurrentState;
+
+    Animator runtimeAnimator = Animancer.Animator;
+
+    string clipName =
+        animationState?.MainObject != null
+            ? animationState.MainObject.name
+            : "<null>";
+
+    float animationTime =
+        animationState != null ? animationState.Time : -1f;
+
+    float normalizedTime =
+        animationState != null
+            ? animationState.NormalizedTime
+            : -1f;
+
+    float effectiveSpeed =
+        animationState != null
+            ? animationState.EffectiveSpeed
+            : -1f;
+
+    float weight =
+        animationState != null ? animationState.Weight : -1f;
+
+    Debug.Log(
+        $"[动画诊断] " +
+        $"Instance={GetInstanceID()}, " +
+        $"ExternalStateDriven={IsExternalSimulationStateDriven}, " +
+        $"LogicState={StateMachine?.CurrentState?.GetType().Name}, " +
+        $"Clip={clipName}, " +
+        $"Loop={animationState?.IsLooping}, " +
+        $"StatePlaying={animationState?.IsPlaying}, " +
+        $"GraphPlaying={Animancer.Graph.IsGraphPlaying}, " +
+        $"Time={animationTime:F3}, " +
+        $"NormalizedTime={normalizedTime:F3}, " +
+        $"EffectiveSpeed={effectiveSpeed:F2}, " +
+        $"Weight={weight:F2}, " +
+        $"ComponentEnabled={Animancer.isActiveAndEnabled}, " +
+        $"AnimatorEnabled=" +
+        $"{(runtimeAnimator != null && runtimeAnimator.isActiveAndEnabled)}, " +
+        $"AnimatorSpeed=" +
+        $"{(runtimeAnimator != null ? runtimeAnimator.speed : -1f):F2}, " +
+        $"TimeScale={Time.timeScale:F2}, " +
+        $"DeltaTime={Time.deltaTime:F4}, " +
+        $"Focused={Application.isFocused}",
+        this);
+}
+
+#endregion
+
+    }
+
+    
 }
