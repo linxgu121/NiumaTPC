@@ -483,7 +483,7 @@ namespace NiumaTPC.FishNet
             }
 
             _lastReceivedPresentationTick = presentationState.Tick;
-            _hasPresentationDiagnosticSnapshot = true;
+            _hasReceivedPresentationSnapshot = true;
 
             ApplyPresentationState(in presentationState);
 
@@ -678,7 +678,7 @@ namespace NiumaTPC.FishNet
 
             Vector3 localDirection = inverseYaw * worldDirection;
 
-            return Vector2.ClampMagnitude(new Vector2(localDirection.x,localDirection.y),1f);
+            return Vector2.ClampMagnitude(new Vector2(localDirection.x, localDirection.z),1f);
         }
 
         /// <summary>
