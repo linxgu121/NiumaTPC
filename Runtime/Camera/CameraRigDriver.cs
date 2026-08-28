@@ -40,6 +40,7 @@ namespace NiumaTPC.Cameras
         [SerializeField] private int _debugLogEveryNFrames = 10;
 
         private Camera _mainCamera;
+        private Transform _runtimeFollowTarget;
 
         [Header("网络同步")]
         public NiumaCharacterController BoundPlayer => _player;
@@ -63,7 +64,17 @@ namespace NiumaTPC.Cameras
         /// </summary>
         public void BindPlayer(NiumaCharacterController player)
         {
+            BindPlayer(player, null);
+        }
+
+        /// <summary>
+        /// 绑定玩家与运行时视觉跟随目标。
+        /// 网络角色应传入经过 Tick 平滑的 GraphicsRoot，避免摄像机直接采样模拟根节点。
+        /// </summary>
+        public void BindPlayer(NiumaCharacterController player, Transform runtimeFollowTarget)
+        {
             _player = player;
+            _runtimeFollowTarget = runtimeFollowTarget;
         }
 
         public void UnbindPlayer(NiumaCharacterController player)
@@ -74,6 +85,7 @@ namespace NiumaTPC.Cameras
             }
 
             _player = null;
+            _runtimeFollowTarget = null;
         }
 
         #endregion
@@ -84,7 +96,9 @@ namespace NiumaTPC.Cameras
             var data = _player.RuntimeData;
 
             // Rig 跟随与旋转同步
-            Transform target = _followTarget != null ? _followTarget : _player.transform;
+            Transform target = _runtimeFollowTarget != null
+                ? _runtimeFollowTarget
+                : (_followTarget != null ? _followTarget : _player.transform);
             transform.position = target.position + _followOffset;
 
             if (_syncPitch)

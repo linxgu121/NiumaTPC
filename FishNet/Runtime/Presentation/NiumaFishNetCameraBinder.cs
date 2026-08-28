@@ -1,5 +1,5 @@
-using System;
 using FishNet.Connection;
+using FishNet.Component.Transforming.Beta;
 using FishNet.Object;
 using NiumaTPC.Cameras;
 using NiumaTPC.Character;
@@ -20,6 +20,10 @@ namespace NiumaTPC.FishNet
         [SerializeField]
         [Tooltip("当前网络角色:为空时自动获取同物体上的NiumaCharacterController")]
         private NiumaCharacterController _player;
+
+        [SerializeField]
+        [Tooltip("本地摄像机跟随的平滑视觉根节点。通常绑定挂有NetworkTickSmoother的GraphicsRoot；为空时自动查找，仍找不到才回退到Player根节点")]
+        private Transform _cameraFollowTarget;
 
         #endregion
 
@@ -88,14 +92,43 @@ namespace NiumaTPC.FishNet
                 return;
             }
 
+            Transform cameraFollowTarget = ResolveCameraFollowTarget();
+
             _cameraManager.BindPlayer(_player);
-            _cameraRigDriver.BindPlayer(_player);
+            _cameraRigDriver.BindPlayer(_player, cameraFollowTarget);
             _cameraBound = true;
 
             Debug.Log(
                 $"[NiumaFishNet摄像机] 已绑定本地玩家：" +
-                $"ObjectId={ObjectId}, OwnerId={OwnerId}",
+                $"ObjectId={ObjectId}, OwnerId={OwnerId}, " +
+                $"FollowTarget={cameraFollowTarget.name}",
                 this);
+        }
+
+        /// <summary>
+        /// 优先使用 FishNet 已平滑的图形节点，避免摄像机直接跟随固定 Tick 移动的模拟根节点。
+        /// </summary>
+        private Transform ResolveCameraFollowTarget()
+        {
+            if (_cameraFollowTarget != null)
+            {
+                return _cameraFollowTarget;
+            }
+
+            NetworkTickSmoother smoother = GetComponentInChildren<NetworkTickSmoother>(true);
+
+            if (smoother != null)
+            {
+                _cameraFollowTarget = smoother.transform;
+                return _cameraFollowTarget;
+            }
+
+            Debug.LogWarning(
+                "[NiumaFishNet摄像机] 未找到NetworkTickSmoother，" +
+                "摄像机将回退跟随Player根节点，固定Tick下可能出现轻微抖动。",
+                this);
+
+            return _player.transform;
         }
 
         /// <summary>
