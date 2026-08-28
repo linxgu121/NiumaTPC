@@ -43,6 +43,14 @@ namespace NiumaTPC.Character.Simulation
                     $"PlayerSO“{playerConfig.name}”没有配置 LocomotionSO。");
             }
 
+            JumpSO jump = playerConfig.JumpAndLanding;
+
+            if(jump == null)
+            {
+                throw new InvalidOperationException(
+                    $"PlayerSO“{playerConfig.name}”没有配置 JumpSO");
+            }
+
             CharacterStartMotionProfile[] startProfiles =
                 CreateStartProfiles(locomotion, tickDeltaTime);
 
@@ -56,6 +64,8 @@ namespace NiumaTPC.Character.Simulation
                 gravity: core.Gravity,
                 groundedVerticalVelocity: core.ReboundForce,
                 airControl: core.AirControl,
+                jumpInitialVelocity:jump.JumpForce,
+                
                 startMotionProfiles: startProfiles
             );
         }

@@ -18,11 +18,12 @@ namespace NiumaTPC.Character.Simulation
             float tickDeltaTime
         )
         {
+            
             state.Tick = command.Tick;
 
             Vector3 horizontalDisplacement = CharacterHorizontalMovementSimulator.Simulate(ref state, in command, in config, canSprint, tickDeltaTime);
 
-            Vector3 verticalDisplacement = CharacterVerticalMovementSimulator.Simulate(ref state, in config, tickDeltaTime);
+            Vector3 verticalDisplacement = CharacterVerticalMovementSimulator.Simulate(ref state, in command, in config, tickDeltaTime);
 
             return horizontalDisplacement + verticalDisplacement;
         }

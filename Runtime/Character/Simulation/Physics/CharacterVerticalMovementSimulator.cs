@@ -15,13 +15,21 @@ namespace NiumaTPC.Character.Simulation
         /// </summary>
         public static Vector3 Simulate(
             ref CharacterSimulationState state,
+            in CharacterInputCommand command,
             in CharacterSimulationConfig config,
             float tickDeltaTime
         )
         {
             ValidateTickDeltaTime(tickDeltaTime);
 
-            if(state.IsGrounded && state.VerticalVelocity < 0f)
+            bool wantsToJump = command.HasButton(CharacterInputButtons.Jump);
+
+            if(wantsToJump && state.IsGrounded)
+            {
+                state.VerticalVelocity = config.JumpInitialVelocity;
+                state.IsGrounded = false;
+            }
+            else if(state.IsGrounded && state.VerticalVelocity < 0f)
             {
                 state.VerticalVelocity = config.GroundedVerticalVelocity;
             }
