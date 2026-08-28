@@ -131,8 +131,7 @@ namespace NiumaTPC.Character.Simulation
                 return;
             }
 
-            if (_player.Config == null ||
-                _player.Config.Core == null)
+            if (_player.Config == null || _player.Config.Core == null)
             {
                 Debug.LogError(
                     "[离线模拟] 玩家没有配置 PlayerSO 或 CoreSO。",
