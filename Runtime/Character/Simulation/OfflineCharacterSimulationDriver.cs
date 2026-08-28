@@ -10,8 +10,7 @@ namespace NiumaTPC.Character.Simulation
     [DisallowMultipleComponent]
     [RequireComponent(typeof(NiumaCharacterController))]
     [DefaultExecutionOrder(-200)]
-    public sealed class OfflineCharacterSimulationDriver
-        : MonoBehaviour
+    public sealed class OfflineCharacterSimulationDriver : MonoBehaviour
     {
         #region Inspector
 
@@ -33,7 +32,7 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
-        #region Runtime State
+        #region Runtime State(运行时状态)
 
         private NiumaCharacterController _player;
         private CharacterInputCommandBuilder _commandBuilder;
@@ -52,7 +51,7 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
-        #region Unity Lifecycle
+        #region Unity Lifecycle(Unity生命周期)
 
         private void Awake()
         {
@@ -106,7 +105,7 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
-        #region Simulation Lifetime
+        #region Simulation Lifetime(模拟生命周期)
 
         private void StartSimulation()
         {
@@ -249,6 +248,11 @@ namespace NiumaTPC.Character.Simulation
                     _tick,
                     in input,
                     viewYaw);
+
+            if (command.HasButton(CharacterInputButtons.Jump))
+            {
+                _player.InputPipeline.ConsumeJumpPressed();
+            }
 
             bool canSprint =
                 !_player.RuntimeData.IsStaminaDepleted &&

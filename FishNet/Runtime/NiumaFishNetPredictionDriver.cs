@@ -322,6 +322,12 @@ namespace NiumaTPC.FishNet
                 viewYaw: _player.RuntimeData.AuthorityYaw
             );
 
+            if (command.HasButton(CharacterInputButtons.Jump))
+            {
+                // 命令已经保存了跳跃事实，可以清除本地帧输入缓冲。
+                _player.InputPipeline.ConsumeJumpPressed();
+            }
+
             return new NiumaReplicateData(command.Move, command.ViewYaw, command.Buttons);
         }
 
@@ -618,7 +624,7 @@ namespace NiumaTPC.FishNet
 
             float viewYaw = IsFinite(source.ViewYaw) ? Mathf.Repeat(source.ViewYaw, 360f) : _runner.State.Yaw;
 
-            CharacterInputButtons allowedButtons = CharacterInputButtons.Walk | CharacterInputButtons.Sprint;
+            CharacterInputButtons allowedButtons = CharacterInputButtons.Walk | CharacterInputButtons.Sprint | CharacterInputButtons.Jump;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 
