@@ -42,7 +42,10 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 else player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerFallState>());
             });
 
-            PerformJumpPhysics();
+            if(!player.IsExternalJumpSimulationActive)
+            {
+                PerformJumpPhysics();
+            }
 
             // 消费跳跃输入 防止同帧重复触发
             player.InputPipeline.ConsumeJumpPressed();

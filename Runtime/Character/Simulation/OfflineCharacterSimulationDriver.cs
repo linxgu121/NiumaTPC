@@ -288,8 +288,12 @@ namespace NiumaTPC.Character.Simulation
             in CharacterInputCommand command,
             in CharacterSimulationState state)
         {
-            PlayerRuntimeData data =
-                _player.RuntimeData;
+            PlayerRuntimeData data = _player.RuntimeData;
+
+            bool jumpStated = 
+                data.IsGrounded && 
+                !state.IsGrounded &&
+                state.VerticalVelocity > 0f;
 
             data.MoveInput = command.Move;
             data.CurrentYaw = state.Yaw;
@@ -301,8 +305,12 @@ namespace NiumaTPC.Character.Simulation
             data.SimulationMotionPhase = state.MotionPhase;
             data.SimulationMotionPhaseTick = state.MotionPhaseTick;
             data.SimulationStartDirection = state.StartDirection;
-            data.SimulationStartLocomotionState =
-                state.StartLocomotionState;
+            data.SimulationStartLocomotionState = state.StartLocomotionState;
+
+            if(jumpStated)
+            {
+                data.WantsToJump = true;
+            }
         }
 
         #endregion

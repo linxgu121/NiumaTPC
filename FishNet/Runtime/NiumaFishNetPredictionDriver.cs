@@ -683,6 +683,8 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            bool jumpStated =  data.IsGrounded && !state.IsGrounded && state.VerticalVelocity > 0f;
+
             /*
              * 远端副本不会运行 LocomotionIntentProcessor，
              * 因此必须由网络桥记录上一个运动档位。
@@ -710,6 +712,10 @@ namespace NiumaTPC.FishNet
              */
             data.DesiredWorldMoveDir = state.MotionPhase == CharacterMotionPhase.Idle ? Vector3.zero : state.LastMoveDirection;
 
+            if(jumpStated)
+            {
+                data.WantsToJump = true;
+            }
         }
 
         /// <summary>
@@ -751,6 +757,9 @@ namespace NiumaTPC.FishNet
             data.VerticalVelocity = presentationState.VerticalVelocity;
             data.CurrentLocomotionState = presentationState.LocomotionState;
             data.CurrentSpeed = presentationState.Speed;
+
+            bool jumpStarted = data.IsGrounded && !presentationState.IsGrounded && presentationState.VerticalVelocity > 0f;
+            
             data.IsGrounded = presentationState.IsGrounded;
             data.SimulationMotionPhase = presentationState.MotionPhase;
             data.SimulationMotionPhaseTick = presentationState.MotionPhaseTick;
@@ -784,6 +793,11 @@ namespace NiumaTPC.FishNet
                                 presentationState.MotionPhase == CharacterMotionPhase.Moving;
 
             data.MoveInput = hasMoveInput ? ConvertWorldDirectionToMoveInput( worldDirection, presentationState.Yaw) : Vector2.zero;
+
+            if (jumpStarted)
+            {
+               data.WantsToJump = true;
+            }
         }
 
         #endregion
