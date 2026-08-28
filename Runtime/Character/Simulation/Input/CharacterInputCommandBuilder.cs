@@ -31,6 +31,12 @@ namespace NiumaTPC.Character.Simulation
             {
                 buttons |= CharacterInputButtons.Walk;
             }
+            
+            // JumpPressed 带有输入缓冲，可以避免按键发生在两个网络 Tick 之间时丢失。
+            if(input.JumpPressed)
+            {
+                buttons |= CharacterInputButtons.Jump;
+            }
 
             float normalizedYaw = Mathf.Repeat(viewYaw, 360f);
 
