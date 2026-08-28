@@ -34,6 +34,11 @@ namespace NiumaTPC.Character.Simulation
 
         public readonly float AirControl;
 
+        /// <summary>
+        /// 地面起跳的时候赋予角色的向上初速度
+        /// </summary>
+        public readonly float JumpInitialVelocity;
+
         #endregion
 
         #region Constructor(构造的数据快照)
@@ -47,6 +52,7 @@ namespace NiumaTPC.Character.Simulation
             float gravity,
             float groundedVerticalVelocity,
             float airControl,
+            float jumpInitialVelocity,
             CharacterStartMotionProfile[] startMotionProfiles)
         {
             WalkSpeed = Mathf.Max(0f, walkSpeed);
@@ -59,6 +65,7 @@ namespace NiumaTPC.Character.Simulation
             Gravity = gravity;
             GroundedVerticalVelocity = groundedVerticalVelocity;
             AirControl = Mathf.Clamp01(airControl);
+            JumpInitialVelocity = Mathf.Max(0f,jumpInitialVelocity);
 
             _startMotionProfiles = startMotionProfiles != null && startMotionProfiles.Length == StartProfileCount ?
                                    startMotionProfiles : Array.Empty<CharacterStartMotionProfile>();

@@ -18,7 +18,7 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         [Tooltip("跳跃动画数据")]
         public MotionClipData JumpAirAnim;
 
-         [Header("行走跳跃")]
+        [Header("行走跳跃")]
         
         [Tooltip("行走时跳跃初速度")]
         public float JumpForceWalk = 5f;

@@ -604,9 +604,17 @@ namespace NiumaTPC.FishNet
                 return;
             }
 
-            if(_player != null && _player.MotionDriver != null)
+            if(_player != null)
             {
-                _player.MotionDriver.SetExternalSimulationActive(_externalJumpSimulationBeforeNetwork);
+                if(_networkAppliedExternalJumpSimulation)
+                {
+                    _player.SetExternalJumpSimulationActive(_externalJumpSimulationBeforeNetwork);
+                }
+
+                if(_player.MotionDriver != null)
+                {
+                    _player.MotionDriver.SetExternalSimulationActive(false);
+                }
             }
 
             _externalJumpSimulationBeforeNetwork = false;
