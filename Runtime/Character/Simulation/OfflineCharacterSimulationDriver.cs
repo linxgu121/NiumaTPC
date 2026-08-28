@@ -38,6 +38,9 @@ namespace NiumaTPC.Character.Simulation
         private CharacterInputCommandBuilder _commandBuilder;
         private CharacterSimulationRunner _runner;
 
+        // 对象启动前备份_externalJumpSimulationActive的原始状态
+        private bool _externalJumpSimulationBeforeStart;
+
         private double _accumulator;
         private uint _tick;
         private bool _isRunning;
@@ -160,6 +163,10 @@ namespace NiumaTPC.Character.Simulation
             _accumulator = 0d;
             _tick = 0u;
 
+            _externalJumpSimulationBeforeStart = _player.IsExternalJumpSimulationActive;
+
+            _player.SetExternalJumpSimulationActive(true);
+
             // 必须最后才切换所有权。
             // 如果前面初始化失败，旧 MotionDriver 仍可正常工作。
             _player.MotionDriver.SetExternalSimulationActive(true);
@@ -178,11 +185,16 @@ namespace NiumaTPC.Character.Simulation
                 return;
             }
 
-            if (_player != null &&
-                _player.MotionDriver != null)
+            if (_player != null)
             {
-                _player.MotionDriver
-                    .SetExternalSimulationActive(false);
+                // 恢复开始模拟前的跳跃接管状态。
+                _player.SetExternalJumpSimulationActive(_externalJumpSimulationBeforeStart);
+
+                if(_player.MotionDriver != null)
+                {
+                    _player.MotionDriver.SetExternalSimulationActive(false);
+                }
+                
             }
 
             _runner = null;

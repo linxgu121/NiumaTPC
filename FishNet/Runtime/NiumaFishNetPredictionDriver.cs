@@ -43,7 +43,6 @@ namespace NiumaTPC.FishNet
         [Tooltip("服务器每隔多少个网络 Tick 发送一次表现快照,推荐值为 2:当 Tick Rate 为 60 时，相当于每秒发送 30 次。")]
         private int _presentationSendIntervalTicks = 2;
 
-
         [Header("诊断")]
         [Tooltip("启用后每秒打印一次 FishNet Tick 和网络身份。")]
         [SerializeField]
@@ -80,6 +79,17 @@ namespace NiumaTPC.FishNet
 
         private bool _inputWasBlockedBeforeNetwork;
         private bool _networkBlockedInput;
+
+        //FishNet 驱动接管和归还跳跃
+        /// <summary>
+        /// 保存网络驱动接管前，IsExternalJumpSimulationActive 原本的值。
+        /// </summary>
+        private bool _externalJumpSimulationBeforeNetwork;
+        /// <summary>
+        /// 记录“网络驱动是否真的执行过接管”
+        /// 防止初始化失败、重复退出或尚未进入网络时，错误地恢复角色状态
+        /// </summary>
+        private bool _networkAppliedExternalJumpSimulation;
 
         //远端观察者
 
@@ -575,6 +585,11 @@ namespace NiumaTPC.FishNet
 
             _player.MotionDriver.SetExternalSimulationActive(true);
 
+            _externalJumpSimulationBeforeNetwork = _player.IsExternalJumpSimulationActive;
+
+            _player.SetExternalJumpSimulationActive(true);
+            _networkAppliedExternalJumpSimulation = true;
+
             _networkSimulationActive = true;
             return true;
         }
@@ -591,8 +606,11 @@ namespace NiumaTPC.FishNet
 
             if(_player != null && _player.MotionDriver != null)
             {
-                _player.MotionDriver.SetExternalSimulationActive(false);
+                _player.MotionDriver.SetExternalSimulationActive(_externalJumpSimulationBeforeNetwork);
             }
+
+            _externalJumpSimulationBeforeNetwork = false;
+            _networkAppliedExternalJumpSimulation = false;
 
             _runner = null;
             _commandBuilder = null;
@@ -624,7 +642,9 @@ namespace NiumaTPC.FishNet
 
             float viewYaw = IsFinite(source.ViewYaw) ? Mathf.Repeat(source.ViewYaw, 360f) : _runner.State.Yaw;
 
-            CharacterInputButtons allowedButtons = CharacterInputButtons.Walk | CharacterInputButtons.Sprint | CharacterInputButtons.Jump;
+            CharacterInputButtons allowedButtons = 
+                CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
+                CharacterInputButtons.Jump;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 

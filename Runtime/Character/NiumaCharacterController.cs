@@ -127,6 +127,14 @@ namespace NiumaTPC.Character
         /// </summary>
         private bool _externalSimulationStateDriven;
 
+        /// <summary>
+        /// 跳跃输入是否由外部固定 Tick 模拟接管
+        /// </summary>
+        private bool _externalJumpSimulationActive;
+
+        
+
+
         // Awake 负责内存分配、找组件、依赖注入 
         private void Awake()
         {
@@ -327,7 +335,7 @@ namespace NiumaTPC.Character
                 //只有本地输入拥有者才能读取设备输入并产生玩法意图
                 InputPipeline.Update();
 
-                MainProcessorPipeline.UpdateIntentProcessors();
+                MainProcessorPipeline.UpdateIntentProcessors(processJumpOrVaultIntent: !_externalJumpSimulationActive);
             }
 
             InventoryController.Update();
@@ -361,7 +369,6 @@ namespace NiumaTPC.Character
                 }
             }
 
-            PrintAnimationDiagnostics();
 
         }
 
@@ -419,6 +426,41 @@ namespace NiumaTPC.Character
                 RuntimeData?.ResetIntent();
             }
         }
+
+        #endregion
+
+        #region 子模块外部驱动
+
+        /// <summary>
+        /// 跳跃输入是否由外部固定 Tick 模拟接管。
+        /// 核心层不关心外部是 FishNet、离线模拟器还是其他网络库。
+        /// </summary>
+        public bool IsExternalJumpSimulationActive => _externalJumpSimulationActive;
+
+        /// <summary>
+        /// 切换跳跃逻辑的实现链路
+        /// </summary>
+        public void SetExternalJumpSimulationActive(bool active)
+        {
+            if (_externalJumpSimulationActive == active)
+            {
+                return;
+            }
+
+            _externalJumpSimulationActive = active;
+
+            if (active && RuntimeData != null)
+            {
+                // 只清理旧状态机产生的意图。
+                // 不能清理 InputPipeline，否则网络模拟器会拿不到 JumpPressed。
+                RuntimeData.WantsToJump = false;
+                RuntimeData.WantsDoubleJump = false;
+                RuntimeData.WantsToVault = false;
+                RuntimeData.WantsLowVault = false;
+                RuntimeData.WantsHighVault = false;
+            }
+        }
+
         #endregion
         
         public bool IsInputBlocked => InputPipeline != null && InputPipeline.IsBlocked;
@@ -525,67 +567,6 @@ namespace NiumaTPC.Character
 
         #endregion
 
-        #region Animation Diagnostics(临时动画诊断)
-
-        private void PrintAnimationDiagnostics()
-        {
-            if (Time.unscaledTime < _nextAnimationDiagnosticTime)
-            {
-                return;
-            }
-
-            _nextAnimationDiagnosticTime = Time.unscaledTime + 1f;
-
-            if (Animancer == null)
-            {
-                Debug.LogWarning(
-                    $"[动画诊断] Instance={GetInstanceID()}, Animancer为空。",
-                    this);
-
-                return;
-            }
-
-            AnimancerState animationState = Animancer.Layers[0].CurrentState;
-
-            Animator runtimeAnimator = Animancer.Animator;
-
-            string clipName = animationState?.MainObject != null ? animationState.MainObject.name : "<null>";
-
-            float animationTime = animationState != null ? animationState.Time : -1f;
-
-            float normalizedTime =animationState != null ? animationState.NormalizedTime : -1f;
-
-            float effectiveSpeed = animationState != null ? animationState.EffectiveSpeed : -1f;
-
-            float weight = animationState != null ? animationState.Weight : -1f;
-
-            Debug.Log(
-                $"[动画诊断] " +
-                $"Instance={GetInstanceID()}, " +
-                $"ExternalStateDriven={IsExternalSimulationStateDriven}, " +
-                $"LogicState={StateMachine?.CurrentState?.GetType().Name}, " +
-                $"Clip={clipName}, " +
-                $"Loop={animationState?.IsLooping}, " +
-                $"StatePlaying={animationState?.IsPlaying}, " +
-                $"GraphPlaying={Animancer.Graph.IsGraphPlaying}, " +
-                $"Time={animationTime:F3}, " +
-                $"NormalizedTime={normalizedTime:F3}, " +
-                $"EffectiveSpeed={effectiveSpeed:F2}, " +
-                $"Weight={weight:F2}, " +
-                $"ComponentEnabled={Animancer.isActiveAndEnabled}, " +
-                $"AnimatorEnabled=" +
-                $"{(runtimeAnimator != null && runtimeAnimator.isActiveAndEnabled)}, " +
-                $"AnimatorSpeed=" +
-                $"{(runtimeAnimator != null ? runtimeAnimator.speed : -1f):F2}, " +
-                $"TimeScale={Time.timeScale:F2}, " +
-                $"DeltaTime={Time.deltaTime:F4}, " +
-                $"Focused={Application.isFocused}",
-                this);
-        }
-
-        #endregion
-
-    }
-
     
+    }
 }
