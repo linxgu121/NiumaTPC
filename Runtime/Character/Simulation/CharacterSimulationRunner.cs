@@ -46,6 +46,9 @@ namespace NiumaTPC.Character.Simulation
                 lastMoveDirection: Vector3.zero,
                 isGrounded: body.IsGrounded,
                 hasPerformedDoubleJumpInAir: false,
+                actionType: CharacterActionType.None,
+                actionTick: 0u,
+                actionDirection: CharacterActionDirection.Forward,
                 smoothSpeed: 0f,
                 speedSmoothVelocity: 0f,
                 rotationSmoothVelocity: 0f
@@ -143,6 +146,21 @@ namespace NiumaTPC.Character.Simulation
                 throw new ArgumentException(
                     $"未知的起步速度档位：{state.StartLocomotionState}。",
                     nameof(state));
+            }
+
+            if (!Enum.IsDefined(typeof(CharacterActionType), state.ActionType))
+            {
+                throw new ArgumentException($"未知的角色动作类型：{state.ActionType}。", nameof(state));
+            }
+
+            if (!Enum.IsDefined(typeof(CharacterActionDirection),state.ActionDirection))
+            {
+                throw new ArgumentException($"未知的角色动作方向：{state.ActionDirection}。",nameof(state));
+            }
+
+            if (state.ActionType == CharacterActionType.None && state.ActionTick != 0u)
+            {
+                throw new ArgumentException("角色没有执行动作时，ActionTick 必须为 0。",nameof(state));
             }
 
         }

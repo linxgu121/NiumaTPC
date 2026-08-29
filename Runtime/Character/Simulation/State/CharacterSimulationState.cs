@@ -77,6 +77,23 @@ namespace NiumaTPC.Character.Simulation
         public bool HasPerformedDoubleJumpInAir;
 
         /// <summary>
+        /// 当前正在执行的可回滚短时动作
+        /// </summary>
+        public CharacterActionType ActionType;
+
+        /// <summary>
+        /// 当前动作已经执行的固定 Tick 数。
+        /// 动作开始时归零，结束时也必须归零。
+        /// </summary>
+        public uint ActionTick;
+        
+        /// <summary>
+        /// 动作开始瞬间锁定的八方向。
+        /// 动作过程中普通移动输入不能修改它
+        /// </summary>
+        public CharacterActionDirection ActionDirection;
+
+        /// <summary>
         /// 移动速度平滑后的当前值。
         /// 它会影响下一 Tick，不能只保存最终位置。
         /// </summary>
@@ -106,6 +123,9 @@ namespace NiumaTPC.Character.Simulation
             Vector3 lastMoveDirection,
             bool isGrounded,
             bool hasPerformedDoubleJumpInAir,
+            CharacterActionType actionType,
+            uint actionTick,
+            CharacterActionDirection actionDirection,
             float smoothSpeed,
             float speedSmoothVelocity,
             float rotationSmoothVelocity
@@ -123,6 +143,9 @@ namespace NiumaTPC.Character.Simulation
             LastMoveDirection = lastMoveDirection;
             IsGrounded = isGrounded;
             HasPerformedDoubleJumpInAir = hasPerformedDoubleJumpInAir;
+            ActionType = actionType;
+            ActionTick = actionTick;
+            ActionDirection = actionDirection;
             SmoothSpeed = smoothSpeed;
             SpeedSmoothVelocity = speedSmoothVelocity;
             RotationSmoothVelocity = rotationSmoothVelocity;

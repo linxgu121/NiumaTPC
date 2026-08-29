@@ -144,9 +144,30 @@ namespace NiumaTPC.FishNet.Prediction
         /// </summary>
         public Vector3 LastMoveDirection;
 
+        /// <summary>
+        /// 是否落地
+        /// </summary>
         public bool IsGrounded;
 
+        /// <summary>
+        /// 可否执行二连跳
+        /// </summary>
         public bool HasPerformedDoubleJumpInAir;
+
+        /// <summary>
+        /// CharacterActionType 的网络存储值。
+        /// </summary>
+        public byte ActionTypeValue;
+
+        /// <summary>
+        /// 权威动作已经执行的 Tick 数。
+        /// </summary>
+        public uint ActionTick;
+
+        /// <summary>
+        /// CharacterActionDirection 的网络存储值。
+        /// </summary>
+        public byte ActionDirectionValue;
 
         public float SmoothSpeed;
 
@@ -181,6 +202,9 @@ namespace NiumaTPC.FishNet.Prediction
             LastMoveDirection = state.LastMoveDirection;
             IsGrounded = state.IsGrounded;
             HasPerformedDoubleJumpInAir = state.HasPerformedDoubleJumpInAir;
+            ActionTypeValue = (byte)state.ActionType;
+            ActionTick = state.ActionTick;
+            ActionDirectionValue = (byte)state.ActionDirection;
             SmoothSpeed = state.SmoothSpeed;
             SpeedSmoothVelocity = state.SpeedSmoothVelocity;
             RotationSmoothVelocity = state.RotationSmoothVelocity;
@@ -205,11 +229,13 @@ namespace NiumaTPC.FishNet.Prediction
                 motionPhase:(CharacterMotionPhase)MotionPhaseValue,
                 motionPhaseTick: MotionPhaseTick,
                 startDirection:(CharacterStartDirection)StartDirectionValue,
-                startLocomotionState:
-                    (LocomotionState)StartLocomotionStateValue,
+                startLocomotionState:(LocomotionState)StartLocomotionStateValue,
                 lastMoveDirection: LastMoveDirection,
                 isGrounded: IsGrounded,
                 hasPerformedDoubleJumpInAir:HasPerformedDoubleJumpInAir,
+                actionType: (CharacterActionType)ActionTypeValue,
+                actionTick: ActionTick,
+                actionDirection:(CharacterActionDirection)ActionDirectionValue,
                 smoothSpeed: SmoothSpeed,
                 speedSmoothVelocity: SpeedSmoothVelocity,
                 rotationSmoothVelocity: RotationSmoothVelocity);
