@@ -25,10 +25,23 @@ namespace NiumaTPC.Character.Simulation
 
             bool wantsToJump = command.HasButton(CharacterInputButtons.Jump);
 
+            //一旦回到地面就恢复二连跳次数
+            if(state.IsGrounded)
+            {
+                state.HasPerformedDoubleJumpInAir = false;
+            }
+
             if(wantsToJump && state.IsGrounded)
             {
+                //第一次起跳
                 state.VerticalVelocity = config.GetJumpInitialVelocity(state.LocomotionState,isHandsEmpty);
                 state.IsGrounded = false;
+            }
+            else if(wantsToJump && !state.HasPerformedDoubleJumpInAir)
+            {
+                //二连跳
+                state.VerticalVelocity = config.GetDoubleJumpInitialVelocity(state.LocomotionState,isHandsEmpty);
+                state.HasPerformedDoubleJumpInAir = true;
             }
             else if(state.IsGrounded && state.VerticalVelocity < 0f)
             {

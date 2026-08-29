@@ -69,6 +69,9 @@ namespace NiumaTPC.Character.Simulation
                 walkJumpInitialVelocity:jump.JumpForceWalk,
                 sprintJumpInitialVelocity:jump.JumpForceSprint,
                 sprintEmptyJumpInitialVelocity:jump.JumpForceSprintEmpty,
+
+                doubleJumpInitialVelocity: jump.DoubleJumpForceUp,
+                sprintEmptyDoubleJumpInitialVelocity: jump.DoubleJumpEmptyHandSprintForceUp,
                 
                 startMotionProfiles: startProfiles
             );
