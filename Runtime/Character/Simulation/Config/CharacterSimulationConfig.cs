@@ -42,6 +42,16 @@ namespace NiumaTPC.Character.Simulation
         public readonly float SprintJumpInitialVelocity;
         public readonly float SprintEmptyJumpInitialVelocity;
 
+        /// <summary>
+        /// 普通二段跳初速度。
+        /// </summary>
+        public readonly float DoubleJumpInitialVelocity;
+
+        /// <summary>
+        /// 空手冲刺状态下的二段跳初速度。
+        /// </summary>
+        public readonly float SprintEmptyDoubleJumpInitialVelocity;
+
         #endregion
 
         #region Constructor(构造的数据快照)
@@ -59,6 +69,8 @@ namespace NiumaTPC.Character.Simulation
             float walkJumpInitialVelocity,
             float sprintJumpInitialVelocity,
             float sprintEmptyJumpInitialVelocity,
+            float doubleJumpInitialVelocity,
+            float sprintEmptyDoubleJumpInitialVelocity,
             CharacterStartMotionProfile[] startMotionProfiles)
         {
             WalkSpeed = Mathf.Max(0f, walkSpeed);
@@ -76,6 +88,8 @@ namespace NiumaTPC.Character.Simulation
             WalkJumpInitialVelocity =Mathf.Max(0f, walkJumpInitialVelocity);
             SprintJumpInitialVelocity =Mathf.Max(0f, sprintJumpInitialVelocity);
             SprintEmptyJumpInitialVelocity = Mathf.Max(0f, sprintEmptyJumpInitialVelocity);
+            DoubleJumpInitialVelocity = Mathf.Max(0f,doubleJumpInitialVelocity);
+            SprintEmptyDoubleJumpInitialVelocity = Mathf.Max(0f, sprintEmptyDoubleJumpInitialVelocity);
 
             _startMotionProfiles = startMotionProfiles != null && startMotionProfiles.Length == StartProfileCount ?
                                    startMotionProfiles : Array.Empty<CharacterStartMotionProfile>();
@@ -126,6 +140,9 @@ namespace NiumaTPC.Character.Simulation
             };
         }
 
+        /// <summary>
+        /// 获取跳跃向上初速度
+        /// </summary>
         public float GetJumpInitialVelocity(LocomotionState locomotionState, bool isHandsEmpty)
         {
             switch(locomotionState)
@@ -143,6 +160,16 @@ namespace NiumaTPC.Character.Simulation
                 default:
                     return DefaultJumpInitialVelocity;
             }
+        }
+
+        public float GetDoubleJumpInitialVelocity(LocomotionState locomotionState, bool isHandsEmpty)
+        {
+            if(locomotionState == LocomotionState.Sprint && isHandsEmpty)
+            {
+                return SprintEmptyDoubleJumpInitialVelocity;
+            }
+
+            return DoubleJumpInitialVelocity;
         }
 
         #endregion
