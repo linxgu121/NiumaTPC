@@ -26,7 +26,14 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             SelectDoubleJumpAnimation();
             ChooseOptionsAndPlay(_clipData.Clip);
-            PerformJumpPhysics();
+
+            if(!player.IsExternalJumpSimulationActive)
+            {
+                //离线旧链仍由状态机施加跳跃力
+                PerformJumpPhysics();
+                player.InputPipeline?.ConsumeJumpPressed();
+            }
+            
 
             // 消费跳跃输入 防止同帧重复触发
             player.InputPipeline.ConsumeJumpPressed();

@@ -4,6 +4,7 @@ using NiumaTPC.Character;
 using NiumaTPC.Character.Simulation;
 using NiumaTPC.FishNet.Prediction;
 using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.Motion.MotionEnums;
 using FishNet.Object.Prediction;
 using FishNet.Transporting;
 using FishNet.Connection;
@@ -687,6 +688,7 @@ namespace NiumaTPC.FishNet
 
             ApplyAirborneTransition(data,state.IsGrounded,state.VerticalVelocity);
 
+            ApplyDoubleJumpTransition(data, state.HasPerformedDoubleJumpInAir);
             /*
              * 远端副本不会运行 LocomotionIntentProcessor，
              * 因此必须由网络桥记录上一个运动档位。
@@ -702,6 +704,7 @@ namespace NiumaTPC.FishNet
             data.CurrentLocomotionState = state.LocomotionState;
             data.CurrentSpeed = state.SmoothSpeed;
             data.IsGrounded = state.IsGrounded;
+            data.HasPerformedDoubleJumpInAir = state.HasPerformedDoubleJumpInAir;
 
             data.SimulationMotionPhase = state.MotionPhase;
             data.SimulationMotionPhaseTick = state.MotionPhaseTick;
@@ -751,6 +754,23 @@ namespace NiumaTPC.FishNet
             {
                 data.WantsToFall = nextVerticalVelocity < _player.Config.Core.FallVerticalVelocityThreshold;
             }
+        }
+
+        /// <summary>
+        /// 根据模拟状态中的二段跳消费标记生成一次性表现意图。
+        /// 只有 false -> true 的边沿才触发动画。
+        /// </summary>
+        private static void ApplyDoubleJumpTransition(PlayerRuntimeData data, bool nextHasPerformedDoubleJumpInAir)
+        {
+            bool justPerformedDoubleJump = !data.HasPerformedDoubleJumpInAir && nextHasPerformedDoubleJumpInAir;
+
+            if(!justPerformedDoubleJump)
+            {
+                return;
+            }
+
+            data.DoubleJumpDirection = DoubleJumpDirection.Up;
+            data.WantsDoubleJump = true;
         }
 
         /// <summary>

@@ -1,3 +1,4 @@
+using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.State.Base;
 using NiumaTPC.Character.State.Core.Locomotion;
 using UnityEngine;
@@ -19,6 +20,28 @@ namespace NiumaTPC.Character.State.Core.Interceptors
             var config = player.Config;
 
             if(data == null || config == null) return false;
+
+            //判断是否从普通跳跃或下落状态切入二段跳表现
+            if(data.WantsDoubleJump)
+            {
+                if(currentState is PlayerDoubleJumpState || currentState is PlayerVaultState ||
+                   currentState is PlayerRollState || currentState is PlayerDodgeState)
+                {
+                    return false;
+                }
+
+                bool useSprintRoll = data.CurrentLocomotionState == LocomotionState.Sprint && data.CurrentItem == null;
+
+                data.NextStatePlayOptions = useSprintRoll
+                    ? config.JumpAndLanding.DoubleJumpSprintRollFadeInOptions
+                    : config.JumpAndLanding.DoubleJumpFadeInOptions;
+
+                data.WantsDoubleJump = false;
+
+                nextState = player.StateRegistry.GetState<PlayerDoubleJumpState>();
+
+                return nextState != null;
+            }
 
             if(!data.WantsToJump) return false;
 
