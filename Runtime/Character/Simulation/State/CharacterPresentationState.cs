@@ -65,6 +65,12 @@ namespace NiumaTPC.Character.Simulation
         public bool IsGrounded;
 
         /// <summary>
+        /// 本轮滞空是否已经消费二段跳。
+        /// 观察客户端通过它的 false -> true 边沿触发二段跳动画。
+        /// </summary>
+        public bool HasPerformedDoubleJumpInAir;
+
+        /// <summary>
         /// 当前经过平滑后的水平移动速度。
         /// </summary>
         public float Speed;
@@ -84,6 +90,7 @@ namespace NiumaTPC.Character.Simulation
             StartLocomotionState = simulationState.StartLocomotionState;
             MoveDirection = simulationState.LastMoveDirection;
             IsGrounded = simulationState.IsGrounded;
+            HasPerformedDoubleJumpInAir = simulationState.HasPerformedDoubleJumpInAir;
             Speed = simulationState.SmoothSpeed;
         }
     }

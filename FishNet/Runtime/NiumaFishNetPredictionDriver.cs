@@ -814,6 +814,7 @@ namespace NiumaTPC.FishNet
             data.CurrentSpeed = presentationState.Speed;
 
             ApplyAirborneTransition(data, presentationState.IsGrounded, presentationState.VerticalVelocity);
+            ApplyDoubleJumpTransition(data,presentationState.HasPerformedDoubleJumpInAir);
             data.IsGrounded = presentationState.IsGrounded;
             data.SimulationMotionPhase = presentationState.MotionPhase;
             data.SimulationMotionPhaseTick = presentationState.MotionPhaseTick;
