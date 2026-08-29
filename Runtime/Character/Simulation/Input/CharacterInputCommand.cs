@@ -5,6 +5,7 @@ namespace NiumaTPC.Character.Simulation
 {
     /// <summary>
     /// 某个模拟 Tick 中持续生效的按钮状态
+    /// 同时包含 Walk/Sprint 等持续状态和 Jump/Dodge/Roll 等缓冲按键边沿
     /// 使用位标志把多个 bool 压缩到一个 ushort 中
     /// </summary>
     [Flags]
@@ -16,7 +17,11 @@ namespace NiumaTPC.Character.Simulation
 
         Sprint = 1 << 1,
 
-        Jump = 1 << 2
+        Jump = 1 << 2,
+
+        Dodge = 1 <<3,
+
+        Roll = 1 << 4,
     }
 
     /// <summary>

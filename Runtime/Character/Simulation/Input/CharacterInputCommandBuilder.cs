@@ -38,6 +38,17 @@ namespace NiumaTPC.Character.Simulation
                 buttons |= CharacterInputButtons.Jump;
             }
 
+            // DodgePressed 和 RollPressed 都来自 InputPipeline 的输入缓冲，
+            // 避免按键发生在两个网络 Tick 之间时丢失。
+            if(input.DodgePressed)
+            {
+                buttons |= CharacterInputButtons.Dodge;
+            }
+            if(input.RollPressed)
+            {
+                buttons |= CharacterInputButtons.Roll;
+            }
+
             float normalizedYaw = Mathf.Repeat(viewYaw, 360f);
 
             return new CharacterInputCommand(tick, move, normalizedYaw, buttons);

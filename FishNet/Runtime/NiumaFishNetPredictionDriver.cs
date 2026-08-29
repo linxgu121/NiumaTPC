@@ -655,7 +655,8 @@ namespace NiumaTPC.FishNet
 
             CharacterInputButtons allowedButtons = 
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
-                CharacterInputButtons.Jump;
+                CharacterInputButtons.Jump | CharacterInputButtons.Dodge |
+                CharacterInputButtons.Roll;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 
@@ -816,6 +817,7 @@ namespace NiumaTPC.FishNet
             ApplyAirborneTransition(data, presentationState.IsGrounded, presentationState.VerticalVelocity);
             ApplyDoubleJumpTransition(data,presentationState.HasPerformedDoubleJumpInAir);
             data.IsGrounded = presentationState.IsGrounded;
+            data.HasPerformedDoubleJumpInAir = presentationState.HasPerformedDoubleJumpInAir;
             data.SimulationMotionPhase = presentationState.MotionPhase;
             data.SimulationMotionPhaseTick = presentationState.MotionPhaseTick;
             data.SimulationStartDirection = presentationState.StartDirection;
