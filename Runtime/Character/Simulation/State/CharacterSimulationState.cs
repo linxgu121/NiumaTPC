@@ -71,6 +71,12 @@ namespace NiumaTPC.Character.Simulation
         public bool IsGrounded;
 
         /// <summary>
+        /// 本轮置空是否已经消耗二连跳
+        /// 必须进入权威状态，否则 Reconcile 后可能重复获得二段跳
+        /// </summary>
+        public bool HasPerformedDoubleJumpInAir;
+
+        /// <summary>
         /// 移动速度平滑后的当前值。
         /// 它会影响下一 Tick，不能只保存最终位置。
         /// </summary>
@@ -99,6 +105,7 @@ namespace NiumaTPC.Character.Simulation
             LocomotionState startLocomotionState,
             Vector3 lastMoveDirection,
             bool isGrounded,
+            bool hasPerformedDoubleJumpInAir,
             float smoothSpeed,
             float speedSmoothVelocity,
             float rotationSmoothVelocity
@@ -115,6 +122,7 @@ namespace NiumaTPC.Character.Simulation
             StartLocomotionState = startLocomotionState;
             LastMoveDirection = lastMoveDirection;
             IsGrounded = isGrounded;
+            HasPerformedDoubleJumpInAir = hasPerformedDoubleJumpInAir;
             SmoothSpeed = smoothSpeed;
             SpeedSmoothVelocity = speedSmoothVelocity;
             RotationSmoothVelocity = rotationSmoothVelocity;

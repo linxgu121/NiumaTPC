@@ -146,6 +146,8 @@ namespace NiumaTPC.FishNet.Prediction
 
         public bool IsGrounded;
 
+        public bool HasPerformedDoubleJumpInAir;
+
         public float SmoothSpeed;
 
         public float SpeedSmoothVelocity;
@@ -178,6 +180,7 @@ namespace NiumaTPC.FishNet.Prediction
             StartLocomotionStateValue = (byte)state.StartLocomotionState;
             LastMoveDirection = state.LastMoveDirection;
             IsGrounded = state.IsGrounded;
+            HasPerformedDoubleJumpInAir = state.HasPerformedDoubleJumpInAir;
             SmoothSpeed = state.SmoothSpeed;
             SpeedSmoothVelocity = state.SpeedSmoothVelocity;
             RotationSmoothVelocity = state.RotationSmoothVelocity;
@@ -206,6 +209,7 @@ namespace NiumaTPC.FishNet.Prediction
                     (LocomotionState)StartLocomotionStateValue,
                 lastMoveDirection: LastMoveDirection,
                 isGrounded: IsGrounded,
+                hasPerformedDoubleJumpInAir:HasPerformedDoubleJumpInAir,
                 smoothSpeed: SmoothSpeed,
                 speedSmoothVelocity: SpeedSmoothVelocity,
                 rotationSmoothVelocity: RotationSmoothVelocity);

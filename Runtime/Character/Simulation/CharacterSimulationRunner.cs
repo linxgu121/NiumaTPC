@@ -45,6 +45,7 @@ namespace NiumaTPC.Character.Simulation
                 startLocomotionState: LocomotionState.Idle,
                 lastMoveDirection: Vector3.zero,
                 isGrounded: body.IsGrounded,
+                hasPerformedDoubleJumpInAir: false,
                 smoothSpeed: 0f,
                 speedSmoothVelocity: 0f,
                 rotationSmoothVelocity: 0f
