@@ -1,11 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
 using Animancer;
 using NiumaTPC.Character.Core.Animation;
-using NiumaTPC.Character.Data;
 using UnityEngine;
 
-namespace NiumaTPC.Character.Data.Base
+namespace NiumaTPC.Item
 {
     /// <summary>
     /// 可装备物品图纸基类：包含了实例化所需的外壳 Prefab 和基础通用动画。
@@ -23,7 +20,7 @@ namespace NiumaTPC.Character.Data.Base
         [Header("通用表现动画")]
         [Tooltip("拔出/装备时的动画")]
         public ClipTransition EquipAnim;
-        public AnimPlayOptions EquipAnimPlayOption = AnimPlayOptions.UpperBodyDefault;
+        public AnimPlayOptions EquipAnimPlayOptions = AnimPlayOptions.UpperBodyDefault;
 
         [Tooltip("收起时的动画")]
         public ClipTransition UnEquipAnim;

@@ -1,11 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
-using NiumaTPC.Character;
-using NiumaTPC.Character.Core;
+using NiumaTPC.Item;
 using NiumaTPC.Character.Simulation;
 using UnityEngine;
 

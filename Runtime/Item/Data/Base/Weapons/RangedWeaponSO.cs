@@ -1,10 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
 using Animancer;
 using NiumaTPC.Character.Core.Animation;
 using UnityEngine;
 
-namespace NiumaTPC.Character.Data.Base.Weapon
+namespace NiumaTPC.Item
 {
     [CreateAssetMenu(fileName = "New Ranged Weapon", menuName = "NiumaTPC/Items/Weapons/Ranged Weapon")]
     public class RangedWeaponSO : EquippableItemSO

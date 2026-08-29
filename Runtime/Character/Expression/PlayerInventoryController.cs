@@ -1,10 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.RuntimeData;
-using NiumaTPC.Character.Core;
-using NiumaTPC.Character.Data.Base;
 using NiumaTPC.Character.Storage;
 using UnityEngine;
+using NiumaTPC.Item;
 
 namespace NiumaTPC.Character.Expression
 {

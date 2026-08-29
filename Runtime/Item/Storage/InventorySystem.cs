@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using NiumaTPC.Character.Data;
-using NiumaTPC.Character.Core;
+using NiumaTPC.Item;
 using UnityEngine;
 
 namespace NiumaTPC.Character.Storage

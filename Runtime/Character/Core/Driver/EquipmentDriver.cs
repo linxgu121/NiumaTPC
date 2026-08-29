@@ -1,10 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
+using NiumaTPC.Item;
 using NiumaTPC.Core.Object;
-using NiumaTPC.Character;
-using NiumaTPC.Character.Base.Core;
-using NiumaTPC.Character.Core;
-using NiumaTPC.Character.Data.Base;
 using UnityEngine;
 
 namespace NiumaTPC.Character.Core.Driver

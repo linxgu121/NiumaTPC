@@ -15,12 +15,11 @@ using NiumaTPC.Character.RuntimeData;
 using NiumaTPC.Character.State.Core;
 using NiumaTPC.Character.State.Core.Interceptors;
 using NiumaTPC.Core.Combat;
-using NiumaTPC.Core.Object.Base;
 using NiumaTPC.Core.StateMachine;
-using NiumaTPC.Character.Core;
-using NiumaTPC.Character.Data.Base;
+using NiumaTPC.Item;
 using UnityEngine;
 using NiumaTPC.Character.Core.Animation;
+using NiumaTPC.Core.Object;
 
 namespace NiumaTPC.Character
 {

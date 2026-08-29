@@ -1,8 +1,4 @@
-using System.Collections;
-using System.Collections.Generic;
-using NiumaTPC.Character.Base.Core;
-using NiumaTPC.Character.Core;
-using UnityEngine;
+using NiumaTPC.Item;
 
 namespace NiumaTPC.Character.State.UpperBody
 {

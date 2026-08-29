@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using NiumaTPC.Core.Object.Base;
+using NiumaTPC.Core.Object;
 
 namespace NiumaTPC.Core.Object
 {

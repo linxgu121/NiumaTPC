@@ -1,10 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using NiumaTPC.Character.Data;
-using UnityEngine;
 
-namespace NiumaTPC.Character.Core
+namespace NiumaTPC.Item
 {
     /// <summary>
     /// 物品运行时逻辑实例 存储在背包和手上 记录物品逻辑状态
