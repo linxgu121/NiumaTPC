@@ -55,13 +55,14 @@ namespace NiumaTPC.Character.Simulation
 
         #region Simulation(模拟核心逻辑)
 
-        public CharacterSimulationState Simulate(in CharacterInputCommand command, bool canSprint, float tickDeltaTime)
+        public CharacterSimulationState Simulate(in CharacterInputCommand command, bool canSprint, bool isHandsEmpty, float tickDeltaTime)
         {
             Vector3 displacement = CharacterMovementSimulator.Simulate(
                 ref _state,
                 in command,
                 in _config,
                 canSprint,
+                isHandsEmpty,
                 tickDeltaTime
             );
 

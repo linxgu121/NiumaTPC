@@ -269,10 +269,13 @@ namespace NiumaTPC.Character.Simulation
                 !_player.RuntimeData.IsStaminaDepleted &&
                 _player.RuntimeData.CurrentStamina > 0f;
 
+            bool isHandsEmpty = _player.RuntimeData.CurrentItem == null;
+
             CharacterSimulationState state =
                 _runner.Simulate(
                     in command,
                     canSprint,
+                    isHandsEmpty,
                     tickDeltaTime);
 
             WriteStateToRuntimeData(

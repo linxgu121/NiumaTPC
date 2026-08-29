@@ -37,7 +37,10 @@ namespace NiumaTPC.Character.Simulation
         /// <summary>
         /// 地面起跳的时候赋予角色的向上初速度
         /// </summary>
-        public readonly float JumpInitialVelocity;
+        public readonly float DefaultJumpInitialVelocity;
+        public readonly float WalkJumpInitialVelocity;
+        public readonly float SprintJumpInitialVelocity;
+        public readonly float SprintEmptyJumpInitialVelocity;
 
         #endregion
 
@@ -52,7 +55,10 @@ namespace NiumaTPC.Character.Simulation
             float gravity,
             float groundedVerticalVelocity,
             float airControl,
-            float jumpInitialVelocity,
+            float defaultJumpInitialVelocity,
+            float walkJumpInitialVelocity,
+            float sprintJumpInitialVelocity,
+            float sprintEmptyJumpInitialVelocity,
             CharacterStartMotionProfile[] startMotionProfiles)
         {
             WalkSpeed = Mathf.Max(0f, walkSpeed);
@@ -65,7 +71,11 @@ namespace NiumaTPC.Character.Simulation
             Gravity = gravity;
             GroundedVerticalVelocity = groundedVerticalVelocity;
             AirControl = Mathf.Clamp01(airControl);
-            JumpInitialVelocity = Mathf.Max(0f,jumpInitialVelocity);
+
+            DefaultJumpInitialVelocity = Mathf.Max(0f, defaultJumpInitialVelocity);
+            WalkJumpInitialVelocity =Mathf.Max(0f, walkJumpInitialVelocity);
+            SprintJumpInitialVelocity =Mathf.Max(0f, sprintJumpInitialVelocity);
+            SprintEmptyJumpInitialVelocity = Mathf.Max(0f, sprintEmptyJumpInitialVelocity);
 
             _startMotionProfiles = startMotionProfiles != null && startMotionProfiles.Length == StartProfileCount ?
                                    startMotionProfiles : Array.Empty<CharacterStartMotionProfile>();
@@ -114,6 +124,25 @@ namespace NiumaTPC.Character.Simulation
                 LocomotionState.Sprint => SprintSpeed,
                 _=> 0f
             };
+        }
+
+        public float GetJumpInitialVelocity(LocomotionState locomotionState, bool isHandsEmpty)
+        {
+            switch(locomotionState)
+            {
+                case LocomotionState.Idle:
+                    return DefaultJumpInitialVelocity;
+
+                case LocomotionState.Walk:
+                case LocomotionState.Jog:
+                    return WalkJumpInitialVelocity;
+                
+                case LocomotionState.Sprint:
+                    return isHandsEmpty ? SprintEmptyJumpInitialVelocity : SprintJumpInitialVelocity;
+
+                default:
+                    return DefaultJumpInitialVelocity;
+            }
         }
 
         #endregion

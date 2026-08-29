@@ -15,6 +15,7 @@ namespace NiumaTPC.Character.Simulation
             in CharacterInputCommand command,
             in CharacterSimulationConfig config,
             bool canSprint,
+            bool isHandsEmpty,
             float tickDeltaTime
         )
         {
@@ -23,7 +24,7 @@ namespace NiumaTPC.Character.Simulation
 
             Vector3 horizontalDisplacement = CharacterHorizontalMovementSimulator.Simulate(ref state, in command, in config, canSprint, tickDeltaTime);
 
-            Vector3 verticalDisplacement = CharacterVerticalMovementSimulator.Simulate(ref state, in command, in config, tickDeltaTime);
+            Vector3 verticalDisplacement = CharacterVerticalMovementSimulator.Simulate(ref state, in command, in config, isHandsEmpty, tickDeltaTime);
 
             return horizontalDisplacement + verticalDisplacement;
         }

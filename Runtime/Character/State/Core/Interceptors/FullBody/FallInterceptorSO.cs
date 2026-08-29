@@ -18,7 +18,7 @@ namespace NiumaTPC.Character.State.Core.Interceptors
             var config = player.Config;
 
             //检测下落意图和垂直速度
-            if(data.WantsToFire && data.VerticalVelocity < config.Core.FallVerticalVelocityThreshold &&
+            if(data.WantsToFall && data.VerticalVelocity < config.Core.FallVerticalVelocityThreshold &&
             currentState is not PlayerFallState && currentState is not PlayerVaultState)
             {
                 data.NextStatePlayOptions = config.LocomotionAnims.FadeInFallOptions;

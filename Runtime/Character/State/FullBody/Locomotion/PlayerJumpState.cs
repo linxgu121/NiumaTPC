@@ -45,10 +45,11 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             if(!player.IsExternalJumpSimulationActive)
             {
                 PerformJumpPhysics();
+
+                // 旧链路由状态机消费；固定 Tick 链路此前已经消费。
+                player.InputPipeline?.ConsumeJumpPressed();
             }
 
-            // 消费跳跃输入 防止同帧重复触发
-            player.InputPipeline.ConsumeJumpPressed();
         }
 
         // 根据当前运动状态和装备情况选择对应的跳跃动画和跳跃力量
@@ -59,6 +60,9 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             switch (data.CurrentLocomotionState)
             {
                 case LocomotionState.Idle:
+                    _clipData = config.JumpAndLanding.JumpAirAnim;
+                    _jumpForce = config.JumpAndLanding.JumpForce;
+                    break;
                 case LocomotionState.Walk:
                 case LocomotionState.Jog:
                     _clipData = config.JumpAndLanding.JumpAirAnimWalk ?? config.JumpAndLanding.JumpAirAnim;

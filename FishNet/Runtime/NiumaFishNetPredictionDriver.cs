@@ -369,10 +369,12 @@ namespace NiumaTPC.FishNet
              * 不接受客户端在网络包中直接声明。
              */
             bool canSprint = !_player.RuntimeData.IsStaminaDepleted && _player.RuntimeData.CurrentStamina > 0f;
+            
+            bool isHandsEmpty = _player.RuntimeData.CurrentItem == null;
 
             float tickDeltaTime = (float)TimeManager.TickDelta;
 
-            CharacterSimulationState state = _runner.Simulate(in command, canSprint, tickDeltaTime);
+            CharacterSimulationState state = _runner.Simulate(in command, canSprint,isHandsEmpty ,tickDeltaTime);
 
             /*
              * 纯观察客户端仍需执行 FishNet 的远端模拟，
@@ -683,7 +685,7 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
-            bool jumpStated =  data.IsGrounded && !state.IsGrounded && state.VerticalVelocity > 0f;
+            ApplyAirborneTransition(data,state.IsGrounded,state.VerticalVelocity);
 
             /*
              * 远端副本不会运行 LocomotionIntentProcessor，
@@ -712,9 +714,42 @@ namespace NiumaTPC.FishNet
              */
             data.DesiredWorldMoveDir = state.MotionPhase == CharacterMotionPhase.Idle ? Vector3.zero : state.LastMoveDirection;
 
-            if(jumpStated)
+        }
+
+        /// <summary>
+        /// 根据前后接地状态生成一次性跳跃、离地、落地和下落意图。
+        /// 远端副本不会运行本地 GameplayParameterProcessor，
+        /// 因此这些事实必须由服务器状态快照推导。
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="nextIsGrounded"></param>
+        /// <param name="nextVerticalVelocity"></param>
+        private void ApplyAirborneTransition(
+            PlayerRuntimeData data,
+            bool nextIsGrounded,
+            float nextVerticalVelocity)
+        {
+            bool wasGrounded = data.IsGrounded;
+
+            bool justLeftGround = wasGrounded && !nextIsGrounded;
+
+            bool justLanded = !wasGrounded && nextIsGrounded;
+
+            data.JustLeftGround = justLeftGround;
+            data.JustLanded = justLanded;
+
+            if(justLeftGround && nextVerticalVelocity > 0f)
             {
                 data.WantsToJump = true;
+            }
+
+            if(nextIsGrounded)
+            {
+                data.WantsToFall = false;
+            }
+            else
+            {
+                data.WantsToFall = nextVerticalVelocity < _player.Config.Core.FallVerticalVelocityThreshold;
             }
         }
 
@@ -758,8 +793,7 @@ namespace NiumaTPC.FishNet
             data.CurrentLocomotionState = presentationState.LocomotionState;
             data.CurrentSpeed = presentationState.Speed;
 
-            bool jumpStarted = data.IsGrounded && !presentationState.IsGrounded && presentationState.VerticalVelocity > 0f;
-            
+            ApplyAirborneTransition(data, presentationState.IsGrounded, presentationState.VerticalVelocity);
             data.IsGrounded = presentationState.IsGrounded;
             data.SimulationMotionPhase = presentationState.MotionPhase;
             data.SimulationMotionPhaseTick = presentationState.MotionPhaseTick;
@@ -794,10 +828,6 @@ namespace NiumaTPC.FishNet
 
             data.MoveInput = hasMoveInput ? ConvertWorldDirectionToMoveInput( worldDirection, presentationState.Yaw) : Vector2.zero;
 
-            if (jumpStarted)
-            {
-               data.WantsToJump = true;
-            }
         }
 
         #endregion

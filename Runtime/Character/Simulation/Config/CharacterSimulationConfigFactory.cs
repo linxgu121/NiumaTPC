@@ -64,7 +64,11 @@ namespace NiumaTPC.Character.Simulation
                 gravity: core.Gravity,
                 groundedVerticalVelocity: core.ReboundForce,
                 airControl: core.AirControl,
-                jumpInitialVelocity:jump.JumpForce,
+                
+                defaultJumpInitialVelocity:jump.JumpForce,
+                walkJumpInitialVelocity:jump.JumpForceWalk,
+                sprintJumpInitialVelocity:jump.JumpForceSprint,
+                sprintEmptyJumpInitialVelocity:jump.JumpForceSprintEmpty,
                 
                 startMotionProfiles: startProfiles
             );

@@ -17,6 +17,7 @@ namespace NiumaTPC.Character.Simulation
             ref CharacterSimulationState state,
             in CharacterInputCommand command,
             in CharacterSimulationConfig config,
+            bool isHandsEmpty,
             float tickDeltaTime
         )
         {
@@ -26,7 +27,7 @@ namespace NiumaTPC.Character.Simulation
 
             if(wantsToJump && state.IsGrounded)
             {
-                state.VerticalVelocity = config.JumpInitialVelocity;
+                state.VerticalVelocity = config.GetJumpInitialVelocity(state.LocomotionState,isHandsEmpty);
                 state.IsGrounded = false;
             }
             else if(state.IsGrounded && state.VerticalVelocity < 0f)
