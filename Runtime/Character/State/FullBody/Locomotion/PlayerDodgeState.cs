@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
@@ -9,7 +7,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家闪避状态 
-    /// 负责执行闪避动画和运动变形 根据移动方向选择8方向闪避 最后回到移动或空闲状态
+    /// 负责执行闪避动画和独立平滑位移，根据移动方向选择八方向闪避，最后回到移动或空闲状态。
     /// </summary>
     public class PlayerDodgeState : PlayerBaseState
     {
@@ -19,6 +17,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 累计播放时长和是否已触发 EndTime 逻辑 防止重复执行
         private float _stateDuration;
         private bool _endTimeTriggered;
+        private bool _animationEnded;
 
         public PlayerDodgeState(NiumaCharacterController player) : base(player) { }
 
@@ -36,9 +35,10 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             _stateDuration = 0f;
             _endTimeTriggered = false;
+            _animationEnded = false;
 
             // 根据方向选择闪避数据
-            _selectedData = GetDodgeData();
+            _selectedData = GetDodgeData(out Vector3 actionLocalDirection);
 
             // 如果没有闪避数据 回到空闲
             if (_selectedData == null || _selectedData.Clip == null)
@@ -47,15 +47,26 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            // 初始化运动变形
-            player.MotionDriver.InitializeWarpData(_selectedData);
+            // 动画只负责表现，位移使用 DodgingSO 的独立配置。
+            player.MotionDriver.InitializeActionMotion(
+                actionLocalDirection,
+                config.Dodging.DistanceMeters,
+                config.Dodging.DurationSeconds,
+                config.Dodging.ProgressCurve,
+                config.Dodging.ApplyGravity);
 
             ChooseOptionsAndPlay(_selectedData.Clip);
 
             // 设置结束回调 如果提前触发EndTime则忽略此回调
             player.AnimationFacade.SetOnEndCallback(() =>
             {
-                if (_endTimeTriggered) return;
+                _animationEnded = true;
+                if (_endTimeTriggered ||
+                    !player.MotionDriver.IsActionMotionComplete)
+                {
+                    return;
+                }
+
                 HandleDodgeEnd();
             });
 
@@ -68,18 +79,24 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         {
         }
 
-        // 物理更新 计算运动变形时间 驱动Warp运动
+        // 物理更新 按 DodgingSO 的累计曲线驱动平滑位移
         public override void PhysicsUpdate()
         {
             if (_selectedData == null) return;
 
-            float normalizedTime = player.AnimationFacade.CurrentNormalizedTime;
-            player.MotionDriver.UpdateWarpMotion(normalizedTime);
+            bool motionComplete =
+                player.MotionDriver.UpdateActionMotion(Time.deltaTime);
 
             // 累计播放时长 检查是否到达 EndTime 提前切换
             _stateDuration = player.AnimationFacade.CurrentTime;
 
-            if (!_endTimeTriggered && _selectedData.EndTime > 0f && _stateDuration >= _selectedData.EndTime)
+            bool reachedEarlyEnd =
+                _selectedData.EndTime > 0f &&
+                _stateDuration >= _selectedData.EndTime;
+
+            if (!_endTimeTriggered &&
+                motionComplete &&
+                (_animationEnded || reachedEarlyEnd))
             {
                 _endTimeTriggered = true;
                 HandleDodgeEnd();
@@ -93,7 +110,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             data.IsDodging = false;
             data.WantsToDodge = false;
 
-            player.MotionDriver.ClearWarpData();
+            player.MotionDriver.ClearActionMotion();
 
             player.AnimationFacade.ClearOnEndCallback();
 
@@ -101,7 +118,8 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         }
 
         // 根据运动方向获取闪避动画数据 8方向量化
-        private WarpedMotionData GetDodgeData()
+        private WarpedMotionData GetDodgeData(
+            out Vector3 localDirection)
         {
             float angle = data.DesiredLocalMoveAngle;
 
@@ -110,30 +128,55 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             // 8方向判断逻辑 初始化使用连续输入的8方向扇区量化
             if (angle > -HalfSectorAngle && angle <= HalfSectorAngle)
+            {
+                localDirection = Vector3.forward;
                 return config.Dodging.ForwardDodge;
+            }
 
             if (angle > HalfSectorAngle && angle <= HalfSectorAngle + SectorAngle)
+            {
+                localDirection = new Vector3(1f, 0f, 1f).normalized;
                 return config.Dodging.ForwardRightDodge;
+            }
 
             if (angle > HalfSectorAngle + SectorAngle && angle <= HalfSectorAngle + SectorAngle * 2)
+            {
+                localDirection = Vector3.right;
                 return config.Dodging.RightDodge;
+            }
 
             if (angle > HalfSectorAngle + SectorAngle * 2 && angle <= 180f - HalfSectorAngle)
+            {
+                localDirection = new Vector3(1f, 0f, -1f).normalized;
                 return config.Dodging.BackwardRightDodge;
+            }
 
             if (angle > 180f - HalfSectorAngle || angle <= -180f + HalfSectorAngle)
+            {
+                localDirection = Vector3.back;
                 return config.Dodging.BackwardDodge;
+            }
 
             if (angle > -180f + HalfSectorAngle && angle <= -HalfSectorAngle - SectorAngle * 2)
+            {
+                localDirection = new Vector3(-1f, 0f, -1f).normalized;
                 return config.Dodging.BackwardLeftDodge;
+            }
 
             if (angle > -HalfSectorAngle - SectorAngle * 2 && angle <= -HalfSectorAngle - SectorAngle)
+            {
+                localDirection = Vector3.left;
                 return config.Dodging.LeftDodge;
+            }
 
             if (angle > -HalfSectorAngle - SectorAngle && angle <= -HalfSectorAngle)
+            {
+                localDirection = new Vector3(-1f, 0f, 1f).normalized;
                 return config.Dodging.ForwardLeftDodge;
+            }
 
             // 兜底使用左闪避
+            localDirection = Vector3.left;
             return config.Dodging.LeftDodge;
         }
 

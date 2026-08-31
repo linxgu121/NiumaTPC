@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.RuntimeData;
@@ -124,9 +122,41 @@ namespace NiumaTPC.Character.Core.Driver
             }
         }
 
+        /// <summary>
+        /// 翻滚/闪避的固定距离位移上下文。
+        /// 进入动作时将本地方向转换为世界方向并锁定，避免中途输入改变路径。
+        /// </summary>
+        private struct ActionMotionCtx
+        {
+            public Vector3 WorldDirection;
+            public float DistanceMeters;
+            public float DurationSeconds;
+            public AnimationCurve ProgressCurve;
+            public bool ApplyGravity;
+            public float ElapsedSeconds;
+            public float PreviousProgress;
+            public bool IsActive;
+
+            public bool IsComplete =>
+                IsActive && ElapsedSeconds >= DurationSeconds;
+
+            public void Clear()
+            {
+                WorldDirection = Vector3.zero;
+                DistanceMeters = 0f;
+                DurationSeconds = 0f;
+                ProgressCurve = null;
+                ApplyGravity = true;
+                ElapsedSeconds = 0f;
+                PreviousProgress = 0f;
+                IsActive = false;
+            }
+        }
+
         private LocomotionCtx _loco;
         private CurveCtx _curve;
         private WarpCtx _warp;
+        private ActionMotionCtx _actionMotion;
 
         // 单帧重力缓存：避免同帧多处调用重复积分 VerticalVelocity
         private int _gravityFrame = -1;
@@ -290,6 +320,113 @@ namespace NiumaTPC.Character.Core.Driver
         /// 清空扭曲运动数据
         /// </summary>
         public void ClearWarpData() => _warp.Clear();
+
+        #endregion
+
+        #region 固定距离动作位移API
+
+        /// <summary>
+        /// 开始一段固定距离动作位移。
+        /// localDirection 只在进入动作时采样一次，后续保持世界方向不变。
+        /// </summary>
+        public void InitializeActionMotion(
+            Vector3 localDirection,
+            float distanceMeters,
+            float durationSeconds,
+            AnimationCurve progressCurve,
+            bool applyGravity)
+        {
+            localDirection.y = 0f;
+            if (localDirection.sqrMagnitude < 0.0001f)
+            {
+                localDirection = Vector3.forward;
+            }
+            else
+            {
+                localDirection.Normalize();
+            }
+
+            Vector3 worldDirection =
+                _transform.TransformDirection(localDirection);
+            worldDirection.y = 0f;
+            worldDirection.Normalize();
+
+            _actionMotion.WorldDirection = worldDirection;
+            _actionMotion.DistanceMeters = Mathf.Max(0f, distanceMeters);
+            _actionMotion.DurationSeconds = Mathf.Max(0.01f, durationSeconds);
+            _actionMotion.ProgressCurve = progressCurve;
+            _actionMotion.ApplyGravity = applyGravity;
+            _actionMotion.ElapsedSeconds = 0f;
+            _actionMotion.PreviousProgress = 0f;
+            _actionMotion.IsActive = true;
+
+            // 动作位移不继承普通 Locomotion 的速度平滑缓存。
+            _loco.ResetSpeed();
+        }
+
+        /// <summary>
+        /// 按累计进度曲线的本帧差值推进动作位移。
+        /// 返回 true 表示配置的位移时长已结束。
+        /// </summary>
+        public bool UpdateActionMotion(float deltaTime)
+        {
+            if (!_actionMotion.IsActive)
+            {
+                return false;
+            }
+
+            float safeDeltaTime = Mathf.Max(0f, deltaTime);
+            float nextElapsed = Mathf.Min(
+                _actionMotion.ElapsedSeconds + safeDeltaTime,
+                _actionMotion.DurationSeconds);
+            float normalizedTime =
+                nextElapsed / _actionMotion.DurationSeconds;
+
+            float nextProgress = normalizedTime >= 1f
+                ? 1f
+                : EvaluateActionProgress(
+                    _actionMotion.ProgressCurve,
+                    normalizedTime);
+
+            // 非法的非单调曲线不允许将角色向后拉回。
+            nextProgress = Mathf.Max(
+                _actionMotion.PreviousProgress,
+                nextProgress);
+
+            float frameDistance =
+                _actionMotion.DistanceMeters *
+                (nextProgress - _actionMotion.PreviousProgress);
+            Vector3 displacement =
+                _actionMotion.WorldDirection * frameDistance;
+
+            if (_actionMotion.ApplyGravity)
+            {
+                displacement += GetGravityThisFrame() * safeDeltaTime;
+            }
+            else
+            {
+                _data.IsGrounded = _cc.isGrounded;
+            }
+
+            _cc.Move(displacement);
+            _data.CurrentSpeed = _cc.velocity.magnitude;
+
+            _actionMotion.ElapsedSeconds = nextElapsed;
+            _actionMotion.PreviousProgress = nextProgress;
+            return _actionMotion.IsComplete;
+        }
+
+        /// <summary>
+        /// 当前动作位移是否已完成配置的持续时间。
+        /// </summary>
+        public bool IsActionMotionComplete =>
+            _actionMotion.IsComplete;
+
+        /// <summary>
+        /// 清理翻滚/闪避位移上下文。
+        /// </summary>
+        public void ClearActionMotion() =>
+            _actionMotion.Clear();
 
         #endregion
         
@@ -505,6 +642,20 @@ namespace NiumaTPC.Character.Core.Driver
 
             _cachedGravity = new Vector3(0f, _data.VerticalVelocity, 0f);
             return _cachedGravity;
+        }
+
+        /// <summary>
+        /// 采样动作的累计位移进度，未配置曲线时使用线性进度。
+        /// </summary>
+        private static float EvaluateActionProgress(
+            AnimationCurve curve,
+            float normalizedTime)
+        {
+            float clampedTime = Mathf.Clamp01(normalizedTime);
+            float progress = curve != null
+                ? curve.Evaluate(clampedTime)
+                : clampedTime;
+            return Mathf.Clamp01(progress);
         }
 
         /// <summary>

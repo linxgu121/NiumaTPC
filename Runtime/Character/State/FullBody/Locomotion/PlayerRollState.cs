@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
@@ -9,7 +7,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家翻滚状态
-    /// 负责执行翻滚动画和运动变形 根据移动方向选择8方向翻滚 最后回到移动或空闲状态
+    /// 负责执行翻滚动画和独立平滑位移，根据移动方向选择八方向翻滚，最后回到移动或空闲状态。
     /// </summary>
     public class PlayerRollState : PlayerBaseState
     {
@@ -19,6 +17,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 累计播放时长和是否已触发 EndTime 逻辑 防止重复执行
         private float _stateDuration;
         private bool _endTimeTriggered;
+        private bool _animationEnded;
 
         public PlayerRollState(NiumaCharacterController player) : base(player) { }
 
@@ -35,9 +34,10 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             _stateDuration = 0f;
             _endTimeTriggered = false;
+            _animationEnded = false;
 
             // 根据方向选择翻滚数据
-            _selectedData = GetRollData();
+            _selectedData = GetRollData(out Vector3 actionLocalDirection);
 
             // 如果没有翻滚数据 回到空闲
             if (_selectedData == null || _selectedData.Clip == null)
@@ -46,15 +46,26 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            // 初始化运动变形
-            player.MotionDriver.InitializeWarpData(_selectedData);
+            // 动画只负责表现，位移使用 RollSO 的独立配置。
+            player.MotionDriver.InitializeActionMotion(
+                actionLocalDirection,
+                config.Rolling.DistanceMeters,
+                config.Rolling.DurationSeconds,
+                config.Rolling.ProgressCurve,
+                config.Rolling.ApplyGravity);
 
             ChooseOptionsAndPlay(_selectedData.Clip);
 
             // 设置结束回调 如果提前触发EndTime则忽略此回调
             player.AnimationFacade.SetOnEndCallback(() =>
             {
-                if (_endTimeTriggered) return;
+                _animationEnded = true;
+                if (_endTimeTriggered ||
+                    !player.MotionDriver.IsActionMotionComplete)
+                {
+                    return;
+                }
+
                 HandleRollEnd();
             });
 
@@ -67,18 +78,25 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         {
         }
 
-        // 物理更新 计算运动变形时间 驱动Warp运动
+        // 物理更新 按 RollSO 的累计曲线驱动平滑位移
         public override void PhysicsUpdate()
         {
             if (_selectedData == null) return;
 
-            float normalizedTime = player.AnimationFacade.CurrentNormalizedTime;
-            player.MotionDriver.UpdateWarpMotion(normalizedTime);
+            bool motionComplete =
+                player.MotionDriver.UpdateActionMotion(Time.deltaTime);
 
             // 累计播放时长 检查是否到达 EndTime 提前切换
             _stateDuration = player.AnimationFacade.CurrentTime;
 
-            if (!_endTimeTriggered && _selectedData.EndTime > 0f && _stateDuration >= _selectedData.EndTime && data.CurrentLocomotionState != LocomotionState.Idle)
+            bool reachedEarlyEnd =
+                _selectedData.EndTime > 0f &&
+                _stateDuration >= _selectedData.EndTime &&
+                data.CurrentLocomotionState != LocomotionState.Idle;
+
+            if (!_endTimeTriggered &&
+                motionComplete &&
+                (_animationEnded || reachedEarlyEnd))
             {
                 _endTimeTriggered = true;
                 HandleRollEnd();
@@ -91,7 +109,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         {
             data.WantsToRoll = false;
 
-            player.MotionDriver.ClearWarpData();
+            player.MotionDriver.ClearActionMotion();
 
             player.AnimationFacade.ClearOnEndCallback();
 
@@ -99,7 +117,8 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         }
 
         // 根据方向获取翻滚动画数据 8方向量化
-        private WarpedMotionData GetRollData()
+        private WarpedMotionData GetRollData(
+            out Vector3 localDirection)
         {
             float angle = data.DesiredLocalMoveAngle;
 
@@ -108,30 +127,55 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             // 8方向判断逻辑
             if (angle > -HalfSectorAngle && angle <= HalfSectorAngle)
+            {
+                localDirection = Vector3.forward;
                 return config.Rolling.ForwardRoll;
+            }
 
             if (angle > HalfSectorAngle && angle <= HalfSectorAngle + SectorAngle)
+            {
+                localDirection = new Vector3(1f, 0f, 1f).normalized;
                 return config.Rolling.ForwardRightRoll;
+            }
 
             if (angle > HalfSectorAngle + SectorAngle && angle <= HalfSectorAngle + SectorAngle * 2)
+            {
+                localDirection = Vector3.right;
                 return config.Rolling.RightRoll;
+            }
 
             if (angle > HalfSectorAngle + SectorAngle * 2 && angle <= 180f - HalfSectorAngle)
+            {
+                localDirection = new Vector3(1f, 0f, -1f).normalized;
                 return config.Rolling.BackwardRightRoll;
+            }
 
             if (angle > 180f - HalfSectorAngle || angle <= -180f + HalfSectorAngle)
+            {
+                localDirection = Vector3.back;
                 return config.Rolling.BackwardRoll;
+            }
 
             if (angle > -180f + HalfSectorAngle && angle <= -HalfSectorAngle - SectorAngle * 2)
+            {
+                localDirection = new Vector3(-1f, 0f, -1f).normalized;
                 return config.Rolling.BackwardLeftRoll;
+            }
 
             if (angle > -HalfSectorAngle - SectorAngle * 2 && angle <= -HalfSectorAngle - SectorAngle)
+            {
+                localDirection = Vector3.left;
                 return config.Rolling.LeftRoll;
+            }
 
             if (angle > -HalfSectorAngle - SectorAngle && angle <= -HalfSectorAngle)
+            {
+                localDirection = new Vector3(-1f, 0f, 1f).normalized;
                 return config.Rolling.ForwardLeftRoll;
+            }
 
             // 兜底使用左翻滚
+            localDirection = Vector3.left;
             return config.Rolling.LeftRoll;
         }
 
