@@ -1,5 +1,6 @@
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.Simulation;
 using UnityEngine;
 
 namespace NiumaTPC.Character.ProcessingPipeline.Parameter
@@ -70,6 +71,15 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
         /// </summary>
         private void UpdateDesiredLocalMoveAngleFromWorldDir()
         {
+            if (_data.SimulationActionType != CharacterActionType.None)
+            {
+                /*
+                 * Roll/Dodge 的方向已经在动作开始时锁定。
+                 * 动作期间不能让新的移动输入覆盖动画方向。
+                 */
+                return;
+            }
+
             Vector3 worldDir = _data.DesiredWorldMoveDir;
             if (worldDir.sqrMagnitude < 0.0001f)
             {

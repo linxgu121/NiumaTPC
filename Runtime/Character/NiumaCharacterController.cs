@@ -334,7 +334,9 @@ namespace NiumaTPC.Character
                 //只有本地输入拥有者才能读取设备输入并产生玩法意图
                 InputPipeline.Update();
 
-                MainProcessorPipeline.UpdateIntentProcessors(processJumpOrVaultIntent: !_externalJumpSimulationActive);
+                MainProcessorPipeline.UpdateIntentProcessors(
+                    processJumpOrVaultIntent: !_externalJumpSimulationActive,
+                    processActionMovementIntent: !MotionDriver.IsExternalSimulationActive);
             }
 
             InventoryController.Update();

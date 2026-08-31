@@ -697,6 +697,12 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            CharacterActionPresentationBridge.Apply(
+                data,
+                state.ActionType,
+                state.ActionTick,
+                state.ActionDirection);
+
             ApplyAirborneTransition(data,state.IsGrounded,state.VerticalVelocity);
 
             ApplyDoubleJumpTransition(data, state.HasPerformedDoubleJumpInAir);
@@ -809,6 +815,12 @@ namespace NiumaTPC.FishNet
         private void ApplyPresentationState(in CharacterPresentationState presentationState)
         {
             PlayerRuntimeData data = _player.RuntimeData;
+
+            CharacterActionPresentationBridge.Apply(
+                data,
+                presentationState.ActionType,
+                presentationState.ActionTick,
+                presentationState.ActionDirection);
 
             /*
              * 记录上一个速度档位。

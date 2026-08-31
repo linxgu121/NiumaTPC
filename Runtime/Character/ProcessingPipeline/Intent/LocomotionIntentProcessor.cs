@@ -21,10 +21,10 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
             _config = config;
         }
 
-        public void Update(in ProcessedInputData input)
+        public void Update(in ProcessedInputData input, bool processActionMovementIntent)
         {
             ProcessMovementIntent();
-            ProcessLocomotionStateAndStaminaIntent(in input);
+            ProcessLocomotionStateAndStaminaIntent(in input,processActionMovementIntent);
         }
 
         private void ProcessMovementIntent()
@@ -50,18 +50,21 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
             }
         }
 
-        private void ProcessLocomotionStateAndStaminaIntent(in ProcessedInputData input)
+        private void ProcessLocomotionStateAndStaminaIntent(in ProcessedInputData input,bool processActionMovementIntent)
         {
             LocomotionState prestate = _data.CurrentLocomotionState;
 
-            if (input.RollPressed && _data.IsGrounded)
+            if(processActionMovementIntent)
             {
-                _data.WantsToRoll = true;
-            }
+                if (input.RollPressed && _data.IsGrounded)
+                {
+                    _data.WantsToRoll = true;
+                }
 
-            if (input.DodgePressed && _data.IsGrounded)
-            {
-                _data.WantsToDodge = true;
+                if (input.DodgePressed && _data.IsGrounded)
+                {
+                    _data.WantsToDodge = true;
+                }
             }
 
             // 持续性移动状态判定

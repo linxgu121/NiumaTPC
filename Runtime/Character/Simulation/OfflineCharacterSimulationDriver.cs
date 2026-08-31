@@ -303,6 +303,13 @@ namespace NiumaTPC.Character.Simulation
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            CharacterActionPresentationBridge.Apply(
+                data,
+                state.ActionType,
+                state.ActionTick,
+                state.ActionDirection);
+                
+
             bool jumpStated = 
                 data.IsGrounded && 
                 !state.IsGrounded &&
