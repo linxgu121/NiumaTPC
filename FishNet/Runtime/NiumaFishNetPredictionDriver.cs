@@ -339,6 +339,16 @@ namespace NiumaTPC.FishNet
                 _player.InputPipeline.ConsumeJumpPressed();
             }
 
+             if (command.HasButton(CharacterInputButtons.Roll))
+            {
+                _player.InputPipeline.ConsumeRollPressed();
+            }
+
+            if (command.HasButton(CharacterInputButtons.Dodge))
+            {
+                _player.InputPipeline.ConsumeDodgePressed();
+            }
+
             return new NiumaReplicateData(command.Move, command.ViewYaw, command.Buttons);
         }
 

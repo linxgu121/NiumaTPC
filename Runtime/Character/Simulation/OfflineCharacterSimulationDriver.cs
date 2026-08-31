@@ -265,6 +265,16 @@ namespace NiumaTPC.Character.Simulation
                 _player.InputPipeline.ConsumeJumpPressed();
             }
 
+            if (command.HasButton(CharacterInputButtons.Roll))
+            {
+                _player.InputPipeline.ConsumeRollPressed();
+            }
+
+            if (command.HasButton(CharacterInputButtons.Dodge))
+            {
+                _player.InputPipeline.ConsumeDodgePressed();
+            }
+
             bool canSprint =
                 !_player.RuntimeData.IsStaminaDepleted &&
                 _player.RuntimeData.CurrentStamina > 0f;
@@ -303,8 +313,7 @@ namespace NiumaTPC.Character.Simulation
             data.VerticalVelocity = state.VerticalVelocity;
             data.IsGrounded = state.IsGrounded;
             data.CurrentSpeed = state.SmoothSpeed;
-            data.CurrentLocomotionState =
-                state.LocomotionState;
+            data.CurrentLocomotionState = state.LocomotionState;
             data.SimulationMotionPhase = state.MotionPhase;
             data.SimulationMotionPhaseTick = state.MotionPhaseTick;
             data.SimulationStartDirection = state.StartDirection;

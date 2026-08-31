@@ -22,11 +22,45 @@ namespace NiumaTPC.Character.Simulation
             
             state.Tick = command.Tick;
 
-            Vector3 horizontalDisplacement = CharacterHorizontalMovementSimulator.Simulate(ref state, in command, in config, canSprint, tickDeltaTime);
+           bool simulatedAction = CharacterActionMovementSimulator.TrySimulate(
+                    ref state,
+                    in command,
+                    in config,
+                    out Vector3 actionDisplacement,
+                    out bool actionAppliesGravity);
 
-            Vector3 verticalDisplacement = CharacterVerticalMovementSimulator.Simulate(ref state, in command, in config, isHandsEmpty, tickDeltaTime);
+            Vector3 horizontalDisplacement =
+                simulatedAction
+                    ? actionDisplacement
+                    : CharacterHorizontalMovementSimulator.Simulate(
+                        ref state,
+                        in command,
+                        in config,
+                        canSprint,
+                        tickDeltaTime);
+
+            Vector3 verticalDisplacement = Vector3.zero;
+
+            /*
+             * 普通移动始终执行垂直模拟。
+             * 动作期间则遵循 RollSO/DodgingSO 的 ApplyGravity。
+             */
+            bool shouldSimulateVertical = !simulatedAction || actionAppliesGravity;
+
+            if (shouldSimulateVertical)
+            {
+                verticalDisplacement =
+                    CharacterVerticalMovementSimulator.Simulate(
+                        ref state,
+                        in command,
+                        in config,
+                        isHandsEmpty,
+                        allowJumpInput: !simulatedAction,
+                        tickDeltaTime);
+            }
 
             return horizontalDisplacement + verticalDisplacement;
+
         }
 
         #endregion

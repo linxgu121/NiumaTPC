@@ -48,6 +48,13 @@ namespace NiumaTPC.Character.Simulation
             state.SpeedSmoothVelocity = 0f;
             state.RotationSmoothVelocity = 0f;
 
+            /*
+             * 动作不能结束后继续执行动作前尚未完成的起步曲线。
+             * 动作结束后由新输入重新决定 Starting 或 Idle。
+             */
+            state.MotionPhase = CharacterMotionPhase.Idle;
+            state.MotionPhaseTick = 0u;
+
             return true;
         }
 
