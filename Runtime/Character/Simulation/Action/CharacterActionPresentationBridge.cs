@@ -1,5 +1,4 @@
 using NiumaTPC.Character.RuntimeData;
-using UnityEngine;
 
 namespace NiumaTPC.Character.Simulation
 {

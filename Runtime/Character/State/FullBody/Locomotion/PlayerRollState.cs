@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.Simulation;
 using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Locomotion
@@ -51,12 +52,19 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             ChooseOptionsAndPlay(_selectedData.Clip);
 
-            // 设置结束回调 如果提前触发EndTime则忽略此回调
-            player.AnimationFacade.SetOnEndCallback(() =>
+            /*
+             * 纯净版仍由动画结束回调退出。
+             * 固定 Tick 模式必须等待权威动作状态结束，不能让动画提前结束动作表现。
+             */
+            if(!player.MotionDriver.IsExternalSimulationActive)
             {
-                if (_endTimeTriggered) return;
-                HandleRollEnd();
-            });
+                // 设置结束回调 如果提前触发EndTime则忽略此回调
+                player.AnimationFacade.SetOnEndCallback(() =>
+                {
+                    if (_endTimeTriggered) return;
+                    HandleRollEnd();
+                });
+            }
 
             // 记录末相位确保后续状态能正确选择脚位
             data.ExpectedFootPhase = _selectedData.EndPhase;
@@ -71,6 +79,20 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         public override void PhysicsUpdate()
         {
             if (_selectedData == null) return;
+
+            if (player.MotionDriver.IsExternalSimulationActive)
+            {
+                /*
+                 * 外部模拟期间不再读取动画时间产生位移。
+                 * 当固定 Tick 状态退出 Roll 时，再结束动画状态。
+                 */
+                if (data.SimulationActionType != CharacterActionType.Roll)
+                {
+                    HandleRollEnd();
+                }
+
+                return;
+            }
 
             float normalizedTime = player.AnimationFacade.CurrentNormalizedTime;
             player.MotionDriver.UpdateWarpMotion(normalizedTime);

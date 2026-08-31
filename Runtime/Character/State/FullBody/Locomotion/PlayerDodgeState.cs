@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.Simulation;
 using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Locomotion
@@ -52,13 +53,20 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             ChooseOptionsAndPlay(_selectedData.Clip);
 
-            // 设置结束回调 如果提前触发EndTime则忽略此回调
-            player.AnimationFacade.SetOnEndCallback(() =>
+            /*
+             * 固定 Tick 模式由模拟动作状态控制退出；
+             * 纯净版继续使用动画结束回调。
+             */
+            if(!player.MotionDriver.IsExternalSimulationActive)
             {
-                if (_endTimeTriggered) return;
-                HandleDodgeEnd();
-            });
+                // 设置结束回调 如果提前触发EndTime则忽略此回调
+                player.AnimationFacade.SetOnEndCallback(() =>
+                {
+                    if (_endTimeTriggered) return;
+                    HandleDodgeEnd();
+                });
 
+            }
             // 记录末相位确保后续状态能正确选择脚位
             data.ExpectedFootPhase = _selectedData.EndPhase;
         }
@@ -72,6 +80,16 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         public override void PhysicsUpdate()
         {
             if (_selectedData == null) return;
+
+            if(player.MotionDriver.IsExternalSimulationActive)
+            {
+                if(data.SimulationActionType != CharacterActionType.Dodge)
+                {
+                    HandleDodgeEnd();
+                }
+
+                return;
+            }
 
             float normalizedTime = player.AnimationFacade.CurrentNormalizedTime;
             player.MotionDriver.UpdateWarpMotion(normalizedTime);
