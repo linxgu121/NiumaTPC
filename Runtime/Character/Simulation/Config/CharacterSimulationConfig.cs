@@ -54,6 +54,13 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
+        #region Action Motion(动作位移)
+
+        private readonly CharacterActionMotionProfile _rollMotionProfile;
+        private readonly CharacterActionMotionProfile _dodgeMotionProfile;
+
+        #endregion
+
         #region Constructor(构造的数据快照)
 
         public CharacterSimulationConfig(
@@ -71,7 +78,9 @@ namespace NiumaTPC.Character.Simulation
             float sprintEmptyJumpInitialVelocity,
             float doubleJumpInitialVelocity,
             float sprintEmptyDoubleJumpInitialVelocity,
-            CharacterStartMotionProfile[] startMotionProfiles)
+            CharacterStartMotionProfile[] startMotionProfiles,
+            CharacterActionMotionProfile rollMotionProfile,
+            CharacterActionMotionProfile dodgeMotionProfile)
         {
             WalkSpeed = Mathf.Max(0f, walkSpeed);
             JogSpeed = Mathf.Max(0f, jogSpeed);
@@ -93,6 +102,9 @@ namespace NiumaTPC.Character.Simulation
 
             _startMotionProfiles = startMotionProfiles != null && startMotionProfiles.Length == StartProfileCount ?
                                    startMotionProfiles : Array.Empty<CharacterStartMotionProfile>();
+
+            _rollMotionProfile = rollMotionProfile;
+            _dodgeMotionProfile = dodgeMotionProfile;
         }
 
         #endregion
@@ -170,6 +182,32 @@ namespace NiumaTPC.Character.Simulation
             }
 
             return DoubleJumpInitialVelocity;
+        }
+
+        /// <summary>
+        /// 获取 Roll 或 Dodge 对应的固定 Tick 位移 Profile
+        /// 返回 false 表示没有配置该动作或 Profile 无效
+        /// </summary>
+        public bool TryGetActionMotionProfile(
+            CharacterActionType actionType,
+            out CharacterActionMotionProfile profile)
+        {
+            switch (actionType)
+            {
+                case CharacterActionType.Roll:
+                    profile = _rollMotionProfile;
+                    break;
+
+                case CharacterActionType.Dodge:
+                    profile = _dodgeMotionProfile;
+                    break;
+
+                default:
+                    profile = default;
+                    return false;
+            }
+
+            return profile.IsValid;
         }
 
         #endregion

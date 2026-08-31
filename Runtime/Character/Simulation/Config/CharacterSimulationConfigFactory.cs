@@ -54,6 +54,33 @@ namespace NiumaTPC.Character.Simulation
             CharacterStartMotionProfile[] startProfiles =
                 CreateStartProfiles(locomotion, tickDeltaTime);
 
+             RollSO roll = playerConfig.Rolling;
+            DodgingSO dodge = playerConfig.Dodging;
+
+            /*
+             * Roll、Dodge 属于高级可选模块。
+             * 没有配置时生成无效 Profile，不影响基础角色模拟。
+             */
+            CharacterActionMotionProfile rollProfile =
+                roll != null ? CreateActionMotionProfile(
+                        roll.DistanceMeters,
+                        roll.DurationSeconds,
+                        roll.ProgressCurve,
+                        roll.ApplyGravity,
+                        tickDeltaTime,
+                        roll.name)
+                    : default;
+
+            CharacterActionMotionProfile dodgeProfile =
+                dodge != null ? CreateActionMotionProfile(
+                        dodge.DistanceMeters,
+                        dodge.DurationSeconds,
+                        dodge.ProgressCurve,
+                        dodge.ApplyGravity,
+                        tickDeltaTime,
+                        dodge.name)
+                    : default;
+
             return new CharacterSimulationConfig(
                 walkSpeed: core.WalkSpeed,
                 jogSpeed: core.JogSpeed,
@@ -73,13 +100,15 @@ namespace NiumaTPC.Character.Simulation
                 doubleJumpInitialVelocity: jump.DoubleJumpForceUp,
                 sprintEmptyDoubleJumpInitialVelocity: jump.DoubleJumpEmptyHandSprintForceUp,
                 
-                startMotionProfiles: startProfiles
+                startMotionProfiles: startProfiles,
+                rollMotionProfile: rollProfile,
+                dodgeMotionProfile: dodgeProfile
             );
         }
 
         #endregion
 
-        #region Start Motion Profiles
+        #region Start Motion Profiles(启动运动剖面集)
 
         private static CharacterStartMotionProfile[] CreateStartProfiles(LocomotionSO locomotion, float tickDeltaTime)
         {
@@ -222,5 +251,148 @@ namespace NiumaTPC.Character.Simulation
         }
 
         #endregion
+
+       #region Action Motion Profiles(事件动作剖面集)
+
+        /// <summary>
+        /// 将总距离和累计进度曲线转换为逐 Tick 位移。
+        /// </summary>
+        private static CharacterActionMotionProfile
+            CreateActionMotionProfile(
+                float distanceMeters,
+                float durationSeconds,
+                AnimationCurve progressCurve,
+                bool applyGravity,
+                float tickDeltaTime,
+                string sourceName)
+        {
+            if (!IsFinite(distanceMeters) || distanceMeters < 0f)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”的动作总距离必须是非负有限值。");
+            }
+
+            if (!IsFinite(durationSeconds) ||
+                durationSeconds <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”的动作持续时间必须是有限正数。");
+            }
+
+            ValidateActionProgressCurve(progressCurve, sourceName);
+
+            int sampleCount = Mathf.Max(1,Mathf.CeilToInt(durationSeconds / tickDeltaTime));
+
+            var distanceSamples = new float[sampleCount];
+
+            float previousProgress = progressCurve.Evaluate(0f);
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                /*
+                 * 使用 Tick 结束边界采样累计进度。
+                 * 最后一个 Tick 可能不足完整 tickDeltaTime，
+                 * 但仍然会准确落在归一化时间 1。
+                 */
+                float normalizedTime = Mathf.Min(
+                    (i + 1) * tickDeltaTime /
+                    durationSeconds,
+                    1f);
+
+                float currentProgress = progressCurve.Evaluate(normalizedTime);
+
+                float progressDelta = Mathf.Max(0f,currentProgress - previousProgress);
+
+                distanceSamples[i] = distanceMeters * progressDelta;
+
+                previousProgress = currentProgress;
+            }
+
+            return new CharacterActionMotionProfile(
+                distanceSamples,
+                applyGravity);
+        }
+
+        /// <summary>
+        /// 验证累计位移曲线满足：
+        /// 从 0 到 1、范围合法、单调不下降。
+        /// </summary>
+        private static void ValidateActionProgressCurve(
+            AnimationCurve curve,
+            string sourceName)
+        {
+            if (curve == null || curve.length < 2)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”没有配置有效的动作位移曲线。");
+            }
+
+            const float endpointTolerance = 0.001f;
+            const float monotonicTolerance = 0.0001f;
+            const int validationSteps = 128;
+
+            float startProgress = curve.Evaluate(0f);
+            float endProgress = curve.Evaluate(1f);
+
+            if (!IsFinite(startProgress) ||
+                !IsFinite(endProgress))
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”的动作位移曲线包含无效数值。");
+            }
+
+            if (Mathf.Abs(startProgress) >
+                endpointTolerance)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”的位移曲线必须从(0,0)开始。");
+            }
+
+            if (Mathf.Abs(endProgress - 1f) >
+                endpointTolerance)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”的位移曲线必须在(1,1)结束。");
+            }
+
+            float previousProgress = startProgress;
+
+            for (int i = 1; i <= validationSteps; i++)
+            {
+                float normalizedTime =
+                    i / (float)validationSteps;
+
+                float progress =
+                    curve.Evaluate(normalizedTime);
+
+                if (!IsFinite(progress))
+                {
+                    throw new InvalidOperationException(
+                        $"“{sourceName}”的位移曲线包含无效数值。");
+                }
+
+                bool outsideRange =
+                    progress < -endpointTolerance ||
+                    progress > 1f + endpointTolerance;
+
+                if (outsideRange)
+                {
+                    throw new InvalidOperationException(
+                        $"“{sourceName}”的位移曲线必须保持在0到1之间。");
+                }
+
+                if (progress <
+                    previousProgress - monotonicTolerance)
+                {
+                    throw new InvalidOperationException(
+                        $"“{sourceName}”的位移曲线不能出现倒退。");
+                }
+
+                previousProgress = progress;
+            }
+        }
+
+        #endregion
+
     }
 }
