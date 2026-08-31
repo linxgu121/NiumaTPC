@@ -29,6 +29,26 @@ namespace NiumaTPC.Character.Simulation
             }
 
             CharacterActionType requestedAction = ResolveRequestedAction(in command, in config);
+
+            if(requestedAction == CharacterActionType.None)
+            {
+                return false;
+            }
+
+            state.ActionType = requestedAction;
+            state.ActionTick = 0u;
+            state.ActionDirection = ResolveActionDirection(state.Yaw, in command);
+
+            /*
+             * 普通移动的平滑缓存不能跨越动作保留。
+             * 否则动作结束后可能立即恢复动作前的高速，
+             * 破坏 ProgressCurve 的平滑收尾。
+             */
+            state.SmoothSpeed = 0f;
+            state.SpeedSmoothVelocity = 0f;
+            state.RotationSmoothVelocity = 0f;
+
+            return true;
         }
 
         #endregion
@@ -61,6 +81,65 @@ namespace NiumaTPC.Character.Simulation
             }
 
             return CharacterActionType.None;
+        }
+
+        #endregion
+
+        #region Direction Lock(方向锁定)
+
+        private static CharacterActionDirection ResolveActionDirection(
+            float characterYaw,
+            in CharacterInputCommand command)
+        {
+            bool hasMoveInput =
+                CharacterMovementDirectionResolver.TryResolve(
+                    in command,
+                    out Vector3 worldDirection,
+                    out _);
+
+            // 与旧状态机一致：没有移动输入时默认向前。
+            if (!hasMoveInput)
+            {
+                return CharacterActionDirection.Forward;
+            }
+
+            CharacterStartDirection direction =
+                CharacterStartDirectionResolver.Resolve(
+                    characterYaw,
+                    in worldDirection);
+
+            /*
+             * 起步与动作使用相同的八方向扇区，
+             * 但保持两个枚举契约独立，不直接强制转换数值。
+             */
+            return direction switch
+            {
+                CharacterStartDirection.Forward =>
+                    CharacterActionDirection.Forward,
+
+                CharacterStartDirection.ForwardRight =>
+                    CharacterActionDirection.ForwardRight,
+
+                CharacterStartDirection.Right =>
+                    CharacterActionDirection.Right,
+
+                CharacterStartDirection.BackRight =>
+                    CharacterActionDirection.BackRight,
+
+                CharacterStartDirection.Back =>
+                    CharacterActionDirection.Back,
+
+                CharacterStartDirection.BackLeft =>
+                    CharacterActionDirection.BackLeft,
+
+                CharacterStartDirection.Left =>
+                    CharacterActionDirection.Left,
+
+                CharacterStartDirection.ForwardLeft =>
+                    CharacterActionDirection.ForwardLeft,
+
+                _ => CharacterActionDirection.Forward
+            };
         }
 
         #endregion
