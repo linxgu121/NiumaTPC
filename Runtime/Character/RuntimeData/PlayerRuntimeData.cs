@@ -99,6 +99,15 @@ namespace NiumaTPC.Character.RuntimeData
         public LocomotionState SimulationStartLocomotionState =
             LocomotionState.Idle;
 
+        /// <summary> 固定 Tick 模拟当前正在执行的动作，表现状态机通过它识别 Roll/Dodge 的开始与结束。</summary>
+        public CharacterActionType SimulationActionType = CharacterActionType.None;
+
+        /// <summary>当前动作已经执行的 Tick 数，这是持续状态，不是一次性输入意图。 </summary>
+        public uint SimulationActionTick;
+
+        /// <summary>动作开始时锁定的八方向，动作播放期间不再跟随新的移动输入改变。 </summary>
+        public CharacterActionDirection SimulationActionDirection = CharacterActionDirection.Forward;
+
         #endregion
 
         #region 装备及指向基准

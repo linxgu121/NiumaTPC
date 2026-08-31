@@ -53,7 +53,22 @@ namespace NiumaTPC.Character.Simulation
         /// </summary>
         public LocomotionState StartLocomotionState;
 
-         /// <summary>
+        /// <summary>
+        /// 服务器确认的当前动作类型。
+        /// </summary>
+        public CharacterActionType ActionType;
+
+        /// <summary>
+        /// 服务器生成快照时，动作已经执行的 Tick 数。
+        /// </summary>
+        public uint ActionTick;
+
+        /// <summary>
+        /// 动作开始时锁定的八方向。
+        /// </summary>
+        public CharacterActionDirection ActionDirection;
+
+        /// <summary>
         /// 服务器确认的世界空间移动方向。
         /// 表现层会把它转换成角色局部动画方向。
         /// </summary>
@@ -88,6 +103,9 @@ namespace NiumaTPC.Character.Simulation
             MotionPhaseTick = simulationState.MotionPhaseTick;
             StartDirection = simulationState.StartDirection;
             StartLocomotionState = simulationState.StartLocomotionState;
+            ActionType = simulationState.ActionType;
+            ActionTick = simulationState.ActionTick;
+            ActionDirection = simulationState.ActionDirection;
             MoveDirection = simulationState.LastMoveDirection;
             IsGrounded = simulationState.IsGrounded;
             HasPerformedDoubleJumpInAir = simulationState.HasPerformedDoubleJumpInAir;
