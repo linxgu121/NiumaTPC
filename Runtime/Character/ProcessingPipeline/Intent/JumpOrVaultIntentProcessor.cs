@@ -1,6 +1,8 @@
+using System;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.Traversal;
 using UnityEngine;
 
 namespace NiumaTPC.Character.ProcessingPipeline.Intent
@@ -13,46 +15,62 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
         private readonly PlayerRuntimeData _data;
         private readonly PlayerSO _config;
         private readonly Transform _playerTransform;
-        private bool _warnedMissingObstacleMask;
-        private bool _warnedMissingGroundMask;
+        private readonly ICharacterTraversalProbe _traversalProbe;
 
-        public JumpOrVaultIntentProcessor(PlayerRuntimeData data, PlayerSO config, Transform playerTransform)
+         public JumpOrVaultIntentProcessor(
+            PlayerRuntimeData data,
+            PlayerSO config,
+            Transform playerTransform,
+            ICharacterTraversalProbe traversalProbe)
         {
-            _data = data;
-            _config = config;
-            _playerTransform = playerTransform;
-        }
+            _data = data ??
+                throw new ArgumentNullException(nameof(data));
 
-        // 注： 彻底移除了早期版本每帧空转的射线探测缓存机制
+            _config = config ??
+                throw new ArgumentNullException(nameof(config));
+
+            _playerTransform = playerTransform != null
+                ? playerTransform
+                : throw new ArgumentNullException(
+                    nameof(playerTransform));
+
+            _traversalProbe = traversalProbe ??
+                throw new ArgumentNullException(
+                    nameof(traversalProbe));
+        }
+        
         // 只有当接收到明确的跳跃指令时，才瞬间进行物理环境扫描
         public bool Update(in ProcessedInputData input)
         {
-            // 只有按键按下的那一帧，才启动极其昂贵的射线检测逻辑
-            if (input.JumpPressed)
+            // 只在 Jump 按下边沿执行环境检测，
+            // 不允许每帧持续发射翻越射线。
+            if (!input.JumpPressed)
             {
-                if (HandleJumpIntent(_data))
-                {
-                    return true;
-                }
+                return false;
             }
 
-            return false;
+            return HandleJumpIntent(_data);
         }
 
         // 跳跃意图处理与优先级仲裁
         private bool HandleJumpIntent(PlayerRuntimeData data)
         {
             // 低位翻越检测 (在这里才真正发射射线)
-            if (TryGetVaultIntent(data, out VaultObstacleInfo info, _config.Vaulting.LowVaultMinHeight, _config.Vaulting.LowVaultMaxHeight))
+            if (TryGetVaultIntent(
+                    out VaultObstacleInfo info,
+                    _config.Vaulting.LowVaultMinHeight,
+                    _config.Vaulting.LowVaultMaxHeight))
             {
                 data.WantsToVault = true;
                 data.WantsLowVault = true;
                 data.CurrentVaultInfo = info;
                 return true;
             }
-
             // 高位翻越检测
-            if (TryGetVaultIntent(data, out info, _config.Vaulting.HighVaultMinHeight, _config.Vaulting.HighVaultMaxHeight))
+            if (TryGetVaultIntent(
+                    out info,
+                    _config.Vaulting.HighVaultMinHeight,
+                    _config.Vaulting.HighVaultMaxHeight))
             {
                 data.WantsToVault = true;
                 data.WantsHighVault = true;
@@ -60,7 +78,8 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
                 return true;
             }
 
-            // 普通地面跳跃
+
+            // 普通地面跳跃(在没有检测到障碍时)
             if (data.IsGrounded)
             {
                 data.WantsToJump = true;
@@ -78,196 +97,21 @@ namespace NiumaTPC.Character.ProcessingPipeline.Intent
             return false;
         }
 
-        public bool TryGetVaultIntent(PlayerRuntimeData data, out VaultObstacleInfo info, float minHeight, float maxHeight)
+         private bool TryGetVaultIntent(
+            out VaultObstacleInfo obstacleInfo,
+            float minHeight,
+            float maxHeight)
         {
-            return DetectObstacle(out info, minHeight, maxHeight, true);
+            var request = new VaultProbeRequest(
+                _playerTransform.position,
+                _playerTransform.forward,
+                minHeight,
+                maxHeight);
+
+            return _traversalProbe.TryProbeVault(
+                in request,
+                out obstacleInfo);
         }
 
-        private bool DetectObstacle(out VaultObstacleInfo info, float minHeight, float maxHeight, bool isSilent)
-        {
-            info = new VaultObstacleInfo { IsValid = false };
-
-            Transform root = _playerTransform;
-
-            // 先确认前方墙面，再用地面层检测墙顶与落点，避免地面不在障碍层时检测失败。
-
-            Vector3 forward = root.forward;
-            // forward = 角色面向 用于朝前的射线方向
-
-            int obstacleMask = ResolveObstacleMask();
-            int groundMask = ResolveGroundMask();
-
-            if (TryFindWall(root, forward, minHeight, maxHeight, obstacleMask, out RaycastHit wallHit))
-            {
-                // 命中前方物体 wallHit 包含击中点与法线
-
-                if (Vector3.Dot(wallHit.normal, Vector3.up) > 0.1f) return false;
-                // 如果命中面的法线接近上向（点积大） 说明是地面或缓坡 退出判断
-
-                Vector3 downRayStart = wallHit.point + Vector3.up * _config.Vaulting.VaultDownwardRayLength + forward * _config.Vaulting.VaultDownwardRayOffset;
-                // 在墙面点上方并向前偏移 作为向下搜索 ledge 的起点
-
-                if (Physics.Raycast(downRayStart, Vector3.down, out RaycastHit ledgeHit, _config.Vaulting.VaultDownwardRayLength, groundMask, QueryTriggerInteraction.Ignore))
-                {
-                    // 找到墙顶或台阶的顶面 ledgeHit
-
-                    if (Vector3.Dot(ledgeHit.normal, Vector3.up) < 0.9f) return false;
-                    // ledge 的法线必须接近上向 保证为可站立的平面
-
-                    float height = ledgeHit.point.y - root.position.y;
-                    // 计算台阶顶面相对于角色根点的高度
-
-                    if (height < minHeight || height > maxHeight) return false;
-                    // 高度不在可翻越区间时退出（用于区分低翻越/高翻越）
-
-                    Vector3 vaultForwardDir = -wallHit.normal;
-                    // 翻越的前向为墙法线的反方向（远离墙）
-
-                    float landForwardDistance = _config.Vaulting.VaultLandDistance + Mathf.Max(0f, _config.Vaulting.VaultLandForwardPadding);
-                    Vector3 landRayStart = ledgeHit.point + vaultForwardDir * landForwardDistance + Vector3.up * 0.5f;
-                    // 从 ledge 前方偏移落点距离并额外前推，避免最终落点贴在方块边缘导致角色滑落
-
-                    Vector3 finalLandPoint = Vector3.zero;
-                    bool foundGround = false;
-
-                    if (Physics.Raycast(landRayStart, Vector3.down, out RaycastHit landHit, _config.Vaulting.VaultLandRayLength, groundMask, QueryTriggerInteraction.Ignore))
-                    {
-                        // 向下检测墙后地面
-                        if (Vector3.Dot(landHit.normal, Vector3.up) >= 0.7f)
-                        {
-                            finalLandPoint = landHit.point;
-                            foundGround = true;
-                        }
-                    }
-
-                    if (_config.Vaulting.RequireGroundBehindWall && !foundGround) return false;
-
-                    if (!foundGround)
-                    {
-                        finalLandPoint = landRayStart + Vector3.down * 0.5f;
-                        // 未找到地面时使用兜底点（下移0.5m）作为预估落点 保证数据可用
-                    }
-
-                    info.IsValid = true;
-                    info.WallPoint = wallHit.point;
-                    info.WallNormal = wallHit.normal;
-                    info.Height = height;
-                    info.ExpectedLandPoint = finalLandPoint;
-
-                    Vector3 ledgeEdge = new Vector3(wallHit.point.x, ledgeHit.point.y, wallHit.point.z);
-                    info.LedgePoint = ledgeEdge;
-
-                    Vector3 wallNormalFlat = new Vector3(wallHit.normal.x, 0f, wallHit.normal.z);
-                    if (wallNormalFlat.sqrMagnitude < 0.0001f) return false;
-
-                    Vector3 rightDir = Vector3.Cross(Vector3.up, wallNormalFlat).normalized;
-                    Vector3 characterRight = new Vector3(root.right.x, 0f, root.right.z).normalized;
-
-                    if (characterRight.sqrMagnitude > 0.0001f)
-                    {
-                        if (Vector3.Dot(rightDir, characterRight) < 0f)
-                            rightDir = -rightDir;
-                    }
-
-                    float halfSpread = _config.Vaulting.VaultHandSpread * 0.5f;
-                    // 计算默认握点（不含偏移）
-                    Vector3 baseLeft = ledgeEdge - rightDir * halfSpread;
-                    Vector3 baseRight = ledgeEdge + rightDir * halfSpread;
-
-                    // 将 vaultForwardDir 与 world up 作为 ledge 局部空间基准
-                    Quaternion ledgeBasis = Quaternion.LookRotation(vaultForwardDir, Vector3.up);
-
-                    // 应用 VaultingSO 中的可配置偏移（以 ledgeBasis 变换到世界空间）
-                    Vector3 leftOffsetWorld = ledgeBasis * _config.Vaulting.LeftHandIKOffset;
-                    Vector3 rightOffsetWorld = ledgeBasis * _config.Vaulting.RightHandIKOffset;
-
-                    info.LeftHandPos = baseLeft + leftOffsetWorld;
-                    info.RightHandPos = baseRight + rightOffsetWorld;
-
-                    // 手朝向：以墙面法线为基准的朝向，再叠加可配置的欧拉偏移
-                    Quaternion baseHandRot = Quaternion.LookRotation(-wallNormalFlat.normalized, Vector3.up);
-                    Quaternion handRotOffset = Quaternion.Euler(_config.Vaulting.HandRotationOffsetEuler);
-                    info.HandRot = baseHandRot * handRotOffset;
-
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private bool TryFindWall(Transform root, Vector3 forward, float minHeight, float maxHeight, int obstacleMask, out RaycastHit wallHit)
-        {
-            // 低矮障碍可能低于统一的前向射线高度，所以按当前翻越高度段补充两条探测射线。
-            float configuredHeight = Mathf.Max(0.05f, _config.Vaulting.VaultForwardRayHeight);
-            if (TryRaycastWallAtHeight(root, forward, configuredHeight, obstacleMask, out wallHit))
-            {
-                return true;
-            }
-
-            float middleHeight = Mathf.Clamp((minHeight + maxHeight) * 0.5f, 0.05f, Mathf.Max(0.05f, maxHeight - 0.05f));
-            if (!Mathf.Approximately(middleHeight, configuredHeight) &&
-                TryRaycastWallAtHeight(root, forward, middleHeight, obstacleMask, out wallHit))
-            {
-                return true;
-            }
-
-            float lowHeight = Mathf.Clamp(minHeight + 0.1f, 0.05f, Mathf.Max(0.05f, maxHeight - 0.05f));
-            if (!Mathf.Approximately(lowHeight, configuredHeight) &&
-                !Mathf.Approximately(lowHeight, middleHeight) &&
-                TryRaycastWallAtHeight(root, forward, lowHeight, obstacleMask, out wallHit))
-            {
-                return true;
-            }
-
-            wallHit = default;
-            return false;
-        }
-
-        private bool TryRaycastWallAtHeight(Transform root, Vector3 forward, float height, int obstacleMask, out RaycastHit wallHit)
-        {
-            Vector3 rayStart = root.position + Vector3.up * height;
-
-            if (!Physics.Raycast(rayStart, forward, out wallHit, _config.Vaulting.VaultForwardRayLength, obstacleMask, QueryTriggerInteraction.Ignore))
-            {
-                return false;
-            }
-
-            // 如果命中面的法线接近上向，说明打到的是地面或缓坡，不作为可翻越墙面。
-            return Vector3.Dot(wallHit.normal, Vector3.up) <= 0.1f;
-        }
-
-        private int ResolveObstacleMask()
-        {
-            int mask = _config.Vaulting.ObstacleLayers.value;
-            if (mask != 0)
-            {
-                return mask;
-            }
-
-            if (!_warnedMissingObstacleMask)
-            {
-                Debug.LogWarning("[JumpOrVaultIntentProcessor] VaultingSO.ObstacleLayers 未配置，临时使用 Physics.DefaultRaycastLayers。建议在配置中明确设置障碍物层级。");
-                _warnedMissingObstacleMask = true;
-            }
-
-            return Physics.DefaultRaycastLayers;
-        }
-
-        private int ResolveGroundMask()
-        {
-            int mask = _config.Vaulting.GroundLayers.value;
-            if (mask != 0)
-            {
-                return mask;
-            }
-
-            if (!_warnedMissingGroundMask)
-            {
-                Debug.LogWarning("[JumpOrVaultIntentProcessor] VaultingSO.GroundLayers 未配置，临时使用 Physics.DefaultRaycastLayers。建议在配置中明确设置可站立地面层级。");
-                _warnedMissingGroundMask = true;
-            }
-
-            return Physics.DefaultRaycastLayers;
-        }
     }
 }

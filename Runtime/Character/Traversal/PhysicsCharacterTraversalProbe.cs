@@ -396,7 +396,7 @@ namespace NiumaTPC.Character.Traversal
         }
 
         /// <summary>
-        /// 校验浮点数：排除 `NaN`、`±Infinity`
+        /// 校验浮点数：排除NaN、±Infinity
         /// </summary>
         private static bool IsFinite(float value)
         {

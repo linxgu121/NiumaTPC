@@ -1,10 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.ProcessingPipeline.Intent;
 using NiumaTPC.Character.ProcessingPipeline.Parameter;
 using NiumaTPC.Character.RuntimeData;
-using UnityEngine;
+using NiumaTPC.Character.Traversal;
+
 
 namespace NiumaTPC.Character.ProcessingPipeline
 {
@@ -39,7 +38,8 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
             _aimIntentProcessor = new AimIntentProcessor(_runtimeData);
             _locomotionIntentProcessor = new LocomotionIntentProcessor(_runtimeData, _config);
-            _jumpOrVaultIntentProcessor = new JumpOrVaultIntentProcessor(_runtimeData, _config, player.transform);
+            ICharacterTraversalProbe traversalProbe = new PhysicsCharacterTraversalProbe(_config.Vaulting);
+            _jumpOrVaultIntentProcessor = new JumpOrVaultIntentProcessor(_runtimeData, _config, player.transform, traversalProbe);
             _eojIntentProcessor = new EojIntentProcessor(_runtimeData, _inputPipeline);
             _hotbarIntentProcessor = new HotbarIntentProcessor(_runtimeData);
             _actionIntentProcessor = new ActionIntentProcessor(_runtimeData);

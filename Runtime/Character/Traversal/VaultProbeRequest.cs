@@ -32,12 +32,12 @@ namespace NiumaTPC.Character.Traversal
         public VaultProbeRequest(
             Vector3 position,
             Vector3 forward,
-            float minHeiht,
+            float minHeight,
             float maxHeight)
         {
             Position = position;
             Forward = forward;
-            MinHeight = minHeiht;
+            MinHeight = minHeight;
             MaxHeight = maxHeight;
         }
     }
