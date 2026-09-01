@@ -226,7 +226,7 @@ namespace NiumaTPC.Character.RuntimeData
         [Tooltip("墙的高度  用于选择低翻越还是高翻越")]
         public float Height;
 
-        [Tooltip("墙顶的着陆点 世界坐标 角色翻过去后会落在这个位置")]
+        [Tooltip("翻越第一阶段的角色根节点世界目标。它由墙顶脚底点转换得到，不是墙顶表面点。")]
         public Vector3 LedgePoint;
 
         [Tooltip("左手IK目标点 世界坐标 动画播放时会持续驱动左手向这里靠近")]
@@ -238,7 +238,7 @@ namespace NiumaTPC.Character.RuntimeData
         [Tooltip("手部IK的朝向 确保两只手指向同一个方向")]
         public Quaternion HandRot;
 
-        [Tooltip("翻越后的预期着陆点 用于最终的根运动变形修正")]
+        [Tooltip("翻越结束时的角色根节点世界目标。它由顶面或后方地面的脚底落点转换得到。")]
         public Vector3 ExpectedLandPoint;
 
     }

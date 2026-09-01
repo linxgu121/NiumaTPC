@@ -15,6 +15,12 @@ namespace NiumaTPC.Character.Traversal
 
         private readonly VaultingSO _config;
 
+        /// <summary>
+        /// CharacterController 胶囊脚底相对于角色根节点的偏移
+        /// 已包含角色根节点缩放，但不包含运行时 Yaw
+        /// </summary>
+        private readonly Vector3 _scaledLocalFootOffset;
+
         #endregion
 
         #region Runtime State
@@ -26,11 +32,30 @@ namespace NiumaTPC.Character.Traversal
 
         #region Constructor(构造器)
 
-         public PhysicsCharacterTraversalProbe(VaultingSO config)
+         public PhysicsCharacterTraversalProbe(VaultingSO config, CharacterController characterController)
         {
             _config = config != null ? config : throw new ArgumentNullException(
                 nameof(config),
                 "翻越环境探测器需要有效的 VaultingSO。");
+
+            if (characterController == null)
+            {
+                throw new ArgumentNullException(nameof(characterController),"翻越环境探测器需要有效的 CharacterController。");
+            }
+
+            /*
+             * CharacterController.center 和 height 都位于角色本地空间。
+             * 胶囊脚底 = 胶囊中心 - 半高。
+             */
+            Vector3 localFootPoint = characterController.center + Vector3.down * (characterController.height * 0.5f);
+
+            /*
+             * TransformVector 将根节点缩放计入偏移；
+             * 随后移除当前旋转，保存为稳定的根节点局部偏移。
+             */
+            Vector3 worldFootOffset = characterController.transform.TransformVector(localFootPoint);
+
+            _scaledLocalFootOffset =Quaternion.Inverse(characterController.transform.rotation) * worldFootOffset;
         }
 
         #endregion
@@ -51,11 +76,13 @@ namespace NiumaTPC.Character.Traversal
                 return false;
             }
 
+            Vector3 footPosition = ResolveFootPosition(request.Position,forward);
+
             int obstacleMask = ResolveObstacleMask();
             int groundMask = ResolveGroundMask();
 
             if (!TryFindWall(
-                    request.Position,
+                    footPosition,
                     forward,
                     request.MinHeight,
                     request.MaxHeight,
@@ -93,42 +120,14 @@ namespace NiumaTPC.Character.Traversal
                 return false;
             }
 
-            float height = ledgeHit.point.y - request.Position.y;
+            // Low/High 高度统一相对于胶囊脚底计算。
+            float height = ledgeHit.point.y - footPosition.y;
 
             if (height < request.MinHeight ||
                 height > request.MaxHeight)
             {
                 return false;
             }
-
-            Vector3 vaultForwardDirection = -wallHit.normal;
-
-            float landForwardDistance =
-                _config.VaultLandDistance +
-                Mathf.Max(0f, _config.VaultLandForwardPadding);
-
-            Vector3 landRayStart =
-                ledgeHit.point +
-                vaultForwardDirection * landForwardDistance +
-                Vector3.up * 0.5f;
-
-            bool foundGround = Physics.Raycast(
-                landRayStart,
-                Vector3.down,
-                out RaycastHit landHit,
-                _config.VaultLandRayLength,
-                groundMask,
-                QueryTriggerInteraction.Ignore) &&
-                Vector3.Dot(landHit.normal, Vector3.up) >= 0.7f;
-
-            if (_config.RequireGroundBehindWall && !foundGround)
-            {
-                return false;
-            }
-
-            Vector3 expectedLandPoint = foundGround
-                ? landHit.point
-                : landRayStart + Vector3.down * 0.5f;
 
             Vector3 wallNormalFlat = new Vector3(
                 wallHit.normal.x,
@@ -142,10 +141,84 @@ namespace NiumaTPC.Character.Traversal
 
             wallNormalFlat.Normalize();
 
-            Vector3 ledgePoint = new Vector3(
+            Vector3 vaultForwardDirection =
+                -wallNormalFlat;
+
+            float landForwardDistance =
+                _config.VaultLandDistance +
+                Mathf.Max(
+                    0f,
+                    _config.VaultLandForwardPadding);
+
+            /*
+             * ledgeHit.point 才是下向射线实际命中的墙顶点。
+             * wallHit.point 位于竖直墙面，不能作为胶囊脚底的墙顶目标。
+             */
+            Vector3 ledgeSurfacePoint =
+                ledgeHit.point;
+
+            /*
+             * 落脚距离必须从墙体前沿计算，不能从 ledgeSurfacePoint 继续累加。
+             * ledgeSurfacePoint 本身已经包含 VaultDownwardRayOffset；如果再次把它
+             * 当作落脚搜索起点，会把这段偏移重复计算，并可能直接跳到方块另一侧。
+             * 顶面在短距离内足够站立时，射线会命中顶面，角色就停在方块顶部。
+             */
+            Vector3 wallTopFrontPoint = new Vector3(
                 wallHit.point.x,
-                ledgeHit.point.y,
+                ledgeSurfacePoint.y,
                 wallHit.point.z);
+
+            Vector3 landRayStart =
+                wallTopFrontPoint +
+                vaultForwardDirection *
+                landForwardDistance +
+                Vector3.up * 0.5f;
+
+            bool foundGround = Physics.Raycast(
+                landRayStart,
+                Vector3.down,
+                out RaycastHit landHit,
+                _config.VaultLandRayLength,
+                groundMask,
+                QueryTriggerInteraction.Ignore) &&
+                Vector3.Dot(
+                    landHit.normal,
+                    Vector3.up) >= 0.7f;
+
+            if (_config.RequireGroundBehindWall &&
+                !foundGround)
+            {
+                return false;
+            }
+
+            Vector3 expectedLandSurfacePoint =
+                foundGround
+                    ? landHit.point
+                    : landRayStart +
+                      Vector3.down * 0.5f;
+
+            /*
+             * Physics 命中点表示胶囊脚底应该到达的表面位置，
+             * CharacterSimulationState 保存的却是角色根节点位置。
+             * foot = root + rotation * footOffset，
+             * 因此 root = foot - rotation * footOffset。
+             */
+            Quaternion targetRootRotation =
+                Quaternion.LookRotation(
+                    vaultForwardDirection,
+                    Vector3.up);
+
+            Vector3 targetRootOffsetFromFoot =
+                -(targetRootRotation *
+                  _scaledLocalFootOffset);
+
+            Vector3 ledgeRootTarget =
+                ledgeSurfacePoint +
+                targetRootOffsetFromFoot;
+
+            Vector3 expectedLandRootTarget =
+                expectedLandSurfacePoint +
+                targetRootOffsetFromFoot;
 
             Vector3 rightDirection =
                 Vector3.Cross(Vector3.up, wallNormalFlat).normalized;
@@ -163,10 +236,12 @@ namespace NiumaTPC.Character.Traversal
             float halfHandSpread = _config.VaultHandSpread * 0.5f;
 
             Vector3 baseLeftHand =
-                ledgePoint - rightDirection * halfHandSpread;
+                ledgeSurfacePoint -
+                rightDirection * halfHandSpread;
 
             Vector3 baseRightHand =
-                ledgePoint + rightDirection * halfHandSpread;
+                ledgeSurfacePoint +
+                rightDirection * halfHandSpread;
 
             Quaternion ledgeBasis = Quaternion.LookRotation(
                 vaultForwardDirection,
@@ -192,16 +267,31 @@ namespace NiumaTPC.Character.Traversal
             {
                 IsValid = true,
                 WallPoint = wallHit.point,
-                WallNormal = wallHit.normal,
+                WallNormal = wallNormalFlat,
                 Height = height,
-                LedgePoint = ledgePoint,
-                ExpectedLandPoint = expectedLandPoint,
+                LedgePoint = ledgeRootTarget,
+                ExpectedLandPoint = expectedLandRootTarget,
                 LeftHandPos = leftHandPosition,
                 RightHandPos = rightHandPosition,
                 HandRot = handRotation
             };
 
             return true;
+        }
+
+        #endregion
+
+        #region Probe Origin(探测原点)
+
+        /// <summary>
+        /// 使用权威根节点位置和朝向还原 CharacterController 世界脚底。
+        /// 不读取动画模型或 Graphical Object。
+        /// </summary>
+        private Vector3 ResolveFootPosition(Vector3 rootPosition,Vector3 forward)
+        {
+            Quaternion rootYawRotation = Quaternion.LookRotation(forward,Vector3.up);
+
+            return rootPosition + rootYawRotation * _scaledLocalFootOffset;
         }
 
         #endregion

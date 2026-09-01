@@ -1,5 +1,6 @@
 using System;
 using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.Traversal;
 using UnityEngine;
 
 namespace NiumaTPC.Character.Simulation
@@ -14,6 +15,7 @@ namespace NiumaTPC.Character.Simulation
 
         private readonly ICharacterSimulationBody _body;
         private CharacterSimulationConfig _config;
+        private readonly ICharacterTraversalProbe _traversalProbe;
 
         #endregion
 
@@ -27,9 +29,15 @@ namespace NiumaTPC.Character.Simulation
 
         #region Constructor(构造函数)
 
-        public CharacterSimulationRunner(ICharacterSimulationBody body, in CharacterSimulationConfig config)
+        public CharacterSimulationRunner(
+            ICharacterSimulationBody body, 
+            ICharacterTraversalProbe traversalProbe,
+            in CharacterSimulationConfig config
+            )
         {
             _body = body ?? throw new ArgumentNullException(nameof(body));
+
+            _traversalProbe = traversalProbe ?? throw new ArgumentNullException(nameof(traversalProbe));
 
             _config = config;
 
@@ -73,6 +81,7 @@ namespace NiumaTPC.Character.Simulation
                 ref _state,
                 in command,
                 in _config,
+                _traversalProbe,
                 canSprint,
                 isHandsEmpty,
                 tickDeltaTime

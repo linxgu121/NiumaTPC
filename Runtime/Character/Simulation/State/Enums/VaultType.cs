@@ -9,6 +9,6 @@ namespace NiumaTPC.Character.Simulation
 
         Low = 1,
 
-        Height = 2
+        High = 2
     }
 }

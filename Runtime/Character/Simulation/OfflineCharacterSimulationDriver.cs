@@ -1,4 +1,5 @@
 using NiumaTPC.Character.RuntimeData;
+using NiumaTPC.Character.Traversal;
 using UnityEngine;
 
 namespace NiumaTPC.Character.Simulation
@@ -152,12 +153,17 @@ namespace NiumaTPC.Character.Simulation
                 new CharacterControllerSimulationBody(
                     _player.CharacterController);
 
+            var traversalProbe =
+                new PhysicsCharacterTraversalProbe(
+                    _player.Config.Vaulting,
+                    _player.CharacterController);
+
             _runner = new CharacterSimulationRunner(
                 body,
+                traversalProbe,
                 in config);
 
-            _commandBuilder =
-                new CharacterInputCommandBuilder();
+            _commandBuilder = new CharacterInputCommandBuilder();
 
             _accumulator = 0d;
             _tick = 0u;

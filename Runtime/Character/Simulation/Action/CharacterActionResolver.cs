@@ -23,6 +23,13 @@ namespace NiumaTPC.Character.Simulation
                 return false;
             }
 
+            // 同 Tick 同时出现 Jump 与 Roll/Dodge 时，
+            // Jump/Vault 拥有更高优先级。
+            if (command.HasButton(CharacterInputButtons.Jump))
+            {
+                return false;
+            }
+
             if(!state.IsGrounded)
             {
                 return false;
@@ -34,6 +41,7 @@ namespace NiumaTPC.Character.Simulation
             {
                 return false;
             }
+
 
             state.ActionType = requestedAction;
             state.ActionTick = 0u;

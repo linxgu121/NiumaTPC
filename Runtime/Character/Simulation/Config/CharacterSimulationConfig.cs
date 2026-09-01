@@ -78,6 +78,10 @@ namespace NiumaTPC.Character.Simulation
             float sprintEmptyJumpInitialVelocity,
             float doubleJumpInitialVelocity,
             float sprintEmptyDoubleJumpInitialVelocity,
+            float lowVaultMinHeight,
+            float lowVaultMaxHeight,
+            float highVaultMinHeight,
+            float highVaultMaxHeight,
             CharacterStartMotionProfile[] startMotionProfiles,
             CharacterActionMotionProfile rollMotionProfile,
             CharacterActionMotionProfile dodgeMotionProfile,
@@ -101,9 +105,17 @@ namespace NiumaTPC.Character.Simulation
             SprintEmptyJumpInitialVelocity = Mathf.Max(0f, sprintEmptyJumpInitialVelocity);
             DoubleJumpInitialVelocity = Mathf.Max(0f,doubleJumpInitialVelocity);
             SprintEmptyDoubleJumpInitialVelocity = Mathf.Max(0f, sprintEmptyDoubleJumpInitialVelocity);
+            LowVaultMinHeight = Mathf.Max(0f, lowVaultMinHeight);
+
+            LowVaultMaxHeight = Mathf.Max(LowVaultMinHeight, lowVaultMaxHeight);
+
+            HighVaultMinHeight = Mathf.Max(0f, highVaultMinHeight);
+
+            HighVaultMaxHeight =Mathf.Max(HighVaultMinHeight, highVaultMaxHeight);
 
             _startMotionProfiles = startMotionProfiles != null && startMotionProfiles.Length == StartProfileCount ?
                                    startMotionProfiles : Array.Empty<CharacterStartMotionProfile>();
+
 
             _rollMotionProfile = rollMotionProfile;
             _dodgeMotionProfile = dodgeMotionProfile;
@@ -228,7 +240,7 @@ namespace NiumaTPC.Character.Simulation
                     profile = _lowVaultMotionProfile;
                     break;
 
-                case VaultType.Height:
+                case VaultType.High:
                     profile = _highVaultMotionProfile;
                     break;
 
@@ -262,6 +274,15 @@ namespace NiumaTPC.Character.Simulation
 
         private readonly CharacterVaultMotionProfile
             _highVaultMotionProfile;
+
+        #endregion
+
+        #region Vault Detection(翻越高度)
+
+        public readonly float LowVaultMinHeight;
+        public readonly float LowVaultMaxHeight;
+        public readonly float HighVaultMinHeight;
+        public readonly float HighVaultMaxHeight;
 
         #endregion
     }

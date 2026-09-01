@@ -1,4 +1,5 @@
 using UnityEngine;
+using NiumaTPC.Character.Traversal;
 
 namespace NiumaTPC.Character.Simulation
 {
@@ -14,6 +15,7 @@ namespace NiumaTPC.Character.Simulation
             ref CharacterSimulationState state,
             in CharacterInputCommand command,
             in CharacterSimulationConfig config,
+            ICharacterTraversalProbe traversalProbe,
             bool canSprint,
             bool isHandsEmpty,
             float tickDeltaTime
@@ -21,6 +23,18 @@ namespace NiumaTPC.Character.Simulation
         {
             
             state.Tick = command.Tick;
+
+            bool simulatedVault = CharacterVaultMovementSimulator.TrySimulate(
+                    ref state,
+                    in command,
+                    in config,
+                    traversalProbe,
+                    out Vector3 vaultDisplacement);
+
+            if (simulatedVault)
+            {
+                return vaultDisplacement;
+            }
 
            bool simulatedAction = CharacterActionMovementSimulator.TrySimulate(
                     ref state,

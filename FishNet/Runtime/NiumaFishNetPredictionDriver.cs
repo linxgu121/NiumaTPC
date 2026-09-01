@@ -9,6 +9,7 @@ using FishNet.Object.Prediction;
 using FishNet.Transporting;
 using FishNet.Connection;
 using FishNet.Object;
+using NiumaTPC.Character.Traversal;
 
 namespace NiumaTPC.FishNet
 {
@@ -580,7 +581,9 @@ namespace NiumaTPC.FishNet
 
             var body = new CharacterControllerSimulationBody(_player.CharacterController);
 
-            _runner = new CharacterSimulationRunner(body, in config);
+            var traversalProbe = new PhysicsCharacterTraversalProbe(_player.Config.Vaulting, _player.CharacterController);
+
+            _runner = new CharacterSimulationRunner(body, traversalProbe, in config);
 
             _commandBuilder = new CharacterInputCommandBuilder();
 

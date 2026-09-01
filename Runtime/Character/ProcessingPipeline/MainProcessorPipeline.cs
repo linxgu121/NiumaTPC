@@ -38,7 +38,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
             _aimIntentProcessor = new AimIntentProcessor(_runtimeData);
             _locomotionIntentProcessor = new LocomotionIntentProcessor(_runtimeData, _config);
-            ICharacterTraversalProbe traversalProbe = new PhysicsCharacterTraversalProbe(_config.Vaulting);
+            ICharacterTraversalProbe traversalProbe = new PhysicsCharacterTraversalProbe(_config.Vaulting,player.CharacterController);
             _jumpOrVaultIntentProcessor = new JumpOrVaultIntentProcessor(_runtimeData, _config, player.transform, traversalProbe);
             _eojIntentProcessor = new EojIntentProcessor(_runtimeData, _inputPipeline);
             _hotbarIntentProcessor = new HotbarIntentProcessor(_runtimeData);

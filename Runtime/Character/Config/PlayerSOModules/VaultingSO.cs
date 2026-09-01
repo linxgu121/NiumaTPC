@@ -37,11 +37,11 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         [Tooltip("双手抓握点宽度")]
         public float VaultHandSpread = 0.4f;
 
-        [Tooltip("落脚点搜索距离")]
-        public float VaultLandDistance = 1.5f;
+        [Tooltip("从墙体前沿向内搜索落脚点的基础距离。顶面足够站立时应命中顶面，而不是强制越过整个障碍物。")]
+        public float VaultLandDistance = 0.2f;
 
-        [Tooltip("落脚点额外前推距离。角色总是卡在墙顶或方块边缘时调大；如果落点太靠后会滑下去，建议从 0.25 到 0.5 之间调。")]
-        public float VaultLandForwardPadding = 0.35f;
+        [Tooltip("从墙体前沿额外向内推进的安全距离，不包含 VaultDownwardRayOffset。与基础距离之和应小于常见可站立顶面的深度。")]
+        public float VaultLandForwardPadding = 0.2f;
 
         [Tooltip("落脚点射线长度")]
         public float VaultLandRayLength = 3.0f;
