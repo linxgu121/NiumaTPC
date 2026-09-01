@@ -108,6 +108,20 @@ namespace NiumaTPC.Character.RuntimeData
         /// <summary>动作开始时锁定的八方向，动作播放期间不再跟随新的移动输入改变。 </summary>
         public CharacterActionDirection SimulationActionDirection = CharacterActionDirection.Forward;
 
+        /// <summary>固定 Tick 当前翻越类型。</summary>
+        public VaultType SimulationVaultType = VaultType.None;
+
+        /// <summary>当前翻越已经执行的 Tick 数。</summary>
+        public uint SimulationVaultTick;
+
+        /// <summary>服务器确认的翻越墙面水平法线。</summary>
+        public Vector3 SimulationVaultWallNormal;
+
+        /// <summary>
+        /// 墙沿处的角色根节点世界目标，不是墙顶表面点。
+        /// </summary>
+        public Vector3 SimulationVaultLedgePoint;
+
         #endregion
 
         #region 装备及指向基准

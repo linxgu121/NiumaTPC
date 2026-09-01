@@ -5,7 +5,6 @@ namespace NiumaTPC.Character.Simulation
 {
     /// <summary>
     /// 服务器发送给远端观察者的角色表现快照
-    /// 
     /// 它只描述“角色应该表现成什么状态”
     /// 不保存位置预测、平滑累计值或具体动画播放进度
     /// </summary>
@@ -69,6 +68,22 @@ namespace NiumaTPC.Character.Simulation
         public CharacterActionDirection ActionDirection;
 
         /// <summary>
+        /// 服务器确认的当前翻越类型
+        /// </summary>
+        public VaultType VaultType;
+        
+        /// <summary>
+        /// 当前翻越已经执行Tick数
+        /// </summary>
+        public uint VaultTick;
+
+        /// <summary>服务器确认的翻越墙面法线。</summary>
+        public Vector3 VaultWallNormal;
+
+        /// <summary>服务器确认的墙沿根节点目标。</summary>
+        public Vector3 VaultLedgePoint;
+
+        /// <summary>
         /// 服务器确认的世界空间移动方向。
         /// 表现层会把它转换成角色局部动画方向。
         /// </summary>
@@ -105,6 +120,10 @@ namespace NiumaTPC.Character.Simulation
             StartLocomotionState = simulationState.StartLocomotionState;
             ActionType = simulationState.ActionType;
             ActionTick = simulationState.ActionTick;
+            VaultType = simulationState.VaultType;
+            VaultTick = simulationState.VaultTick;
+            VaultWallNormal = simulationState.VaultWallNormal;
+            VaultLedgePoint = simulationState.VaultLedgePoint;
             ActionDirection = simulationState.ActionDirection;
             MoveDirection = simulationState.LastMoveDirection;
             IsGrounded = simulationState.IsGrounded;

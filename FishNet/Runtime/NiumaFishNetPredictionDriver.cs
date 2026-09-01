@@ -700,6 +700,13 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            CharacterVaultPresentationBridge.Apply(
+                data,
+                state.VaultType,
+                state.VaultTick,
+                state.VaultWallNormal,
+                state.VaultLedgePoint);
+
             CharacterActionPresentationBridge.Apply(
                 data,
                 state.ActionType,
@@ -818,6 +825,14 @@ namespace NiumaTPC.FishNet
         private void ApplyPresentationState(in CharacterPresentationState presentationState)
         {
             PlayerRuntimeData data = _player.RuntimeData;
+
+            CharacterVaultPresentationBridge.Apply(
+                data,
+                presentationState.VaultType,
+                presentationState.VaultTick,
+                presentationState.VaultWallNormal,
+                presentationState.VaultLedgePoint);
+
 
             CharacterActionPresentationBridge.Apply(
                 data,

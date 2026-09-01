@@ -307,7 +307,15 @@ namespace NiumaTPC.Character.Simulation
             in CharacterInputCommand command,
             in CharacterSimulationState state)
         {
+            
             PlayerRuntimeData data = _player.RuntimeData;
+
+            CharacterVaultPresentationBridge.Apply(
+                data,
+                state.VaultType,
+                state.VaultTick,
+                state.VaultWallNormal,
+                state.VaultLedgePoint);
 
             CharacterActionPresentationBridge.Apply(
                 data,
