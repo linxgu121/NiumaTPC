@@ -80,7 +80,9 @@ namespace NiumaTPC.Character.Simulation
             float sprintEmptyDoubleJumpInitialVelocity,
             CharacterStartMotionProfile[] startMotionProfiles,
             CharacterActionMotionProfile rollMotionProfile,
-            CharacterActionMotionProfile dodgeMotionProfile)
+            CharacterActionMotionProfile dodgeMotionProfile,
+            CharacterVaultMotionProfile lowVaultMotionProfile,
+            CharacterVaultMotionProfile highVaultMotionProfile)
         {
             WalkSpeed = Mathf.Max(0f, walkSpeed);
             JogSpeed = Mathf.Max(0f, jogSpeed);
@@ -105,6 +107,9 @@ namespace NiumaTPC.Character.Simulation
 
             _rollMotionProfile = rollMotionProfile;
             _dodgeMotionProfile = dodgeMotionProfile;
+
+            _lowVaultMotionProfile = lowVaultMotionProfile;
+            _highVaultMotionProfile = highVaultMotionProfile;
         }
 
         #endregion
@@ -210,6 +215,31 @@ namespace NiumaTPC.Character.Simulation
             return profile.IsValid;
         }
 
+        /// <summary>
+        /// 获取 Low 或 High 对应的固定 Tick 翻越轨迹。
+        /// </summary>
+        public bool TryGetVaultMotionProfile(
+            VaultType vaultType,
+            out CharacterVaultMotionProfile profile)
+        {
+            switch (vaultType)
+            {
+                case VaultType.Low:
+                    profile = _lowVaultMotionProfile;
+                    break;
+
+                case VaultType.Height:
+                    profile = _highVaultMotionProfile;
+                    break;
+
+                default:
+                    profile = default;
+                    return false;
+            }
+
+            return profile.IsValid;
+        }
+
         #endregion
 
         #region State Motion
@@ -222,6 +252,16 @@ namespace NiumaTPC.Character.Simulation
 
         private readonly CharacterStartMotionProfile[] _startMotionProfiles;
 
+
+        #endregion
+
+        #region Vault Motion
+
+        private readonly CharacterVaultMotionProfile
+            _lowVaultMotionProfile;
+
+        private readonly CharacterVaultMotionProfile
+            _highVaultMotionProfile;
 
         #endregion
     }

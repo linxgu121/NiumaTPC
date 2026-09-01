@@ -54,8 +54,9 @@ namespace NiumaTPC.Character.Simulation
             CharacterStartMotionProfile[] startProfiles =
                 CreateStartProfiles(locomotion, tickDeltaTime);
 
-             RollSO roll = playerConfig.Rolling;
+            RollSO roll = playerConfig.Rolling;
             DodgingSO dodge = playerConfig.Dodging;
+            VaultingSO vaulting = playerConfig.Vaulting;
 
             /*
              * Roll、Dodge 属于高级可选模块。
@@ -81,6 +82,30 @@ namespace NiumaTPC.Character.Simulation
                         dodge.name)
                     : default;
 
+            CharacterVaultMotionProfile lowVaultProfile =
+                vaulting != null
+                    ? CreateVaultMotionProfile(
+                        vaulting.LowVaultDurationSeconds,
+                        vaulting.LowVaultFirstStageEndNormalizedTime,
+                        vaulting.LowVaultFirstStageProgressCurve,
+                        vaulting.LowVaultSecondStageProgressCurve,
+                        vaulting.LowVaultRotationProgressCurve,
+                        tickDeltaTime,
+                        $"{vaulting.name}/LowVault")
+                    : default;
+
+            CharacterVaultMotionProfile highVaultProfile =
+                vaulting != null
+                    ? CreateVaultMotionProfile(
+                        vaulting.HighVaultDurationSeconds,
+                        vaulting.HighVaultFirstStageEndNormalizedTime,
+                        vaulting.HighVaultFirstStageProgressCurve,
+                        vaulting.HighVaultSecondStageProgressCurve,
+                        vaulting.HighVaultRotationProgressCurve,
+                        tickDeltaTime,
+                        $"{vaulting.name}/HighVault")
+                    : default;
+
             return new CharacterSimulationConfig(
                 walkSpeed: core.WalkSpeed,
                 jogSpeed: core.JogSpeed,
@@ -102,7 +127,10 @@ namespace NiumaTPC.Character.Simulation
                 
                 startMotionProfiles: startProfiles,
                 rollMotionProfile: rollProfile,
-                dodgeMotionProfile: dodgeProfile
+                dodgeMotionProfile: dodgeProfile,
+
+                lowVaultMotionProfile: lowVaultProfile,
+                highVaultMotionProfile: highVaultProfile
             );
         }
 
@@ -390,6 +418,108 @@ namespace NiumaTPC.Character.Simulation
 
                 previousProgress = progress;
             }
+        }
+
+
+        #endregion
+
+        #region Vault Motion Profiles(翻越动作剖面集)
+
+        private static CharacterVaultMotionProfile
+            CreateVaultMotionProfile(
+                float durationSeconds,
+                float firstStageEndNormalizedTime,
+                AnimationCurve firstStageCurve,
+                AnimationCurve secondStageCurve,
+                AnimationCurve rotationCurve,
+                float tickDeltaTime,
+                string sourceName)
+        {
+            if (!IsFinite(durationSeconds) ||
+                durationSeconds <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”持续时间必须是有限正数。");
+            }
+
+            if (!IsFinite(firstStageEndNormalizedTime) ||
+                firstStageEndNormalizedTime <= 0f ||
+                firstStageEndNormalizedTime >= 1f)
+            {
+                throw new InvalidOperationException(
+                    $"“{sourceName}”第一阶段结束时间必须位于0到1之间。");
+            }
+
+            ValidateActionProgressCurve(
+                firstStageCurve,
+                $"{sourceName}/FirstStage");
+
+            ValidateActionProgressCurve(
+                secondStageCurve,
+                $"{sourceName}/SecondStage");
+
+            ValidateActionProgressCurve(
+                rotationCurve,
+                $"{sourceName}/Rotation");
+
+            int sampleCount = Mathf.Max(
+                1,
+                Mathf.CeilToInt(
+                    durationSeconds / tickDeltaTime));
+
+            var firstStageSamples =
+                new float[sampleCount];
+
+            var secondStageSamples =
+                new float[sampleCount];
+
+            var rotationSamples =
+                new float[sampleCount];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float normalizedTime = Mathf.Min(
+                    (i + 1) * tickDeltaTime /
+                    durationSeconds,
+                    1f);
+
+                if (normalizedTime <=
+                    firstStageEndNormalizedTime)
+                {
+                    float firstStageTime =
+                        normalizedTime /
+                        firstStageEndNormalizedTime;
+
+                    firstStageSamples[i] =
+                        firstStageCurve.Evaluate(
+                            firstStageTime);
+
+                    secondStageSamples[i] = 0f;
+                }
+                else
+                {
+                    firstStageSamples[i] = 1f;
+
+                    float secondStageTime =
+                        (normalizedTime -
+                         firstStageEndNormalizedTime) /
+                        (1f -
+                         firstStageEndNormalizedTime);
+
+                    secondStageSamples[i] =
+                        secondStageCurve.Evaluate(
+                            secondStageTime);
+                }
+
+                rotationSamples[i] =
+                    rotationCurve.Evaluate(
+                        normalizedTime);
+            }
+
+            return new CharacterVaultMotionProfile(
+                firstStageSamples,
+                secondStageSamples,
+                rotationSamples);
         }
 
         #endregion

@@ -64,8 +64,46 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         [Tooltip("高翻越最大高度")]
         public float HighVaultMaxHeight = 2.5f;
 
+        [Header("低翻越权威轨迹")]
+        [Tooltip("低翻越持续时间,单位秒,应与低翻越动画的主要动作时长接近")]
+        [Min(0.05f)]
+        public float LowVaultDurationSeconds = 0.8f;
+
+        [Tooltip("低翻越第一阶段结束时刻,使用整个动作的归一化时间,0.45 表示前45%时间到达墙沿")]
+        [Range(0.05f, 0.95f)]
+        public float LowVaultFirstStageEndNormalizedTime = 0.45f;
+
+        [Tooltip("低翻越从起点到墙沿的累计进度曲线，必须从(0,0)单调增长到(1,1)。")]
+        public AnimationCurve LowVaultFirstStageProgressCurve =
+            AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Tooltip("低翻越从墙沿到最终落点的累计进度曲线，必须从(0,0)单调增长到(1,1)。")]
+        public AnimationCurve LowVaultSecondStageProgressCurve =
+            AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Tooltip("低翻越朝向目标角度的累计旋转进度。")]
+        public AnimationCurve LowVaultRotationProgressCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Header("高翻越权威轨迹")]
+        [Tooltip("高翻越持续时间，单位秒。")]
+        [Min(0.05f)]
+        public float HighVaultDurationSeconds = 1.1f;
+
+        [Tooltip("高翻越第一阶段结束时刻。高翻越通常需要更长时间到达墙沿。")]
+        [Range(0.05f, 0.95f)]
+        public float HighVaultFirstStageEndNormalizedTime = 0.55f;
+
+        [Tooltip("高翻越从起点到墙沿的累计进度曲线。")]
+        public AnimationCurve HighVaultFirstStageProgressCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Tooltip("高翻越从墙沿到最终落点的累计进度曲线。")]
+        public AnimationCurve HighVaultSecondStageProgressCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Tooltip("高翻越朝向目标角度的累计旋转进度。")]
+        public AnimationCurve HighVaultRotationProgressCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+
         [Header("翻越动画数据")]
-        
         [Tooltip("翻越结束后到待机状态的淡入参数")]
         public AnimPlayOptions VaultToIdleOptions = AnimPlayOptions.Default;
         
