@@ -46,6 +46,14 @@ namespace NiumaTPC.Character.Simulation
                 lastMoveDirection: Vector3.zero,
                 isGrounded: body.IsGrounded,
                 hasPerformedDoubleJumpInAir: false,
+                vaultType: VaultType.None,
+                vaultTick: 0u,
+                vaultStartPosition: body.Position,
+                vaultStartYaw: body.Yaw,
+                vaultWallNormal: Vector3.zero,
+                vaultLedgePoint: Vector3.zero,
+                vaultLandPoint: Vector3.zero,
+                vaultTargetYaw: body.Yaw,
                 actionType: CharacterActionType.None,
                 actionTick: 0u,
                 actionDirection: CharacterActionDirection.Forward,
@@ -116,10 +124,21 @@ namespace NiumaTPC.Character.Simulation
 
         private static void ValidateState(in CharacterSimulationState state)
         {
-            bool hasInvalidNumber = !IsFinite(state.Position.x) || !IsFinite(state.Position.y) ||
-                !IsFinite(state.Position.z) || !IsFinite(state.Yaw) || !IsFinite(state.VerticalVelocity) ||
-                !IsFinite(state.SmoothSpeed) || !IsFinite(state.SpeedSmoothVelocity) || !IsFinite(state.RotationSmoothVelocity)||
-                !IsFinite(state.LastMoveDirection.x) || !IsFinite(state.LastMoveDirection.y) || !IsFinite(state.LastMoveDirection.z);
+            bool hasInvalidNumber = 
+                !IsFiniteVector(state.Position) ||
+                !IsFinite(state.Yaw) ||
+                !IsFinite(state.VerticalVelocity) ||
+                !IsFiniteVector(state.LastMoveDirection) ||
+                !IsFinite(state.SmoothSpeed) ||
+                !IsFinite(state.SpeedSmoothVelocity) ||
+                !IsFinite(state.RotationSmoothVelocity) ||
+                !IsFiniteVector(state.VaultStartPosition) ||
+                !IsFinite(state.VaultStartYaw) ||
+                !IsFiniteVector(state.VaultWallNormal) ||
+                !IsFiniteVector(state.VaultLedgePoint) ||
+                !IsFiniteVector(state.VaultLandPoint) ||
+                !IsFinite(state.VaultTargetYaw);
+
 
             if (hasInvalidNumber)
             {
@@ -148,6 +167,21 @@ namespace NiumaTPC.Character.Simulation
                     nameof(state));
             }
 
+            if (!Enum.IsDefined(typeof(VaultType),state.VaultType))
+            {
+                throw new ArgumentException($"未知的翻越类型：{state.VaultType}。",nameof(state));
+            }
+
+            if (state.VaultType == VaultType.None && state.VaultTick != 0u)
+            {
+                throw new ArgumentException("没有执行翻越时，VaultTick 必须为 0。",nameof(state));
+            }
+
+            if (state.VaultType != VaultType.None && state.ActionType != CharacterActionType.None)
+            {
+                throw new ArgumentException("翻越不能与 Roll/Dodge 动作同时存在。", nameof(state));
+            }
+
             if (!Enum.IsDefined(typeof(CharacterActionType), state.ActionType))
             {
                 throw new ArgumentException($"未知的角色动作类型：{state.ActionType}。", nameof(state));
@@ -165,6 +199,13 @@ namespace NiumaTPC.Character.Simulation
 
         }
 
+        private static bool IsFiniteVector(in Vector3 value)
+        {
+            return IsFinite(value.x) &&
+                   IsFinite(value.y) &&
+                   IsFinite(value.z);
+        }
+        
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);

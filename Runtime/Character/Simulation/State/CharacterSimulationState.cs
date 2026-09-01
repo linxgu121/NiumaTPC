@@ -77,6 +77,46 @@ namespace NiumaTPC.Character.Simulation
         public bool HasPerformedDoubleJumpInAir;
 
         /// <summary>
+        /// 当前正在执行的权威翻越类型。
+        /// </summary>
+        public VaultType VaultType;
+
+        /// <summary>
+        /// 已经执行完成的翻越固定 Tick 数。
+        /// </summary>
+        public uint VaultTick;
+
+        /// <summary>
+        /// 翻越启动时的权威位置。
+        /// </summary>
+        public Vector3 VaultStartPosition;
+
+        /// <summary>
+        /// 翻越启动时的权威朝向。
+        /// </summary>
+        public float VaultStartYaw;
+
+        /// <summary>
+        /// 服务器确认的墙面法线。
+        /// </summary>
+        public Vector3 VaultWallNormal;
+
+        /// <summary>
+        /// 服务器确认的墙沿目标。
+        /// </summary>
+        public Vector3 VaultLedgePoint;
+
+        /// <summary>
+        /// 服务器确认的翻越落点。
+        /// </summary>
+        public Vector3 VaultLandPoint;
+
+        /// <summary>
+        /// 翻越期间需要收敛到的目标朝向。
+        /// </summary>
+        public float VaultTargetYaw;
+
+        /// <summary>
         /// 当前正在执行的可回滚短时动作
         /// </summary>
         public CharacterActionType ActionType;
@@ -123,6 +163,14 @@ namespace NiumaTPC.Character.Simulation
             Vector3 lastMoveDirection,
             bool isGrounded,
             bool hasPerformedDoubleJumpInAir,
+            VaultType vaultType,
+            uint vaultTick,
+            Vector3 vaultStartPosition,
+            float vaultStartYaw,
+            Vector3 vaultWallNormal,
+            Vector3 vaultLedgePoint,
+            Vector3 vaultLandPoint,
+            float vaultTargetYaw,
             CharacterActionType actionType,
             uint actionTick,
             CharacterActionDirection actionDirection,
@@ -143,6 +191,14 @@ namespace NiumaTPC.Character.Simulation
             LastMoveDirection = lastMoveDirection;
             IsGrounded = isGrounded;
             HasPerformedDoubleJumpInAir = hasPerformedDoubleJumpInAir;
+            VaultType = vaultType;
+            VaultTick = vaultTick;
+            VaultStartPosition = vaultStartPosition;
+            VaultStartYaw = vaultStartYaw;
+            VaultWallNormal = vaultWallNormal;
+            VaultLedgePoint = vaultLedgePoint;
+            VaultLandPoint = vaultLandPoint;
+            VaultTargetYaw = vaultTargetYaw;
             ActionType = actionType;
             ActionTick = actionTick;
             ActionDirection = actionDirection;

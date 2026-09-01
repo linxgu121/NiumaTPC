@@ -155,6 +155,25 @@ namespace NiumaTPC.FishNet.Prediction
         public bool HasPerformedDoubleJumpInAir;
 
         /// <summary>
+        /// VaultType 的网络存储值。
+        /// </summary>
+        public byte VaultTypeValue;
+
+        public uint VaultTick;
+
+        public Vector3 VaultStartPosition;
+
+        public float VaultStartYaw;
+
+        public Vector3 VaultWallNormal;
+
+        public Vector3 VaultLedgePoint;
+
+        public Vector3 VaultLandPoint;
+
+        public float VaultTargetYaw;
+
+        /// <summary>
         /// CharacterActionType 的网络存储值。
         /// </summary>
         public byte ActionTypeValue;
@@ -202,6 +221,14 @@ namespace NiumaTPC.FishNet.Prediction
             LastMoveDirection = state.LastMoveDirection;
             IsGrounded = state.IsGrounded;
             HasPerformedDoubleJumpInAir = state.HasPerformedDoubleJumpInAir;
+            VaultTypeValue = (byte)state.VaultType;
+            VaultTick = state.VaultTick;
+            VaultStartPosition = state.VaultStartPosition;
+            VaultStartYaw = state.VaultStartYaw;
+            VaultWallNormal = state.VaultWallNormal;
+            VaultLedgePoint = state.VaultLedgePoint;
+            VaultLandPoint = state.VaultLandPoint;
+            VaultTargetYaw = state.VaultTargetYaw;
             ActionTypeValue = (byte)state.ActionType;
             ActionTick = state.ActionTick;
             ActionDirectionValue = (byte)state.ActionDirection;
@@ -233,6 +260,14 @@ namespace NiumaTPC.FishNet.Prediction
                 lastMoveDirection: LastMoveDirection,
                 isGrounded: IsGrounded,
                 hasPerformedDoubleJumpInAir:HasPerformedDoubleJumpInAir,
+                vaultType: (VaultType)VaultTypeValue,
+                vaultTick: VaultTick,
+                vaultStartPosition: VaultStartPosition,
+                vaultStartYaw: VaultStartYaw,
+                vaultWallNormal: VaultWallNormal,
+                vaultLedgePoint: VaultLedgePoint,
+                vaultLandPoint: VaultLandPoint,
+                vaultTargetYaw: VaultTargetYaw,
                 actionType: (CharacterActionType)ActionTypeValue,
                 actionTick: ActionTick,
                 actionDirection:(CharacterActionDirection)ActionDirectionValue,
