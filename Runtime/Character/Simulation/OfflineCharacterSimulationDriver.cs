@@ -281,6 +281,11 @@ namespace NiumaTPC.Character.Simulation
                 _player.InputPipeline.ConsumeDodgePressed();
             }
 
+            if (command.HasButton(CharacterInputButtons.Slide))
+            {
+                _player.InputPipeline.ConsumeSlidePressed();
+            }
+
             bool canSprint =
                 !_player.RuntimeData.IsStaminaDepleted &&
                 _player.RuntimeData.CurrentStamina > 0f;

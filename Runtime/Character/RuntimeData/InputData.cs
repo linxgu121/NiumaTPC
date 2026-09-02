@@ -81,6 +81,11 @@ namespace NiumaTPC.Character.RuntimeData
         public bool LeftMouseHeld;
 
         /// <summary>
+        /// 走路键本帧刚按下，同时作为滑铲输入边沿
+        /// </summary>
+        public bool WalkJustPressed;
+
+        /// <summary>
         /// 跳（按下）
         /// </summary>
         public bool JumpJustPressed;
@@ -212,6 +217,7 @@ namespace NiumaTPC.Character.RuntimeData
         public bool LeftMouseHeld;
 
         //缓存计时器
+        public float SlideBufferTimer;
         public float JumpBufferTimer;
         public float DodgeBufferTimer;
         public float RollBufferTimer;
@@ -230,6 +236,7 @@ namespace NiumaTPC.Character.RuntimeData
 
         //判断输入缓冲是否有效
         //预输入
+        public bool SlidePressed => SlideBufferTimer > 0f;
         public bool JumpPressed => JumpBufferTimer > 0f;
         public bool DodgePressed => DodgeBufferTimer > 0f;
         public bool RollPressed => RollBufferTimer > 0f;

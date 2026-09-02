@@ -196,6 +196,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
                 return newTimer;
             }
 
+            currentFrame.Processed.SlideBufferTimer = UpdateBuffer(lastProc.SlideBufferTimer, _rawData.WalkJustPressed);
             currentFrame.Processed.JumpBufferTimer = UpdateBuffer(lastProc.JumpBufferTimer, _rawData.JumpJustPressed);
             currentFrame.Processed.DodgeBufferTimer = UpdateBuffer(lastProc.DodgeBufferTimer, _rawData.DodgeJustPressed);
             currentFrame.Processed.RollBufferTimer = UpdateBuffer(lastProc.RollBufferTimer, _rawData.RollJustPressed);
@@ -223,7 +224,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
         // 消费仲裁接口 
         // IntentProcessor (意图判定) 或 State在动作确立时调用
         // 调用后 Timer 瞬间归零 配合 实现同帧内核销
-
+        public void ConsumeSlidePressed() { var frame = _inputData.currentFrameData; frame.Processed.SlideBufferTimer = 0f; _inputData.currentFrameData = frame; }
         public void ConsumeJumpPressed() { var f = _inputData.currentFrameData; f.Processed.JumpBufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeDodgePressed() { var f = _inputData.currentFrameData; f.Processed.DodgeBufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeRollPressed() { var f = _inputData.currentFrameData; f.Processed.RollBufferTimer = 0f; _inputData.currentFrameData = f; }

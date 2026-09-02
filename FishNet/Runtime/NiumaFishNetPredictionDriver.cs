@@ -350,6 +350,11 @@ namespace NiumaTPC.FishNet
                 _player.InputPipeline.ConsumeDodgePressed();
             }
 
+            if (command.HasButton(CharacterInputButtons.Slide))
+            {
+                _player.InputPipeline.ConsumeSlidePressed();
+            }
+
             return new NiumaReplicateData(command.Move, command.ViewYaw, command.Buttons);
         }
 
@@ -669,7 +674,7 @@ namespace NiumaTPC.FishNet
             CharacterInputButtons allowedButtons = 
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
                 CharacterInputButtons.Jump | CharacterInputButtons.Dodge |
-                CharacterInputButtons.Roll;
+                CharacterInputButtons.Roll | CharacterInputButtons.Slide;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 

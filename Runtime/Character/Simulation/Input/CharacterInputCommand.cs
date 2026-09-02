@@ -22,6 +22,8 @@ namespace NiumaTPC.Character.Simulation
         Dodge = 1 <<3,
 
         Roll = 1 << 4,
+
+        Slide = 1 << 5,
     }
 
     /// <summary>

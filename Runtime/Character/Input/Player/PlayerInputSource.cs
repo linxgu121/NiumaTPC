@@ -63,6 +63,7 @@ namespace NiumaTPC.Character.Input.Player
             rawData.RollHeld = rollAction != null && rollAction.action.WasPressedThisFrame();
             rawData.SprintHeld = sprintAction != null && sprintAction.action.IsPressed();
             rawData.WalkHeld = walkAction != null && walkAction.action.IsPressed();
+            rawData.WalkJustPressed = walkAction != null && walkAction.action.WasPressedThisFrame();
             rawData.AimHeld = aimAction != null && aimAction.action.IsPressed();
             rawData.Expression1Held = expression1Action != null && expression1Action.action.IsPressed();
             rawData.Expression2Held = expression2Action != null && expression2Action.action.IsPressed();

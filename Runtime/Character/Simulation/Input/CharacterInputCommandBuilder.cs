@@ -48,6 +48,10 @@ namespace NiumaTPC.Character.Simulation
             {
                 buttons |= CharacterInputButtons.Roll;
             }
+            if (input.SlidePressed)
+            {
+                buttons |= CharacterInputButtons.Slide;
+            }
 
             float normalizedYaw = Mathf.Repeat(viewYaw, 360f);
 
