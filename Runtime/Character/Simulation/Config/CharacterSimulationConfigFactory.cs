@@ -125,6 +125,7 @@ namespace NiumaTPC.Character.Simulation
                 doubleJumpInitialVelocity: jump.DoubleJumpForceUp,
                 sprintEmptyDoubleJumpInitialVelocity: jump.DoubleJumpEmptyHandSprintForceUp,
                 
+                enableVaulting: vaulting != null && vaulting.EnableVaulting,
                 lowVaultMinHeight: vaulting != null ? vaulting.LowVaultMinHeight : 0f,
                 lowVaultMaxHeight: vaulting != null ? vaulting.LowVaultMaxHeight : 0f,
                 highVaultMinHeight: vaulting != null ? vaulting.HighVaultMinHeight : 0f,

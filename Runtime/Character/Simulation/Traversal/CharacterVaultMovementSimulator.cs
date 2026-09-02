@@ -50,12 +50,12 @@ namespace NiumaTPC.Character.Simulation
             in CharacterSimulationConfig config,
             ICharacterTraversalProbe traversalProbe)
         {
-            bool canTryVault =
-                command.HasButton(
-                    CharacterInputButtons.Jump) &&
+
+            bool canTryVault = 
+                config.EnableVaulting &&
+                command.HasButton(CharacterInputButtons.Jump) &&
                 state.IsGrounded &&
-                state.ActionType ==
-                    CharacterActionType.None;
+                state.ActionType == CharacterActionType.None;
 
             if (!canTryVault)
             {

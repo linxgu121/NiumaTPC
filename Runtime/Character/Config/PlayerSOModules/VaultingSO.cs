@@ -13,6 +13,10 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
     [CreateAssetMenu(fileName = "VaultionSO", menuName = "NiumaTPC/Player/Modules/VaultingSO")]
     public class VaultingSO : ScriptableObject
     {
+        [Header("功能开关")]
+        [Tooltip("是否运行角色执行翻越")]
+        public bool EnableVaulting = true;
+
         [Header("翻越检测")]
         
         [Tooltip("障碍物层级")]

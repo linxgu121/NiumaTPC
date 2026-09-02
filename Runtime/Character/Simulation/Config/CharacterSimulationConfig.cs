@@ -78,6 +78,7 @@ namespace NiumaTPC.Character.Simulation
             float sprintEmptyJumpInitialVelocity,
             float doubleJumpInitialVelocity,
             float sprintEmptyDoubleJumpInitialVelocity,
+            bool enableVaulting,
             float lowVaultMinHeight,
             float lowVaultMaxHeight,
             float highVaultMinHeight,
@@ -105,12 +106,11 @@ namespace NiumaTPC.Character.Simulation
             SprintEmptyJumpInitialVelocity = Mathf.Max(0f, sprintEmptyJumpInitialVelocity);
             DoubleJumpInitialVelocity = Mathf.Max(0f,doubleJumpInitialVelocity);
             SprintEmptyDoubleJumpInitialVelocity = Mathf.Max(0f, sprintEmptyDoubleJumpInitialVelocity);
+            
+            EnableVaulting = enableVaulting;
             LowVaultMinHeight = Mathf.Max(0f, lowVaultMinHeight);
-
             LowVaultMaxHeight = Mathf.Max(LowVaultMinHeight, lowVaultMaxHeight);
-
             HighVaultMinHeight = Mathf.Max(0f, highVaultMinHeight);
-
             HighVaultMaxHeight =Mathf.Max(HighVaultMinHeight, highVaultMaxHeight);
 
             _startMotionProfiles = startMotionProfiles != null && startMotionProfiles.Length == StartProfileCount ?
@@ -119,6 +119,7 @@ namespace NiumaTPC.Character.Simulation
 
             _rollMotionProfile = rollMotionProfile;
             _dodgeMotionProfile = dodgeMotionProfile;
+
 
             _lowVaultMotionProfile = lowVaultMotionProfile;
             _highVaultMotionProfile = highVaultMotionProfile;
@@ -277,7 +278,9 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
-        #region Vault Detection(翻越高度)
+        #region Vault Detection
+
+        public readonly bool EnableVaulting;
 
         public readonly float LowVaultMinHeight;
         public readonly float LowVaultMaxHeight;
