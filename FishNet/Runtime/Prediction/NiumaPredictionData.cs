@@ -188,6 +188,16 @@ namespace NiumaTPC.FishNet.Prediction
         /// </summary>
         public byte ActionDirectionValue;
 
+        /// <summary>
+        /// 服务器确认的当前滑铲剩余速度
+        /// </summary>
+        public float SlideSpeed;
+
+        /// <summary>
+        /// 服务器确认的提前跳跃缓存
+        /// </summary>
+        public bool PendingSlideJump;
+
         public float SmoothSpeed;
 
         public float SpeedSmoothVelocity;
@@ -232,6 +242,8 @@ namespace NiumaTPC.FishNet.Prediction
             ActionTypeValue = (byte)state.ActionType;
             ActionTick = state.ActionTick;
             ActionDirectionValue = (byte)state.ActionDirection;
+            SlideSpeed = state.SlideSpeed;
+            PendingSlideJump = state.PendingSlideJump;
             SmoothSpeed = state.SmoothSpeed;
             SpeedSmoothVelocity = state.SpeedSmoothVelocity;
             RotationSmoothVelocity = state.RotationSmoothVelocity;
@@ -271,6 +283,8 @@ namespace NiumaTPC.FishNet.Prediction
                 actionType: (CharacterActionType)ActionTypeValue,
                 actionTick: ActionTick,
                 actionDirection:(CharacterActionDirection)ActionDirectionValue,
+                slideSpeed: SlideSpeed,
+                pendingSlideJump: PendingSlideJump,
                 smoothSpeed: SmoothSpeed,
                 speedSmoothVelocity: SpeedSmoothVelocity,
                 rotationSmoothVelocity: RotationSmoothVelocity);

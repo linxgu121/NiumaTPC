@@ -65,6 +65,8 @@ namespace NiumaTPC.Character.Simulation
                 actionType: CharacterActionType.None,
                 actionTick: 0u,
                 actionDirection: CharacterActionDirection.Forward,
+                slideSpeed: 0f,
+                pendingSlideJump: false,
                 smoothSpeed: 0f,
                 speedSmoothVelocity: 0f,
                 rotationSmoothVelocity: 0f
@@ -138,6 +140,7 @@ namespace NiumaTPC.Character.Simulation
                 !IsFinite(state.Yaw) ||
                 !IsFinite(state.VerticalVelocity) ||
                 !IsFiniteVector(state.LastMoveDirection) ||
+                !IsFinite(state.SlideSpeed) ||
                 !IsFinite(state.SmoothSpeed) ||
                 !IsFinite(state.SpeedSmoothVelocity) ||
                 !IsFinite(state.RotationSmoothVelocity) ||
@@ -204,6 +207,18 @@ namespace NiumaTPC.Character.Simulation
             if (state.ActionType == CharacterActionType.None && state.ActionTick != 0u)
             {
                 throw new ArgumentException("角色没有执行动作时，ActionTick 必须为 0。",nameof(state));
+            }
+
+            if(state.ActionType == CharacterActionType.Slide && state.SlideSpeed < 0)
+            {
+                throw new ArgumentException("滑铲速度不能为负数。",nameof(state));
+            }
+
+            bool hasStaleSlideState = state.ActionType != CharacterActionType.Slide && (Mathf.Abs(state.SlideSpeed) > 0.0001f || state.PendingSlideJump);
+
+            if(hasStaleSlideState)
+            {
+               throw new ArgumentException("未执行滑铲时，滑铲速度与缓存跳跃必须已经清空。",nameof(state)); 
             }
 
         }

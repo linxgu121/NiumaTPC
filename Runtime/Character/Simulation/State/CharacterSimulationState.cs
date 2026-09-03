@@ -134,6 +134,18 @@ namespace NiumaTPC.Character.Simulation
         public CharacterActionDirection ActionDirection;
 
         /// <summary>
+        /// 当前滑铲剩余水平速度，单位 m/s。
+        /// 只有 ActionType 为 Slide 时才能大于零
+        /// </summary>
+        public float SlideSpeed;
+
+        /// <summary>
+        /// 是否缓存了最短滑铲时间内提前按下的跳跃。
+        /// 必须参与回滚，否则校正后可能吞掉或重复触发跳跃。
+        /// </summary>
+        public bool PendingSlideJump;
+
+        /// <summary>
         /// 移动速度平滑后的当前值。
         /// 它会影响下一 Tick，不能只保存最终位置。
         /// </summary>
@@ -174,6 +186,8 @@ namespace NiumaTPC.Character.Simulation
             CharacterActionType actionType,
             uint actionTick,
             CharacterActionDirection actionDirection,
+            float slideSpeed,
+            bool pendingSlideJump,
             float smoothSpeed,
             float speedSmoothVelocity,
             float rotationSmoothVelocity
@@ -202,6 +216,8 @@ namespace NiumaTPC.Character.Simulation
             ActionType = actionType;
             ActionTick = actionTick;
             ActionDirection = actionDirection;
+            SlideSpeed = slideSpeed;
+            PendingSlideJump = pendingSlideJump;
             SmoothSpeed = smoothSpeed;
             SpeedSmoothVelocity = speedSmoothVelocity;
             RotationSmoothVelocity = rotationSmoothVelocity;
