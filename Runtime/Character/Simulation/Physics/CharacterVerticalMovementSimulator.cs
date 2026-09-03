@@ -19,12 +19,17 @@ namespace NiumaTPC.Character.Simulation
             in CharacterSimulationConfig config,
             bool isHandsEmpty,
             bool allowJumpInput,
+            bool forceJumpInput,
             float tickDeltaTime
         )
         {
             ValidateTickDeltaTime(tickDeltaTime);
 
-            bool wantsToJump = allowJumpInput && command.HasButton(CharacterInputButtons.Jump);
+            /*
+             * forceJumpInput 用于消费滑铲期间缓存的 Jump
+             * 即使原始按键只在更早的 Tick 出现，也能在达到最短时间后起跳
+             */
+            bool wantsToJump = forceJumpInput ||(allowJumpInput && command.HasButton(CharacterInputButtons.Jump));
 
             //一旦回到地面就恢复二连跳次数
             if(state.IsGrounded)

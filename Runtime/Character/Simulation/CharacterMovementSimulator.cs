@@ -23,7 +23,8 @@ namespace NiumaTPC.Character.Simulation
         {
             
             state.Tick = command.Tick;
-
+            
+            // Jump/Vault 优先于 Roll、Dodge 和 Slide。
             bool simulatedVault = CharacterVaultMovementSimulator.TrySimulate(
                     ref state,
                     in command,
@@ -36,12 +37,54 @@ namespace NiumaTPC.Character.Simulation
                 return vaultDisplacement;
             }
 
-           bool simulatedAction = CharacterActionMovementSimulator.TrySimulate(
+
+           bool simulatedAction;
+           bool actionAppliesGravity;
+           bool forceJumpInput = false;
+
+           Vector3 actionDisplacement;
+
+           if(state.ActionType == CharacterActionType.Slide)
+            {
+                // 已经处于滑铲时，不能交给 Roll/Dodge 模拟器处理。
+                simulatedAction = CharacterSlideMovementSimulator.TrySimulate(
                     ref state,
                     in command,
                     in config,
-                    out Vector3 actionDisplacement,
-                    out bool actionAppliesGravity);
+                    tickDeltaTime,
+                    out actionDisplacement,
+                    out actionAppliesGravity,
+                    out forceJumpInput);
+            }
+            else
+            {
+                /*
+                 * 记录 Tick 开始时是否没有动作。
+                 * Roll/Dodge 如果在本 Tick 刚结束，
+                 * 不允许紧接着又在同 Tick 启动 Slide。
+                 */
+                bool mayStartSlide = state.ActionType == CharacterActionType.None;
+
+                simulatedAction = CharacterActionMovementSimulator.TrySimulate(
+                    ref state,
+                    in command,
+                    in config,
+                    out actionDisplacement,
+                    out actionAppliesGravity);
+
+                if (!simulatedAction && mayStartSlide && state.ActionType == CharacterActionType.None)
+                {
+                    // Roll > Dodge > Slide。
+                    simulatedAction =CharacterSlideMovementSimulator.TrySimulate(
+                        ref state,
+                        in command,
+                        in config,
+                        tickDeltaTime,
+                        out actionDisplacement,
+                        out actionAppliesGravity,
+                        out forceJumpInput);
+                }
+            }
 
             Vector3 horizontalDisplacement =
                 simulatedAction
@@ -56,10 +99,11 @@ namespace NiumaTPC.Character.Simulation
             Vector3 verticalDisplacement = Vector3.zero;
 
             /*
-             * 普通移动始终执行垂直模拟。
-             * 动作期间则遵循 RollSO/DodgingSO 的 ApplyGravity。
+             * 普通移动始终执行垂直模拟
+             * 动作期间则遵循 RollSO/DodgingSO 的 ApplyGravity
+             * 滑铲缓存 Jump 拥有更高优先级，必须执行垂直模拟
              */
-            bool shouldSimulateVertical = !simulatedAction || actionAppliesGravity;
+            bool shouldSimulateVertical = forceJumpInput || !simulatedAction || actionAppliesGravity;
 
             if (shouldSimulateVertical)
             {
@@ -70,6 +114,7 @@ namespace NiumaTPC.Character.Simulation
                         in config,
                         isHandsEmpty,
                         allowJumpInput: !simulatedAction,
+                        forceJumpInput: forceJumpInput,
                         tickDeltaTime);
             }
 

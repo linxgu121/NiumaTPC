@@ -200,6 +200,21 @@ namespace NiumaTPC.Character.Simulation
             state.SpeedSmoothVelocity = 0f;
             state.RotationSmoothVelocity = 0f;
 
+            /*
+             * 保留速度时直接回到输入驱动阶段，
+             * 避免跳跃打断后再次进入 Starting，
+             * 导致继承的滑铲速度被起步曲线覆盖。
+             */
+            state.MotionPhase = preserveHorizontalSpeed ? CharacterMotionPhase.Moving : CharacterMotionPhase.Idle;
+
+            state.MotionPhaseTick = 0u;
+
+            if (!preserveHorizontalSpeed)
+            {
+                state.LastMoveDirection = Vector3.zero;
+            }
+
+
             return hadPendingJump;
         }
 
