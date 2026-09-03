@@ -28,6 +28,8 @@ namespace NiumaTPC.Character.Config
         public AimingSO Aiming;
 
         [Header("高级模块 ")]
+        [Tooltip("滑铲规则与动画配置")]
+        public SlideSO Sliding;
         public VaultingSO Vaulting;
         public DodgingSO Dodging;
         public RollSO Rolling;
