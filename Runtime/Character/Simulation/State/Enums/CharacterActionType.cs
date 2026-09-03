@@ -8,6 +8,8 @@ namespace NiumaTPC.Character.Simulation
     {
         None = 0,
         Dodge = 1,
-        Roll = 2
+        Roll = 2,
+
+        Slide = 3
     }
 }

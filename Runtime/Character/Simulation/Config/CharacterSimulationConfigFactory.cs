@@ -57,6 +57,7 @@ namespace NiumaTPC.Character.Simulation
             RollSO roll = playerConfig.Rolling;
             DodgingSO dodge = playerConfig.Dodging;
             VaultingSO vaulting = playerConfig.Vaulting;
+            SlideSO slide = playerConfig.Sliding;
 
             /*
              * Roll、Dodge 属于高级可选模块。
@@ -106,6 +107,12 @@ namespace NiumaTPC.Character.Simulation
                         $"{vaulting.name}/HighVault")
                     : default;
 
+            CharacterSlideMotionProfile slideProfile =
+                slide != null && slide.EnableSliding ? CreateSlideMotionProfile(
+                    slide,
+                    tickDeltaTime)
+                : default;
+
             return new CharacterSimulationConfig(
                 walkSpeed: core.WalkSpeed,
                 jogSpeed: core.JogSpeed,
@@ -134,6 +141,7 @@ namespace NiumaTPC.Character.Simulation
                 startMotionProfiles: startProfiles,
                 rollMotionProfile: rollProfile,
                 dodgeMotionProfile: dodgeProfile,
+                slideMotionProfile: slideProfile,
 
                 lowVaultMotionProfile: lowVaultProfile,
                 highVaultMotionProfile: highVaultProfile
@@ -425,7 +433,88 @@ namespace NiumaTPC.Character.Simulation
                 previousProgress = progress;
             }
         }
+        #endregion
 
+        #region Slide Motion Profile(滑铲运动剖面)
+
+        private static CharacterSlideMotionProfile CreateSlideMotionProfile(
+            SlideSO source,
+            float tickDeltaTime)
+        {
+            if(source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            string sourceName = source.name;
+
+            if(!IsFinite(source.MinimumStartSpeed) || source.MinimumStartSpeed <= 0f)
+            {
+                throw new InvalidOperationException( $"“{sourceName}”的最低起滑速度必须是有限正数");
+            }
+
+            if(!IsFinite(source.StartSpeedMultiplier) || source.StartSpeedMultiplier <= 0f)
+            {
+                throw new InvalidOperationException($"“{sourceName}”的起滑速度倍率必须是有限正数");
+            }
+
+            if(!IsFinite(source.MaximumStartSpeed) || source.MaximumStartSpeed < source.MinimumStartSpeed)
+            {
+                throw new InvalidOperationException($"“{sourceName}”的起滑速度上限不能低于最低起滑速度");
+            }
+
+            if(!IsFinite(source.Deceleration) || source.Deceleration <= 0f)
+            {
+                throw new InvalidOperationException($"“{sourceName}”的滑铲减速度必须是有限正数");
+            }
+
+            if(!IsFinite(source.ExitSpeed) || source.ExitSpeed < 0f || source.ExitSpeed >= source.MinimumStartSpeed)
+            {
+                throw new InvalidOperationException($"“{sourceName}”的结束速度必须非负，并且低于最低起滑速度");
+            }
+
+            if(!IsFinite(source.MinimumDurationSeconds) || source.MinimumDurationSeconds < 0.1f || source.MinimumDurationSeconds > 0.15f)
+            {
+                throw new InvalidOperationException( $"“{sourceName}”的最短持续时间必须位于0.1到0.15秒之间。");
+            }
+
+            if(!IsFinite(source.MaximumDurationSeconds) || source.MaximumDurationSeconds < source.MinimumDurationSeconds)
+            {
+                throw new InvalidOperationException($"“{sourceName}”的最长持续时间不能短于最短持续时间。");
+            }
+
+            uint minimumDurationTicks = (uint)Mathf.Max(
+                1,
+                Mathf.CeilToInt(source.MinimumDurationSeconds / tickDeltaTime));
+
+            uint maximumDurationTicks = (uint)Mathf.Max(
+                minimumDurationTicks,
+                Mathf.CeilToInt(source.MaximumDurationSeconds /tickDeltaTime));    
+
+            float decelerationPerTick = source.Deceleration * tickDeltaTime;
+
+            // 检查最低合法起滑速度是否能撑过最短动作时间。
+            float minimumInitialSpeed = Mathf.Min(
+                source.MaximumStartSpeed,
+                source.MinimumStartSpeed *source.StartSpeedMultiplier);
+
+            float speedAfterMinimumTicks = minimumInitialSpeed -decelerationPerTick * minimumDurationTicks;
+
+            if (speedAfterMinimumTicks <= source.ExitSpeed)
+            {
+                throw new InvalidOperationException($"“{sourceName}”在最短持续时间结束前就会衰减到停止速度,请提高初速度、降低减速度或降低结束速度。");
+            }
+
+            return new CharacterSlideMotionProfile(
+                source.MinimumStartSpeed,
+                source.StartSpeedMultiplier,
+                source.MaximumStartSpeed,
+                decelerationPerTick,
+                source.ExitSpeed,
+                minimumDurationTicks,
+                maximumDurationTicks,
+                source.ApplyGravity);
+        }
 
         #endregion
 

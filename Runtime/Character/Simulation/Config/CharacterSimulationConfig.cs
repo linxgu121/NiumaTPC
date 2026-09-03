@@ -61,6 +61,12 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
+        #region Slide Motion(滑铲运动)
+
+        private readonly CharacterSlideMotionProfile _slideMotionProfile;
+
+        #endregion
+
         #region Constructor(构造的数据快照)
 
         public CharacterSimulationConfig(
@@ -86,6 +92,7 @@ namespace NiumaTPC.Character.Simulation
             CharacterStartMotionProfile[] startMotionProfiles,
             CharacterActionMotionProfile rollMotionProfile,
             CharacterActionMotionProfile dodgeMotionProfile,
+            CharacterSlideMotionProfile slideMotionProfile,
             CharacterVaultMotionProfile lowVaultMotionProfile,
             CharacterVaultMotionProfile highVaultMotionProfile)
         {
@@ -119,6 +126,8 @@ namespace NiumaTPC.Character.Simulation
 
             _rollMotionProfile = rollMotionProfile;
             _dodgeMotionProfile = dodgeMotionProfile;
+
+            _slideMotionProfile = slideMotionProfile;
 
 
             _lowVaultMotionProfile = lowVaultMotionProfile;
@@ -229,6 +238,16 @@ namespace NiumaTPC.Character.Simulation
         }
 
         /// <summary>
+        /// 获取固定 Tick 滑铲运动配置。
+        /// 返回 false 表示滑铲未启用、未配置或配置无效。
+        /// </summary>
+        public bool TryGetSlideMotionProfile(out CharacterSlideMotionProfile profile)
+        {
+            profile  = _slideMotionProfile;
+            return profile.IsValid;
+        }
+
+        /// <summary>
         /// 获取 Low 或 High 对应的固定 Tick 翻越轨迹。
         /// </summary>
         public bool TryGetVaultMotionProfile(
@@ -270,11 +289,9 @@ namespace NiumaTPC.Character.Simulation
 
         #region Vault Motion
 
-        private readonly CharacterVaultMotionProfile
-            _lowVaultMotionProfile;
+        private readonly CharacterVaultMotionProfile _lowVaultMotionProfile;
 
-        private readonly CharacterVaultMotionProfile
-            _highVaultMotionProfile;
+        private readonly CharacterVaultMotionProfile _highVaultMotionProfile;
 
         #endregion
 
