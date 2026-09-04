@@ -80,6 +80,7 @@ namespace NiumaTPC.FishNet.Prediction
                 GetTick(),
                 Move,
                 ViewYaw,
+                ViewPitch,
                 Buttons);
         }
 
@@ -118,6 +119,12 @@ namespace NiumaTPC.FishNet.Prediction
         public Vector3 Position;
 
         public float Yaw;
+
+        /// <summary>服务器确认的视角俯仰角。</summary>
+        public float ViewPitch;
+
+        /// <summary>服务器确认的持续瞄准状态。</summary>
+        public bool IsAiming;
 
         public float VerticalVelocity;
 
@@ -230,6 +237,8 @@ namespace NiumaTPC.FishNet.Prediction
         {
             Position = state.Position;
             Yaw = state.Yaw;
+            ViewPitch = state.ViewPitch;
+            IsAiming = state.IsAiming;
             VerticalVelocity = state.VerticalVelocity;
             LocomotionStateValue = (byte)state.LocomotionState;
             MotionPhaseValue = (byte)state.MotionPhase;
@@ -271,6 +280,8 @@ namespace NiumaTPC.FishNet.Prediction
                 tick: GetTick(),
                 position: Position,
                 yaw: Yaw,
+                viewPitch: ViewPitch,
+                isAiming: IsAiming,
                 verticalVelocity: VerticalVelocity,
                 locomotionState: (LocomotionState)LocomotionStateValue,
                 motionPhase:(CharacterMotionPhase)MotionPhaseValue,

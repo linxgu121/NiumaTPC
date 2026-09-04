@@ -26,6 +26,17 @@ namespace NiumaTPC.Character.Simulation
         public float Yaw;
 
         /// <summary>
+        /// 服务器确认的视角俯仰角。
+        /// 它影响远端瞄准表现，但不旋转角色根节点。
+        /// </summary>
+        public float ViewPitch;
+
+        /// <summary>
+        /// 当前是否处于服务器确认的瞄准状态。
+        /// </summary>
+        public bool IsAiming;
+
+        /// <summary>
         /// 当前垂直速度，用于继续计算重力与落地
         /// </summary>
         public float VerticalVelocity;
@@ -166,6 +177,8 @@ namespace NiumaTPC.Character.Simulation
             uint tick,
             Vector3 position,
             float yaw,
+            float viewPitch,
+            bool isAiming,
             float verticalVelocity,
             LocomotionState locomotionState,
             CharacterMotionPhase motionPhase,
@@ -196,6 +209,8 @@ namespace NiumaTPC.Character.Simulation
             Tick = tick;
             Position = position;
             Yaw = yaw;
+            ViewPitch = viewPitch;
+            IsAiming = isAiming;
             VerticalVelocity = verticalVelocity;
             LocomotionState = locomotionState;
             MotionPhase = motionPhase;

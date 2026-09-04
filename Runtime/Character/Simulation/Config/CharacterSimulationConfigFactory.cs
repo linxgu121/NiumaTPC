@@ -17,21 +17,30 @@ namespace NiumaTPC.Character.Simulation
 
         public static CharacterSimulationConfig Create(PlayerSO playerConfig, float tickDeltaTime)
         {
-            if(playerConfig == null)
+            if (playerConfig == null)
             {
                 throw new ArgumentNullException(nameof(playerConfig), "创建角色模拟配置时，PlayerSO 不能为空。");
             }
 
             CoreSO core = playerConfig.Core;
 
-            if(core == null)
+            if (core == null)
             {
                 throw new InvalidOperationException($"PlayerSO“{playerConfig.name}”没有配置 CoreSO。");
             }
 
-            if(tickDeltaTime <= 0f || float.IsNaN(tickDeltaTime) || float.IsInfinity(tickDeltaTime))
+            AimingSO aiming = playerConfig.Aiming;
+
+            if (aiming == null)
             {
-                throw new ArgumentOutOfRangeException(nameof(tickDeltaTime), tickDeltaTime,"Tick 时长必须是有限的正数");
+                throw new InvalidOperationException($"PlayerSO“{playerConfig.name}”没有配置 AimingSO。");
+            }
+
+            ValidateAimingConfig(aiming, core);
+
+            if (tickDeltaTime <= 0f || float.IsNaN(tickDeltaTime) || float.IsInfinity(tickDeltaTime))
+            {
+                throw new ArgumentOutOfRangeException(nameof(tickDeltaTime), tickDeltaTime, "Tick 时长必须是有限的正数");
 
             }
 
@@ -45,7 +54,7 @@ namespace NiumaTPC.Character.Simulation
 
             JumpSO jump = playerConfig.JumpAndLanding;
 
-            if(jump == null)
+            if (jump == null)
             {
                 throw new InvalidOperationException(
                     $"PlayerSO“{playerConfig.name}”没有配置 JumpSO");
@@ -120,18 +129,25 @@ namespace NiumaTPC.Character.Simulation
                 moveSpeedSmoothTime: core.MoveSpeedSmoothTime,
                 rotationSmoothTime: core.RotationSmoothTime,
 
+                minimumViewPitch: core.PitchLimits.x,
+                maximumViewPitch: core.PitchLimits.y,
+                aimWalkSpeed: aiming.AimWalkSpeed,
+                aimJogSpeed: aiming.AimJogSpeed,
+                aimSprintSpeed: aiming.AimSprintSpeed,
+                aimRotationSmoothTime: aiming.AimRotationSmoothTime,
+
                 gravity: core.Gravity,
                 groundedVerticalVelocity: core.ReboundForce,
                 airControl: core.AirControl,
-                
-                defaultJumpInitialVelocity:jump.JumpForce,
-                walkJumpInitialVelocity:jump.JumpForceWalk,
-                sprintJumpInitialVelocity:jump.JumpForceSprint,
-                sprintEmptyJumpInitialVelocity:jump.JumpForceSprintEmpty,
+
+                defaultJumpInitialVelocity: jump.JumpForce,
+                walkJumpInitialVelocity: jump.JumpForceWalk,
+                sprintJumpInitialVelocity: jump.JumpForceSprint,
+                sprintEmptyJumpInitialVelocity: jump.JumpForceSprintEmpty,
 
                 doubleJumpInitialVelocity: jump.DoubleJumpForceUp,
                 sprintEmptyDoubleJumpInitialVelocity: jump.DoubleJumpEmptyHandSprintForceUp,
-                
+
                 enableVaulting: vaulting != null && vaulting.EnableVaulting,
                 lowVaultMinHeight: vaulting != null ? vaulting.LowVaultMinHeight : 0f,
                 lowVaultMaxHeight: vaulting != null ? vaulting.LowVaultMaxHeight : 0f,
@@ -146,6 +162,61 @@ namespace NiumaTPC.Character.Simulation
                 lowVaultMotionProfile: lowVaultProfile,
                 highVaultMotionProfile: highVaultProfile
             );
+        }
+
+        #endregion
+
+        #region Aiming Validation(瞄准配置校验)
+
+        private static void ValidateAimingConfig(
+            AimingSO aiming,
+            CoreSO core)
+        {
+            ValidateNonNegativeAimingValue(
+                aiming.AimWalkSpeed,
+                aiming.name,
+                nameof(aiming.AimWalkSpeed));
+
+            ValidateNonNegativeAimingValue(
+                aiming.AimJogSpeed,
+                aiming.name,
+                nameof(aiming.AimJogSpeed));
+
+            ValidateNonNegativeAimingValue(
+                aiming.AimSprintSpeed,
+                aiming.name,
+                nameof(aiming.AimSprintSpeed));
+
+            ValidateNonNegativeAimingValue(
+                aiming.AimRotationSmoothTime,
+                aiming.name,
+                nameof(aiming.AimRotationSmoothTime));
+
+            if (!IsFinite(core.PitchLimits.x) || !IsFinite(core.PitchLimits.y))
+            {
+                throw new InvalidOperationException($"“{core.name}.PitchLimits”必须包含有限数值。");
+            }
+
+            float minimumPitch = Mathf.Min(
+                core.PitchLimits.x,
+                core.PitchLimits.y);
+
+            float maximumPitch = Mathf.Max(
+                core.PitchLimits.x,
+                core.PitchLimits.y);
+
+            if (maximumPitch - minimumPitch < 0.001f)
+            {
+                throw new InvalidOperationException($"“{core.name}.PitchLimits”必须具有有效的俯仰范围。");
+            }
+        }
+
+        private static void ValidateNonNegativeAimingValue(float value,string sourceName,string fieldName)
+        {
+            if (!IsFinite(value) || value < 0f)
+            {
+                throw new InvalidOperationException( $"“{sourceName}.{fieldName}”必须是非负有限值。");
+            }
         }
 
         #endregion
@@ -192,7 +263,7 @@ namespace NiumaTPC.Character.Simulation
 
             var profile = new CharacterStartMotionProfile[sources.Length];
 
-            for(int i = 0; i < sources.Length; i++)
+            for (int i = 0; i < sources.Length; i++)
             {
                 profile[i] = CreateStartProfile(sources[i], tickDeltaTime);
             }
@@ -202,7 +273,7 @@ namespace NiumaTPC.Character.Simulation
 
         private static CharacterStartMotionProfile CreateStartProfile(MotionClipData source, float tickDeltaTime)
         {
-            if(source == null || source.Type == MotionType.InputDriven ||
+            if (source == null || source.Type == MotionType.InputDriven ||
                source.SpeedCurve == null || source.SpeedCurve.length == 0)
             {
                 return default;
@@ -215,7 +286,7 @@ namespace NiumaTPC.Character.Simulation
 
             float durationSeconds = GetProfileDurationSeconds(source, playbackSpeed);
 
-            if(durationSeconds <= 0f)
+            if (durationSeconds <= 0f)
             {
                 return default;
             }
@@ -230,7 +301,7 @@ namespace NiumaTPC.Character.Simulation
 
             var rotationSamples = new float[sampleCount];
 
-            for(int i = 0; i < sampleCount; i++)
+            for (int i = 0; i < sampleCount; i++)
             {
                 float stateTime = Mathf.Min(i * tickDeltaTime, durationSeconds);
 
@@ -258,7 +329,7 @@ namespace NiumaTPC.Character.Simulation
 
         private static float GetProfileDurationSeconds(MotionClipData source, float playbackSpeed)
         {
-            if(source.Type == MotionType.Mixed)
+            if (source.Type == MotionType.Mixed)
             {
                 //旧 MotionDriver 在 RotationFinishedTime 后
                 // 从曲线驱动切回输入驱动
@@ -276,7 +347,7 @@ namespace NiumaTPC.Character.Simulation
 
         private static float GetCurveEndTime(AnimationCurve curve)
         {
-            if(curve == null || curve.length == 0)
+            if (curve == null || curve.length == 0)
             {
                 return 0f;
             }
@@ -294,7 +365,7 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
-       #region Action Motion Profiles(事件动作剖面集)
+        #region Action Motion Profiles(事件动作剖面集)
 
         /// <summary>
         /// 将总距离和累计进度曲线转换为逐 Tick 位移。
@@ -323,7 +394,7 @@ namespace NiumaTPC.Character.Simulation
 
             ValidateActionProgressCurve(progressCurve, sourceName);
 
-            int sampleCount = Mathf.Max(1,Mathf.CeilToInt(durationSeconds / tickDeltaTime));
+            int sampleCount = Mathf.Max(1, Mathf.CeilToInt(durationSeconds / tickDeltaTime));
 
             var distanceSamples = new float[sampleCount];
 
@@ -343,7 +414,7 @@ namespace NiumaTPC.Character.Simulation
 
                 float currentProgress = progressCurve.Evaluate(normalizedTime);
 
-                float progressDelta = Mathf.Max(0f,currentProgress - previousProgress);
+                float progressDelta = Mathf.Max(0f, currentProgress - previousProgress);
 
                 distanceSamples[i] = distanceMeters * progressDelta;
 
@@ -441,44 +512,44 @@ namespace NiumaTPC.Character.Simulation
             SlideSO source,
             float tickDeltaTime)
         {
-            if(source == null)
+            if (source == null)
             {
                 throw new ArgumentNullException(nameof(source));
             }
 
             string sourceName = source.name;
 
-            if(!IsFinite(source.MinimumStartSpeed) || source.MinimumStartSpeed <= 0f)
+            if (!IsFinite(source.MinimumStartSpeed) || source.MinimumStartSpeed <= 0f)
             {
-                throw new InvalidOperationException( $"“{sourceName}”的最低起滑速度必须是有限正数");
+                throw new InvalidOperationException($"“{sourceName}”的最低起滑速度必须是有限正数");
             }
 
-            if(!IsFinite(source.StartSpeedMultiplier) || source.StartSpeedMultiplier <= 0f)
+            if (!IsFinite(source.StartSpeedMultiplier) || source.StartSpeedMultiplier <= 0f)
             {
                 throw new InvalidOperationException($"“{sourceName}”的起滑速度倍率必须是有限正数");
             }
 
-            if(!IsFinite(source.MaximumStartSpeed) || source.MaximumStartSpeed < source.MinimumStartSpeed)
+            if (!IsFinite(source.MaximumStartSpeed) || source.MaximumStartSpeed < source.MinimumStartSpeed)
             {
                 throw new InvalidOperationException($"“{sourceName}”的起滑速度上限不能低于最低起滑速度");
             }
 
-            if(!IsFinite(source.Deceleration) || source.Deceleration <= 0f)
+            if (!IsFinite(source.Deceleration) || source.Deceleration <= 0f)
             {
                 throw new InvalidOperationException($"“{sourceName}”的滑铲减速度必须是有限正数");
             }
 
-            if(!IsFinite(source.ExitSpeed) || source.ExitSpeed < 0f || source.ExitSpeed >= source.MinimumStartSpeed)
+            if (!IsFinite(source.ExitSpeed) || source.ExitSpeed < 0f || source.ExitSpeed >= source.MinimumStartSpeed)
             {
                 throw new InvalidOperationException($"“{sourceName}”的结束速度必须非负，并且低于最低起滑速度");
             }
 
-            if(!IsFinite(source.MinimumDurationSeconds) || source.MinimumDurationSeconds < 0.1f || source.MinimumDurationSeconds > 0.15f)
+            if (!IsFinite(source.MinimumDurationSeconds) || source.MinimumDurationSeconds < 0.1f || source.MinimumDurationSeconds > 0.15f)
             {
-                throw new InvalidOperationException( $"“{sourceName}”的最短持续时间必须位于0.1到0.15秒之间。");
+                throw new InvalidOperationException($"“{sourceName}”的最短持续时间必须位于0.1到0.15秒之间。");
             }
 
-            if(!IsFinite(source.MaximumDurationSeconds) || source.MaximumDurationSeconds < source.MinimumDurationSeconds)
+            if (!IsFinite(source.MaximumDurationSeconds) || source.MaximumDurationSeconds < source.MinimumDurationSeconds)
             {
                 throw new InvalidOperationException($"“{sourceName}”的最长持续时间不能短于最短持续时间。");
             }
@@ -489,16 +560,16 @@ namespace NiumaTPC.Character.Simulation
 
             uint maximumDurationTicks = (uint)Mathf.Max(
                 minimumDurationTicks,
-                Mathf.CeilToInt(source.MaximumDurationSeconds /tickDeltaTime));    
+                Mathf.CeilToInt(source.MaximumDurationSeconds / tickDeltaTime));
 
             float decelerationPerTick = source.Deceleration * tickDeltaTime;
 
             // 检查最低合法起滑速度是否能撑过最短动作时间。
             float minimumInitialSpeed = Mathf.Min(
                 source.MaximumStartSpeed,
-                source.MinimumStartSpeed *source.StartSpeedMultiplier);
+                source.MinimumStartSpeed * source.StartSpeedMultiplier);
 
-            float speedAfterMinimumTicks = minimumInitialSpeed -decelerationPerTick * minimumDurationTicks;
+            float speedAfterMinimumTicks = minimumInitialSpeed - decelerationPerTick * minimumDurationTicks;
 
             if (speedAfterMinimumTicks <= source.ExitSpeed)
             {

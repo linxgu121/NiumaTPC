@@ -678,7 +678,9 @@ namespace NiumaTPC.FishNet
 
             float maximumPitch = Mathf.Max(pitchLimits.x, pitchLimits.y);
 
-            float viewPitch = IsFinite(source.ViewPitch) ? Mathf.Clamp(source.ViewPitch,minimumPitch, maximumPitch) : 0f;
+            float viewPitch = IsFinite(source.ViewPitch) ? 
+                Mathf.Clamp(source.ViewPitch,minimumPitch, maximumPitch) : 
+                Mathf.Clamp( _runner.State.ViewPitch,minimumPitch,maximumPitch);
 
             CharacterInputButtons allowedButtons = 
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |

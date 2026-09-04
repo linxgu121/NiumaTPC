@@ -60,6 +60,8 @@ namespace NiumaTPC.Character.Simulation
                 tick: 0u,
                 position: body.Position,
                 yaw: body.Yaw,
+                viewPitch: 0f,
+                isAiming: false,
                 verticalVelocity: 0f,
                 locomotionState: LocomotionState.Idle,
                 motionPhase: CharacterMotionPhase.Idle,

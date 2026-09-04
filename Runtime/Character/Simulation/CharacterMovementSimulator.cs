@@ -23,6 +23,8 @@ namespace NiumaTPC.Character.Simulation
         {
             
             state.Tick = command.Tick;
+
+            CharacterAimStateResolver.Update(ref state,in command,in config);
             
             // Jump/Vault 优先于 Roll、Dodge 和 Slide。
             bool simulatedVault = CharacterVaultMovementSimulator.TrySimulate(

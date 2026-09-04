@@ -22,6 +22,28 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
+        #region Aiming(瞄准)
+
+        /// <summary>服务器允许的最小视角俯仰角。</summary>
+        public readonly float MinimumViewPitch;
+
+        /// <summary>服务器允许的最大视角俯仰角。</summary>
+        public readonly float MaximumViewPitch;
+
+        /// <summary>瞄准行走速度，单位 m/s。</summary>
+        public readonly float AimWalkSpeed;
+
+        /// <summary>瞄准慢跑速度，单位 m/s。</summary>
+        public readonly float AimJogSpeed;
+
+        /// <summary>瞄准冲刺速度，单位 m/s。</summary>
+        public readonly float AimSprintSpeed;
+
+        /// <summary>瞄准时身体追随视角 Yaw 的平滑时间。</summary>
+        public readonly float AimRotationSmoothTime;
+
+        #endregion
+
         #region Physics(物理)
 
         public readonly float Gravity;
@@ -75,6 +97,12 @@ namespace NiumaTPC.Character.Simulation
             float sprintSpeed,
             float moveSpeedSmoothTime,
             float rotationSmoothTime,
+            float minimumViewPitch,
+            float maximumViewPitch,
+            float aimWalkSpeed,
+            float aimJogSpeed,
+            float aimSprintSpeed,
+            float aimRotationSmoothTime,
             float gravity,
             float groundedVerticalVelocity,
             float airControl,
@@ -102,6 +130,13 @@ namespace NiumaTPC.Character.Simulation
 
             MoveSpeedSmoothTime = Mathf.Max(0f, moveSpeedSmoothTime);
             RotationSmoothTime = Mathf.Max(0f, rotationSmoothTime);
+
+            MinimumViewPitch = Mathf.Min(minimumViewPitch,maximumViewPitch);
+            MaximumViewPitch = Mathf.Max(minimumViewPitch,maximumViewPitch);
+            AimWalkSpeed = Mathf.Max(0f, aimWalkSpeed);
+            AimJogSpeed = Mathf.Max(0f, aimJogSpeed);
+            AimSprintSpeed = Mathf.Max(0f, aimSprintSpeed);
+            AimRotationSmoothTime = Mathf.Max(0f, aimRotationSmoothTime);
 
             Gravity = gravity;
             GroundedVerticalVelocity = groundedVerticalVelocity;
@@ -270,6 +305,33 @@ namespace NiumaTPC.Character.Simulation
             }
 
             return profile.IsValid;
+        }
+
+        /// <summary>
+        /// 使用服务器配置限制视角俯仰角。
+        /// </summary>
+        public float ClampViewPitch(float viewPitch)
+        {
+            if (float.IsNaN(viewPitch) || float.IsInfinity(viewPitch))
+            {
+                return Mathf.Clamp(0f,MinimumViewPitch,MaximumViewPitch);
+            }
+
+            return Mathf.Clamp(viewPitch,MinimumViewPitch,MaximumViewPitch);
+        }
+
+        /// <summary>
+        /// 获取瞄准状态下对应移动档位的权威速度。
+        /// </summary>
+        public float GetAimMoveSpeed(LocomotionState locomotionState)
+        {
+            return locomotionState switch
+            {
+                LocomotionState.Walk => AimWalkSpeed,
+                LocomotionState.Jog => AimJogSpeed,
+                LocomotionState.Sprint => AimSprintSpeed,
+                _ => 0f
+            };
         }
 
         #endregion
