@@ -34,6 +34,7 @@ namespace NiumaTPC.Character.Simulation
             bool hasMovement,
             in Vector3 requestedDirection,
             in CharacterSimulationConfig config,
+            bool useStartMotion,
             float tickDeltaTime)
         {
             uint stoppingDurationTicks = CalculatePhaseDurationTicks(
@@ -53,6 +54,7 @@ namespace NiumaTPC.Character.Simulation
                 ref state,
                 in requestedDirection,
                 in config,
+                useStartMotion,
                 tickDeltaTime);
         }
 
@@ -64,6 +66,7 @@ namespace NiumaTPC.Character.Simulation
             ref CharacterSimulationState state,
             in Vector3 requestedDirection,
             in CharacterSimulationConfig config,
+            bool useStartMotion,
             float tickDeltaTime)
         {
             bool hadPreviousDirection =
@@ -76,6 +79,35 @@ namespace NiumaTPC.Character.Simulation
                     state.LastMoveDirection,
                     requestedDirection) <
                 ReverseDirectionDotThreshold;
+
+            /*
+             * 瞄准移动由瞄准混合树负责表现，
+             * 不使用普通 Locomotion 的八方向起步位移。
+             */
+            if(!useStartMotion)
+            {
+                if(isReversing)
+                {
+                    // 防止前进切后退时直接以完整旧速度反向。
+                    state.SmoothSpeed = 0f;
+                    state.SpeedSmoothVelocity = 0f;
+                }
+
+                if (state.MotionPhase == CharacterMotionPhase.Moving)
+                {
+                    AdvancePhaseTick(ref state);
+                }
+                else
+                {
+                    EnterPhase(ref state,CharacterMotionPhase.Moving);
+
+                    state.RotationSmoothVelocity = 0f;
+                }
+
+                state.LastMoveDirection = requestedDirection;
+                return;
+
+            }
 
             switch (state.MotionPhase)
             {

@@ -24,16 +24,38 @@ namespace NiumaTPC.Character.Simulation
             // 没有输入时为 Idle，停止阶段会以此作为减速目标。
             state.LocomotionState = CharacterLocomotionResolver.Resolve(in command, canSprint);
 
-            bool hasMovement = CharacterMovementDirectionResolver.TryResolve(in command, out Vector3 worldDirection, out float targetYaw);
+            bool hasMovement = CharacterMovementDirectionResolver.TryResolve(in command, out Vector3 worldDirection, out float movementYaw);
 
-            CharacterMotionPhaseResolver.Update(ref state, hasMovement, in worldDirection, in config, tickDeltaTime);
+            /*
+             * 普通移动朝向移动方向。
+             * 瞄准移动始终朝向客户端提交并经服务器限制后的视角 Yaw。
+            */
+            float targetYaw = state.IsAiming ? Mathf.Repeat(command.ViewYaw, 360f) : movementYaw;
+
+            CharacterMotionPhaseResolver.Update(
+                ref state,
+                hasMovement,
+                in worldDirection,
+                in config,
+                useStartMotion: !state.IsAiming,
+                tickDeltaTime: tickDeltaTime);
 
             switch (state.MotionPhase)
             {
                 case CharacterMotionPhase.Idle:
+                    // 即使没有移动输入，瞄准状态也要持续跟随视角朝向。
+                    if (state.IsAiming)
+                    {
+                        UpdateYaw(ref state,targetYaw,in config,tickDeltaTime);
+                    }
                     return Vector3.zero;
 
                 case CharacterMotionPhase.Stopping:
+                    if(state.IsAiming)
+                    {
+                        UpdateYaw(ref state,targetYaw,in config,tickDeltaTime);
+                    }
+
                     //LocomotionState 此时是 Idle
                     //因此 UpdateSpeed 会把目标速度设置为 0
                     UpdateSpeed(ref state, in config, tickDeltaTime);
@@ -144,11 +166,13 @@ namespace NiumaTPC.Character.Simulation
         {
             float rotationVelocity = state.RotationSmoothVelocity;
 
+            float rotationSmoothTime = state.IsAiming ? config.AimRotationSmoothTime : config.RotationSmoothTime;
+
             state.Yaw = Mathf.SmoothDampAngle(
                 state.Yaw,
                 targetYaw,
                 ref rotationVelocity,
-                config.RotationSmoothTime,
+                rotationSmoothTime,
                 float.PositiveInfinity,
                 tickDeltaTime
             );
@@ -163,7 +187,7 @@ namespace NiumaTPC.Character.Simulation
             float tickDeltaTime
         )
         {
-            float targetSpeed = config.GetMoveSpeed(state.LocomotionState);
+           float targetSpeed = state.IsAiming ? config.GetAimMoveSpeed(state.LocomotionState) : config.GetMoveSpeed(state.LocomotionState);
 
             if (!state.IsGrounded)
             {
