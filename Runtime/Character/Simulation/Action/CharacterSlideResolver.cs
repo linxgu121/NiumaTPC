@@ -211,6 +211,11 @@ namespace NiumaTPC.Character.Simulation
 
             if (!preserveHorizontalSpeed)
             {
+                /*
+                 * 撞墙等强制停止不能继续保留滑铲前的 Sprint，
+                 * 否则表现层会错误返回跑步循环。
+                 */
+                state.LocomotionState = LocomotionState.Idle;
                 state.LastMoveDirection = Vector3.zero;
             }
 

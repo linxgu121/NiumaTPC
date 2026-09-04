@@ -147,8 +147,27 @@ namespace NiumaTPC.Character.Simulation
                 forceJumpInput =
                     hadPendingJump &&
                     state.IsGrounded;
-            }
 
+                /*
+                 * 滑铲结束的当前 Tick 尚未执行普通水平模拟，
+                 * 因此需要立即根据输入修正旧的 Sprint 状态。
+                 */
+                bool hasMovementInput = command.Move.sqrMagnitude > 0.01f;
+
+                if (!forceJumpInput && !hasMovementInput)
+                {
+                    state.LocomotionState = NiumaTPC.Character.Motion.MotionEnums.LocomotionState.Idle;
+
+                    /*
+                     * 剩余速度不直接清零，而是进入 Stopping 平滑收尾。
+                     * 对远端观察者而言，Stopping 也代表移动键已经松开。
+                     */
+                    state.MotionPhase = state.SmoothSpeed > SpeedEpsilon ? CharacterMotionPhase.Stopping : CharacterMotionPhase.Idle;
+
+                    state.MotionPhaseTick = 0u;
+
+                }
+            }
             return true;
         }
 
@@ -156,8 +175,7 @@ namespace NiumaTPC.Character.Simulation
 
         #region Validation
 
-        private static void ValidateTickDeltaTime(
-            float tickDeltaTime)
+        private static void ValidateTickDeltaTime(float tickDeltaTime)
         {
             bool isInvalid =
                 tickDeltaTime <= 0f ||

@@ -94,8 +94,11 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             if (!_isPlayingExit)
             {
-                PlayExitAnimation();
+                TryFinishExitAtConfiguredTime();
+                return;
             }
+
+            PlayExitAnimation();
         }
 
         public override void PhysicsUpdate()
@@ -202,8 +205,20 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             AnimationFacade.SetOnEndCallback(ExitToLocomotionState);
         }
 
-        private static bool HasClip(
-            MotionClipData clipData)
+        private void TryFinishExitAtConfiguredTime()
+        {
+            MotionClipData exitAnimation = config.Sliding.SlideExitAnimation;
+
+            if (AnimationFacade.CurrentTime < exitAnimation.EndTime)
+            {
+                return;
+            }
+
+            ExitToLocomotionState();
+
+        }
+
+        private static bool HasClip( MotionClipData clipData)
         {
             return clipData != null && clipData.Clip != null;
         }
@@ -216,22 +231,25 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         {
             AnimationFacade.ClearOnEndCallback();
 
-            if (data.CurrentLocomotionState == LocomotionState.Idle)
+             /*
+              * 不能只读取 CurrentLocomotionState。
+              * 滑铲期间它可能仍保留进入前的 Sprint，
+              * 必须结合当前移动输入判断是否真的还想移动。
+              */
+            bool hasMovementIntent = data.MoveInput.sqrMagnitude > 0.01f && data.CurrentLocomotionState != LocomotionState.Idle;
+
+            if (!hasMovementIntent)
             {
                 data.NextStatePlayOptions = config.Sliding.SlideToIdleOptions;
 
-                player.StateMachine.ChangeState(
-                    player.StateRegistry
-                        .GetState<PlayerIdleState>());
+                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerIdleState>());
 
                 return;
             }
 
             data.NextStatePlayOptions = config.Sliding.SlideToMoveOptions;
 
-            player.StateMachine.ChangeState(
-                player.StateRegistry
-                    .GetState<PlayerMoveLoopState>());
+            player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerMoveLoopState>());
         }
 
         #endregion
