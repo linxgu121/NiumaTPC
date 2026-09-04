@@ -5,7 +5,6 @@ using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Expression;
 using NiumaTPC.Character.RuntimeData;
 using NiumaTPC.Core.StateMachine;
-using UnityEditor;
 using UnityEngine;
 
 namespace NiumaTPC.Character.State.UpperBody
@@ -35,6 +34,9 @@ namespace NiumaTPC.Character.State.UpperBody
             if (controller == null) controller = player.UpperBodyController;
 
             if (CheckInterrupts()) return;
+
+            // 没有发生拦截时，继续执行当前上半身状态逻辑。
+            UpdateStateLogic();
         }
 
         public override void PhysicsUpdate() { }

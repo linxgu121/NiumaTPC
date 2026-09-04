@@ -24,6 +24,8 @@ namespace NiumaTPC.Character.Simulation
         Roll = 1 << 4,
 
         Slide = 1 << 5,
+
+        Aim = 1 << 6
     }
 
     /// <summary>
@@ -47,17 +49,29 @@ namespace NiumaTPC.Character.Simulation
         /// 玩家期望面对的世界Y轴角度
         /// </summary>
         public float ViewYaw;
+        
+        /// <summary>
+        /// 玩家期望的视角俯仰角。
+        /// 保留正负方向，不进行 360 度循环。
+        /// </summary>
+        public float ViewPitch;
 
         /// <summary>
         /// 当前Tick中持续生效的按钮集合
         /// </summary>
         public CharacterInputButtons Buttons;
 
-        public CharacterInputCommand(uint tick, Vector2 move, float viewYaw, CharacterInputButtons buttons)
+        public CharacterInputCommand(
+            uint tick,
+            Vector2 move,
+            float viewYaw,
+            float viewPitch,
+            CharacterInputButtons buttons)
         {
             Tick = tick;
             Move = move;
             ViewYaw = viewYaw;
+            ViewPitch = viewPitch;
             Buttons = buttons;
         }
 

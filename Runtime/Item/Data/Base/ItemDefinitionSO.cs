@@ -24,7 +24,7 @@ namespace NiumaTPC.Item
         [Tooltip("物品的文本描述")]
         public string Description;
 
-         [Tooltip("最大堆叠数量")]
+        [Tooltip("最大堆叠数量")]
         public int MaxStack = 1;
 
         /// <summary>

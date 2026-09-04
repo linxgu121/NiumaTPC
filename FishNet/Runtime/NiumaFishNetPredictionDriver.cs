@@ -331,8 +331,9 @@ namespace NiumaTPC.FishNet
             CharacterInputCommand command = _commandBuilder.Build(
                 tick: TimeManager.LocalTick,
                 input: in input,
-                viewYaw: _player.RuntimeData.AuthorityYaw
-            );
+                viewYaw: _player.RuntimeData.AuthorityYaw,
+                viewPitch: _player.RuntimeData.AuthorityPitch,
+                pitchLimits: _player.Config.Core.PitchLimits);
 
             if (command.HasButton(CharacterInputButtons.Jump))
             {
@@ -355,7 +356,7 @@ namespace NiumaTPC.FishNet
                 _player.InputPipeline.ConsumeSlidePressed();
             }
 
-            return new NiumaReplicateData(command.Move, command.ViewYaw, command.Buttons);
+            return new NiumaReplicateData(command.Move, command.ViewYaw, command.ViewPitch, command.Buttons);
         }
 
         #endregion
@@ -671,10 +672,19 @@ namespace NiumaTPC.FishNet
 
             float viewYaw = IsFinite(source.ViewYaw) ? Mathf.Repeat(source.ViewYaw, 360f) : _runner.State.Yaw;
 
+            Vector2 pitchLimits = _player.Config.Core.PitchLimits;
+
+            float minimumPitch = Mathf.Min(pitchLimits.x, pitchLimits.y);
+
+            float maximumPitch = Mathf.Max(pitchLimits.x, pitchLimits.y);
+
+            float viewPitch = IsFinite(source.ViewPitch) ? Mathf.Clamp(source.ViewPitch,minimumPitch, maximumPitch) : 0f;
+
             CharacterInputButtons allowedButtons = 
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
                 CharacterInputButtons.Jump | CharacterInputButtons.Dodge |
-                CharacterInputButtons.Roll | CharacterInputButtons.Slide;
+                CharacterInputButtons.Roll | CharacterInputButtons.Slide |
+                CharacterInputButtons.Aim;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 
@@ -683,7 +693,7 @@ namespace NiumaTPC.FishNet
                 buttons &= ~CharacterInputButtons.Walk;
             }
 
-            return new CharacterInputCommand(source.Tick, move, viewYaw, buttons);
+            return new CharacterInputCommand(source.Tick, move, viewYaw, viewPitch, buttons);
 
         }
 

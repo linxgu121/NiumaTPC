@@ -15,7 +15,14 @@ namespace NiumaTPC.Character.Simulation
         /// <param name="tick">命令所属的网络Tick</param>
         /// <param name="input">TPC当前处理后的输入快照</param>
         /// <param name="viewYaw">地玩家当前期望的世界朝向</param>
-        public CharacterInputCommand Build(uint tick, in ProcessedInputData input, float viewYaw)
+        /// <param name="viewPitch">玩家当前视角的 Pitch。</param>
+        /// <param name="pitchLimits">角色配置允许的 Pitch 范围。</param>
+        public CharacterInputCommand Build(
+            uint tick,
+            in ProcessedInputData input,
+            float viewYaw,
+            float viewPitch,
+            Vector2 pitchLimits)
         {
             //防止斜向输入长度超过1，导致角色斜着移动更快
             Vector2 move = Vector2.ClampMagnitude(input.Move, 1f);
@@ -30,6 +37,16 @@ namespace NiumaTPC.Character.Simulation
             else if (input.WalkHeld)
             {
                 buttons |= CharacterInputButtons.Walk;
+            }
+
+            /*
+             * Aim 是持续输入。
+             * 按住期间每个 Tick 都必须携带，
+             * 丢失单个数据包不会导致服务器永久卡在瞄准状态。
+             */
+            if (input.AimHeld)
+            {
+                buttons |= CharacterInputButtons.Aim;
             }
             
             // JumpPressed 带有输入缓冲，可以避免按键发生在两个网络 Tick 之间时丢失。
@@ -53,11 +70,18 @@ namespace NiumaTPC.Character.Simulation
                 buttons |= CharacterInputButtons.Slide;
             }
 
-            float normalizedYaw = Mathf.Repeat(viewYaw, 360f);
-
-            return new CharacterInputCommand(tick, move, normalizedYaw, buttons);
-
+            float normalizedYaw = float.IsNaN(viewYaw) || float.IsInfinity(viewYaw) ? 0f : Mathf.Repeat(viewYaw, 360f);
             
+            float minimumPitch = Mathf.Min(pitchLimits.x, pitchLimits.y);
+
+            float maximumPitch = Mathf.Max(pitchLimits.x, pitchLimits.y);
+
+            float clampedPitch = float.IsNaN(viewPitch) || float.IsInfinity(viewPitch) ? 0f : Mathf.Clamp(
+                viewPitch,
+                minimumPitch,
+                maximumPitch);
+
+            return new CharacterInputCommand(tick,move,normalizedYaw,clampedPitch,buttons);
         }
     }
 }

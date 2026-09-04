@@ -252,8 +252,11 @@ namespace NiumaTPC.Character.Simulation
                     .currentFrameData
                     .Processed;
 
-            float viewYaw =
-                _player.RuntimeData.AuthorityYaw;
+            float viewYaw = _player.RuntimeData.AuthorityYaw;
+
+            float viewPitch = _player.RuntimeData.AuthorityPitch;
+
+            Vector2 pitchLimits = _player.Config.Core.PitchLimits;
 
             unchecked
             {
@@ -262,9 +265,11 @@ namespace NiumaTPC.Character.Simulation
 
             CharacterInputCommand command =
                 _commandBuilder.Build(
-                    _tick,
-                    in input,
-                    viewYaw);
+                    tick: _tick,
+                    input: in input,
+                    viewYaw: viewYaw,
+                    viewPitch: viewPitch,
+                    pitchLimits: pitchLimits);
 
             if (command.HasButton(CharacterInputButtons.Jump))
             {

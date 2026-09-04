@@ -29,6 +29,12 @@ namespace NiumaTPC.FishNet.Prediction
         public float ViewYaw;
 
         /// <summary>
+        /// 输入产生时的视角俯仰角
+        /// 服务器仍会按照自己的 CoreSO 配置再次限幅
+        /// </summary>
+        public float ViewPitch;
+
+        /// <summary>
         /// Walk、Sprint 等持续按钮状态。
         /// </summary>
         public CharacterInputButtons Buttons;
@@ -50,10 +56,12 @@ namespace NiumaTPC.FishNet.Prediction
         public NiumaReplicateData(
             Vector2 move,
             float viewYaw,
+            float viewPitch,
             CharacterInputButtons buttons)
         {
             Move = move;
             ViewYaw = viewYaw;
+            ViewPitch = viewPitch;
             Buttons = buttons;
 
             _tick = 0u;
