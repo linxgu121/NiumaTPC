@@ -336,7 +336,8 @@ namespace NiumaTPC.Character
 
                 MainProcessorPipeline.UpdateIntentProcessors(
                     processJumpOrVaultIntent: !_externalJumpSimulationActive,
-                    processActionMovementIntent: !MotionDriver.IsExternalSimulationActive);
+                    processActionMovementIntent: !MotionDriver.IsExternalSimulationActive,
+                    writeAimState: !MotionDriver.IsExternalSimulationActive);
             }
 
             InventoryController.Update();

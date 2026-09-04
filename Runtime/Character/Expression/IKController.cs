@@ -80,6 +80,9 @@ namespace NiumaTPC.Character.Expression
                 return;
             }
 
+            // 远端没有本地 CameraRig，需要根据服务器视角状态重建纯表现目标。
+            UpdateExternalAimTarget();
+
             // AimIK 基准点更新（注：从瞄准切到非瞄准时必须清理）
             if (_data.IsAiming && _data.WantsLookAtIK && _data.CurrentAimReference != null)
             {
@@ -114,7 +117,7 @@ namespace NiumaTPC.Character.Expression
             // 右手 IK 处理
             float targetRightW = _data.WantsRightHandIK ? 1f : 0f;
             _rightHandWeight = Mathf.SmoothDamp(_rightHandWeight, targetRightW, ref _rightHandVelocity, 0.15f);
-                
+
             if (_rightHandWeight > 0.01f && _data.RightHandGoal != null)
                 _ikSource.SetIKTarget(IKTarget.RightHand, _data.RightHandGoal, _rightHandWeight);
             else
@@ -155,6 +158,48 @@ namespace NiumaTPC.Character.Expression
                 }
             }
         }
+
+        #region Remote Aim Presentation(远端瞄准表现)
+
+        /// <summary>
+        /// 为远端网络副本重建纯表现瞄准目标。
+        /// 本地拥有者继续使用 CameraRigDriver 的屏幕中心射线结果。
+        /// </summary>
+        private void UpdateExternalAimTarget()
+        {
+            if (!_player.IsExternalSimulationStateDriven ||
+                !_data.IsAiming ||
+                _data.CurrentAimReference == null ||
+                _config == null ||
+                _config.Aiming == null)
+            {
+                return;
+            }
+
+            /*
+             * AuthorityRotation 已由服务器确认的
+             * Yaw 与 ViewPitch 组合得到。
+             */
+            Vector3 aimDirection = _data.AuthorityRotation * Vector3.forward;
+
+            if (aimDirection.sqrMagnitude > 0.0001f)
+            {
+                aimDirection.Normalize();
+            }
+            else
+            {
+                // 极端异常情况下使用角色正前方，避免目标落在枪口原点。
+                aimDirection = _player.transform.forward;
+            }
+
+            float targetDistance = Mathf.Max(
+                1f,
+                _config.Aiming.AimPresentationDistance);
+
+            _data.TargetAimPoint = _data.CurrentAimReference.position + aimDirection * targetDistance;
+        }
+
+        #endregion
 
         private void SanitizeAimReference()
         {

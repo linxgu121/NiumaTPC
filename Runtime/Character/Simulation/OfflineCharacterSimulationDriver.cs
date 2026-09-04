@@ -320,6 +320,12 @@ namespace NiumaTPC.Character.Simulation
             
             PlayerRuntimeData data = _player.RuntimeData;
 
+            CharacterAimPresentationBridge.Apply(
+                data,
+                state.IsAiming,
+                command.ViewYaw,
+                state.ViewPitch);
+
             CharacterVaultPresentationBridge.Apply(
                 data,
                 state.VaultType,

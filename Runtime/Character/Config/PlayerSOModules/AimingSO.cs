@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using Animancer;
 using UnityEngine;
 
@@ -37,6 +35,11 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         
         [Tooltip("瞄准目标IK追踪平滑时间(重要！这个决定了角色拉枪到准星的速度)")]
         public float AimIkChaseSmoothTime = 0.1f;
+
+        [Header("远端瞄准表现")]
+        [Min(1f)]
+        [Tooltip("远端观察者根据服务器 Yaw 与 ViewPitch 重建瞄准 IK 目标时使用的距离，仅影响动画表现，不参与射线、命中或伤害计算。推荐 50 米。")]
+        public float AimPresentationDistance = 50f; 
 
         [Header("动画资源")]
 

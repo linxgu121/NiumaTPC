@@ -50,14 +50,17 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
 
         // 翻译机集群遍历
-        public void UpdateIntentProcessors(bool processJumpOrVaultIntent = true,bool processActionMovementIntent = true)
+        public void UpdateIntentProcessors(
+            bool processJumpOrVaultIntent = true,
+            bool processActionMovementIntent = true,
+            bool writeAimState = true)
         {
             // 注:ref readonly 的语义上只读引用 让编译器强制禁止在 Processor 内部对 inputSnapshot 的任何修改行为
             // 同时避免INPUTDATA的复制开销 
             ref readonly ProcessedInputData inputSnapshot = ref _inputPipeline.Current.currentFrameData.Processed;
 
             _viewRotationProcessor.Update(in inputSnapshot);
-            _aimIntentProcessor.Update(in inputSnapshot);
+            _aimIntentProcessor.Update(in inputSnapshot,writeAimState);
             _locomotionIntentProcessor.Update(in inputSnapshot,processActionMovementIntent);
 
             if(processJumpOrVaultIntent)

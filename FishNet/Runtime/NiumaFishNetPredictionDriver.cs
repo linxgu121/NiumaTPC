@@ -710,12 +710,26 @@ namespace NiumaTPC.FishNet
 
         private void WriteInputToRuntimeData(in CharacterInputCommand command)
         {
+            PlayerRuntimeData data = _player.RuntimeData;
+
             _player.RuntimeData.MoveInput = command.Move;
+
+            /*
+             * 服务器副本没有本地 ViewRotationProcessor，
+             * 因此必须记录客户端经过校验后的视角 Yaw。
+             */
+            data.AuthorityYaw = Mathf.Repeat(command.ViewYaw, 360f);
         }
 
         private void WriteStateToRuntimeData(in CharacterSimulationState state)
         {
             PlayerRuntimeData data = _player.RuntimeData;
+
+            CharacterAimPresentationBridge.Apply(
+                data,
+                state.IsAiming,
+                data.AuthorityYaw,
+                state.ViewPitch);
 
             CharacterVaultPresentationBridge.Apply(
                 data,
@@ -843,6 +857,12 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            CharacterAimPresentationBridge.Apply(
+                data,
+                presentationState.IsAiming,
+                presentationState.Yaw,
+                presentationState.ViewPitch);
+
             CharacterVaultPresentationBridge.Apply(
                 data,
                 presentationState.VaultType,
@@ -955,7 +975,8 @@ namespace NiumaTPC.FishNet
 
             bool stateChanged = !_hasPresentationDiagnosticSnapshot ||
                                 presentationState.MotionPhase != _lastPresentationDiagnosticSnapshot.MotionPhase ||
-                                presentationState.LocomotionState != _lastPresentationDiagnosticSnapshot.LocomotionState;
+                                presentationState.LocomotionState != _lastPresentationDiagnosticSnapshot.LocomotionState ||
+                                presentationState.IsAiming != _lastPresentationDiagnosticSnapshot.IsAiming;
 
             bool heartbeatDue =
                 Time.unscaledTime >=
@@ -977,6 +998,8 @@ namespace NiumaTPC.FishNet
                 $"ObjectId={ObjectId}, " +
                 $"Tick={presentationState.Tick}, " +
                 $"Locomotion={presentationState.LocomotionState}, " +
+                $"Aiming={presentationState.IsAiming}, " +
+                $"Pitch={presentationState.ViewPitch:F2}, " +
                 $"Phase={presentationState.MotionPhase}, " +
                 $"PhaseTick={presentationState.MotionPhaseTick}, " +
                 $"Direction={presentationState.StartDirection}, " +

@@ -22,6 +22,17 @@ namespace NiumaTPC.Character.Simulation
         public float Yaw;
 
         /// <summary>
+        /// 服务器确认的视角俯仰角。
+        /// 仅用于远端瞄准动画和 IK 表现。
+        /// </summary>
+        public float ViewPitch;
+
+        /// <summary>
+        /// 服务器确认的持续瞄准状态。
+        /// </summary>
+        public bool IsAiming;
+
+        /// <summary>
         /// 服务器确认的垂直速度。
         /// 后续供起跳、下落和落地表现使用。
         /// </summary>
@@ -112,6 +123,8 @@ namespace NiumaTPC.Character.Simulation
         {
             Tick = simulationState.Tick;
             Yaw = simulationState.Yaw;
+            ViewPitch = simulationState.ViewPitch;
+            IsAiming = simulationState.IsAiming;
             VerticalVelocity = simulationState.VerticalVelocity;
             LocomotionState = simulationState.LocomotionState;
             MotionPhase = simulationState.MotionPhase;
