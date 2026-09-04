@@ -22,6 +22,24 @@ namespace NiumaTPC.Cameras
         [Tooltip("跟随偏移 建议用于把 Rig 放到角色胸口/骨盆/头部附近的稳定点（世界空间偏移）")]
         [SerializeField] private Vector3 _followOffset = Vector3.zero;
 
+        [Header("Slide Follow(滑铲跟随)")]
+        [Tooltip("是否在滑铲期间降低本地摄像机跟随高度")]
+        private bool _enableSlideCameraOffset = true;
+
+        [Tooltip("滑铲期间相机跟随点的垂直偏移。负数表示向下，单位为米。")]
+        [SerializeField]
+        private float _slideCameraHeightOffset = -0.4f;
+
+        [Tooltip("进入滑铲时镜头下降的平滑时间。数值越小，镜头下降越快。")]
+        [SerializeField]
+        [Min(0.01f)]
+        private float _slideCameraEnterSmoothTime = 0.1f;
+
+        [Tooltip("退出滑铲时镜头恢复原高度的平滑时间。建议略慢于进入时间。")]
+        [SerializeField]
+        [Min(0.01f)]
+        private float _slideCameraExitSmoothTime = 0.2f;
+
         [Header("Rotation")]
         [Tooltip("是否同步 Pitch 若关闭 仅同步 Yaw(常用于某些第三人称探索模式)")]
         [SerializeField] private bool _syncPitch = true;
@@ -41,6 +59,12 @@ namespace NiumaTPC.Cameras
 
         private Camera _mainCamera;
         private Transform _runtimeFollowTarget;
+
+        // 当前实际应用的滑铲镜头高度偏移。
+        private float _currentSlideCameraOffset;
+
+        // SmoothDamp 使用的内部速度，不代表角色移动速度。
+        private float _slideCameraOffsetVelocity;
 
         [Header("网络同步")]
         public NiumaCharacterController BoundPlayer => _player;
@@ -75,6 +99,10 @@ namespace NiumaTPC.Cameras
         {
             _player = player;
             _runtimeFollowTarget = runtimeFollowTarget;
+
+            // 防止更换或重新生成本地玩家时继承旧角色的滑铲镜头偏移。
+            _currentSlideCameraOffset = 0f;
+            _slideCameraOffsetVelocity = 0f;
         }
 
         public void UnbindPlayer(NiumaCharacterController player)
@@ -99,7 +127,9 @@ namespace NiumaTPC.Cameras
             Transform target = _runtimeFollowTarget != null
                 ? _runtimeFollowTarget
                 : (_followTarget != null ? _followTarget : _player.transform);
-            transform.position = target.position + _followOffset;
+            
+            UpdateSlideCameraOffset(data);
+            transform.position = target.position + _followOffset + Vector3.up * _currentSlideCameraOffset;
 
             if (_syncPitch)
             {
@@ -128,6 +158,43 @@ namespace NiumaTPC.Cameras
                 }
             }
         }
+
+        #region Slide Camera(滑铲摄像机)
+
+        /// <summary>
+        /// 根据滑铲表现状态平滑修改摄像机跟随高度。
+        /// 镜头只读取表现数据，不参与固定 Tick 模拟。
+        /// </summary>
+        private void UpdateSlideCameraOffset(PlayerRuntimeData data)
+        {
+            bool shouldLowerCamera = _enableSlideCameraOffset && data != null && data.IsSliding;
+
+            float targetOffset =shouldLowerCamera ? _slideCameraHeightOffset : 0f;
+            
+            /*
+             * 进入时快速降低，退出时稍慢恢复，
+             * 避免镜头突然弹起造成明显眩晕。
+             */
+            float smoothTime = targetOffset < _currentSlideCameraOffset  ? _slideCameraEnterSmoothTime : _slideCameraExitSmoothTime;
+
+             _currentSlideCameraOffset = Mathf.SmoothDamp(
+                _currentSlideCameraOffset, targetOffset,
+                ref _slideCameraOffsetVelocity,
+                Mathf.Max(0.01f, smoothTime),
+                float.PositiveInfinity,
+                Time.unscaledDeltaTime);
+
+            // 消除接近零时长期存在的极小浮点尾差。
+            if (!shouldLowerCamera && Mathf.Abs(_currentSlideCameraOffset) < 0.001f)
+            {
+                _currentSlideCameraOffset = 0f;
+                _slideCameraOffsetVelocity = 0f;
+            }
+        }
+
+        //TODO：FOV 放大或镜头倾斜
+
+        #endregion
 
         // 从屏幕中心发射射线 寻找实际的物理交点 并写入黑板（RuntimeData）
         private void CalculateAndPushAimPoint(PlayerRuntimeData data)
