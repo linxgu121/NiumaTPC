@@ -24,10 +24,10 @@ namespace NiumaTPC.Character.Simulation
         bool IsGrounded {get; }
 
         /// <summary>
-        /// 提交本 Tick 的世界空间位移。
-        /// 具体实现负责碰撞、坡度和台阶处理。
+        /// 提交本 Tick 的世界空间位移，
+        /// 并返回碰撞处理后的真实移动结果。
         /// </summary>
-        void Move(Vector3 displacement);
+        CharacterBodyMoveResult Move(Vector3 displacement);
 
         /// <summary>
         /// 应用模拟器计算出的角色朝向

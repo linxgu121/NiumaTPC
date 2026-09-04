@@ -57,6 +57,8 @@ namespace NiumaTPC.Character.RuntimeData
         public bool IsGrounded;
         /// <summary>是否处于闪避中</summary>
         public bool IsDodging;
+        /// <summary>表现状态机当前是否正在播放滑铲状态。</summary>
+        public bool IsSliding;
         /// <summary>竖直速度(m/s)</summary>
         public float VerticalVelocity;
         /// <summary>刚着陆的瞬间(仅一帧)</summary>
@@ -148,6 +150,8 @@ namespace NiumaTPC.Character.RuntimeData
         public bool WantsToDodge;
         /// <summary>本帧是否想翻滚</summary>
         public bool WantsToRoll;
+        /// <summary>本帧是否请求进入滑铲表现状态 </summary>
+        public bool WantsToSlide;
         /// <summary>本帧是否想跳跃</summary>
         public bool WantsToJump;
         /// <summary>本帧是否想二段跳</summary>
@@ -309,6 +313,7 @@ namespace NiumaTPC.Character.RuntimeData
             WantsToJump = false;
             WantsDoubleJump = false;
             WantsToDodge = false;
+            WantsToRoll = false;
             WantsToRoll = false;
             WantsLowVault = false;
             WantsHighVault = false;

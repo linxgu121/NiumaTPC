@@ -49,6 +49,7 @@ namespace NiumaTPC.Character.Core.States
                     PlayerStateType.Dodge => new PlayerDodgeState(player),
                     PlayerStateType.Roll => new PlayerRollState(player),
                     PlayerStateType.Vault => new PlayerVaultState(player),
+                    PlayerStateType.Slide => new PlayerSlideState(player),
                     PlayerStateType.AimIdle => new PlayerAimIdleState(player),
                     PlayerStateType.AimMove => new PlayerAimMoveState(player),
                     PlayerStateType.Override=> new OverrideState(player),

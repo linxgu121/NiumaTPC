@@ -1,7 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 namespace NiumaTPC.Character.State.Enum
 {
     /// <summary>
@@ -24,6 +20,8 @@ namespace NiumaTPC.Character.State.Enum
         AimIdle,
         AimMove,
         Override,
-        Death
+        Death,
+        //为了不弄坏枚举序号，虽然不美观但都得加在最后面
+        Slide
     }
 }

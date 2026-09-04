@@ -26,7 +26,7 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
 
         [Tooltip("允许开始滑铲的最低水平速度，单位 m/s。")]
         [Min(0f)]
-        public float MinimumStartSpeed = 4.5f;
+        public float MinimumStartSpeed = 3.5f;
 
         [Tooltip("滑铲初速度相对于进入前实际速度的倍率。")]
         [Min(0f)]
@@ -34,15 +34,15 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
 
         [Tooltip("滑铲初速度上限，防止异常属性产生过高速度。")]
         [Min(0f)]
-        public float MaximumStartSpeed = 7f;
+        public float MaximumStartSpeed = 8f;
 
         [Tooltip("滑铲每秒减少的速度，单位 m/s²。")]
         [Min(0.01f)]
-        public float Deceleration = 6f;
+        public float Deceleration = 3f;
 
         [Tooltip("速度衰减到该值或以下时结束滑铲，单位 m/s。")]
         [Min(0f)]
-        public float ExitSpeed = 2f;
+        public float ExitSpeed = 1f;
 
         [Tooltip("允许跳跃打断前必须经过的时间。用于保证滑铲动作至少可见一小段。")]
         [Range(0.1f, 0.15f)]
@@ -79,6 +79,7 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         [Tooltip("滑铲结束后进入移动循环的淡入参数。")]
         public AnimPlayOptions SlideToMoveOptions = AnimPlayOptions.Default;
 
+        
         #endregion
     }
 }

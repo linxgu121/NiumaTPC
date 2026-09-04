@@ -11,6 +11,21 @@ namespace NiumaTPC.Character.Simulation
     /// </summary>
     public sealed class CharacterSimulationRunner
     {
+        #region Constants
+
+        /// <summary>
+        /// 请求距离太小时不进行碰墙进度判断。
+        /// </summary>
+        private const float SlideDistanceEpsilon = 0.001f;
+
+        /// <summary>
+        /// 实际前进距离低于请求距离的这个比例时，
+        /// 认为滑铲被正面障碍物阻挡。
+        /// </summary>
+        private const float SlideBlockedProgressRatio = 0.5f;
+
+        #endregion
+
         #region Dependencies(依赖项)
 
         private readonly ICharacterSimulationBody _body;
@@ -89,16 +104,155 @@ namespace NiumaTPC.Character.Simulation
                 tickDeltaTime
             );
 
-            _body.SetYaw(_state.Yaw);
-            _body.Move(displacement);
+            /*
+             * CharacterMovementSimulator 可能在当前 Tick
+             * 自然结束 Slide 或通过 Jump 打断它。
+             * 这里只记录真正仍由 Slide 提交的位移。
+             */
+            bool wasSlidingDuringMove = _state.ActionType == CharacterActionType.Slide;
 
-            // CharacterController 处理碰撞后，
-            // 再把真实结果写回权威状态。
+            Vector3 lockedSlideDirection = _state.LastMoveDirection;
+
+            _body.SetYaw(_state.Yaw);
+
+            CharacterBodyMoveResult moveResult = _body.Move(displacement);
+
+            SynchronizeStateFromBody();
+            if (wasSlidingDuringMove)
+            {
+                FinalizeSlideAfterBodyMove(
+                    in command,
+                    in moveResult,
+                    in lockedSlideDirection,
+                    isHandsEmpty,
+                    tickDeltaTime);
+            }
+            return _state;
+        }
+
+        /// <summary>
+        /// 根据 CharacterController 的真实移动结果
+        /// 处理滑铲碰墙、离地以及缓存跳跃
+        /// </summary>
+        private void FinalizeSlideAfterBodyMove(
+            in CharacterInputCommand command,
+            in CharacterBodyMoveResult moveResult,
+            in Vector3 lockedSlideDirection,
+            bool isHandsEmpty,
+            float tickDeltaTime)
+        {
+            bool blockedByWall = IsSlideBlocked(in moveResult,in lockedSlideDirection);
+
+            bool leftGround = !_state.IsGrounded;
+
+            if (!blockedByWall && !leftGround)
+            {
+                return;
+            }
+
+            /*
+             * 正面碰墙必须清空水平速度。
+             * 离开平台边缘则保留剩余滑行速度，
+             * 供接下来的空中移动继承。
+             */
+            bool preserveHorizontalSpeed = !blockedByWall;
+
+            bool hadPendingJump = CharacterSlideResolver.FinishSlide(
+                ref _state,
+                preserveHorizontalSpeed);
+
+            /*
+             * 提前 Jump 后撞墙时，物理安全结束条件
+             * 不需要等待最短滑铲时间。
+             * 角色仍然接地即可在当前 Tick 消费缓存跳跃。
+             */
+            if (hadPendingJump && _state.IsGrounded)
+            {
+                ConsumePostMoveSlideJump(in command,isHandsEmpty,tickDeltaTime);
+            }
+        }
+
+        /// <summary>
+        /// 消费移动之后的滑铲跳跃
+        /// </summary>
+        private void ConsumePostMoveSlideJump(
+            in CharacterInputCommand command,
+            bool isHandsEmpty,
+            float tickDeltaTime)
+        {
+            Vector3 jumpDisplacement = CharacterVerticalMovementSimulator.Simulate(
+                ref _state,
+                in command,
+                in _config,
+                isHandsEmpty,
+                allowJumpInput: false,
+                forceJumpInput: true,
+                tickDeltaTime: tickDeltaTime);
+
+            /*
+             * 只有“滑铲尚未达到最短时间、同时撞墙且缓存了 Jump”
+             * 才会在同一 Tick 进行第二次 Move。
+             */
+            _body.Move(jumpDisplacement);
+
+            SynchronizeStateFromBody();
+        }
+
+        /// <summary>
+        /// 物理体的最新状态同步回逻辑模拟状态
+        /// </summary>
+        private void SynchronizeStateFromBody()
+        {
             _state.Position = _body.Position;
             _state.Yaw = _body.Yaw;
             _state.IsGrounded = _body.IsGrounded;
+        }
 
-            return _state;
+        /// <summary>
+        /// 判断滑铲是否被正前方墙体阻挡
+        /// </summary>
+        private static bool IsSlideBlocked(
+            in CharacterBodyMoveResult moveResult,
+            in Vector3 lockedSlideDirection)
+        {
+            if (!moveResult.CollidedSides)
+            {
+                return false;
+            }
+
+            Vector3 slideDirection = lockedSlideDirection;
+
+            slideDirection.y = 0f;
+
+            if (slideDirection.sqrMagnitude < SlideDistanceEpsilon * SlideDistanceEpsilon)
+            {
+                return false;
+            }
+
+            slideDirection.Normalize();
+
+            Vector3 requestedHorizontal = moveResult.RequestedDisplacement;
+
+            requestedHorizontal.y = 0f;
+
+            float requestedForwardDistance = Vector3.Dot(requestedHorizontal,slideDirection);
+
+            if (requestedForwardDistance <= SlideDistanceEpsilon)
+            {
+                return false;
+            }
+
+            Vector3 actualHorizontal = moveResult.ActualDisplacement;
+
+            actualHorizontal.y = 0f;
+
+            float actualForwardDistance = Mathf.Max(0f, Vector3.Dot(actualHorizontal,slideDirection));
+
+            /*
+             * 仅有 Sides 不足以认定正面撞墙。
+             * 沿墙平行移动时，实际前进投影仍接近请求距离。
+             */
+            return actualForwardDistance < requestedForwardDistance * SlideBlockedProgressRatio;
         }
 
         #endregion

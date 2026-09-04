@@ -45,7 +45,7 @@ namespace NiumaTPC.Character.Simulation
 
         #region Public API
 
-        public void Move(Vector3 displacement)
+        public CharacterBodyMoveResult Move(Vector3 displacement)
         {
             ValidateFiniteVector(displacement, nameof(displacement));
 
@@ -54,7 +54,19 @@ namespace NiumaTPC.Character.Simulation
                 throw new InvalidOperationException("CharacterController 已禁用，无法执行模拟位移。");
             }
 
-            _controller.Move(displacement);
+            Vector3 startPosition = _transform.position;
+
+            CollisionFlags collisionFlags = _controller.Move(displacement);
+
+            Vector3 actualDisplacement = _transform.position - startPosition;
+
+            return new CharacterBodyMoveResult(
+                displacement,
+                actualDisplacement,
+                collidedSides: (collisionFlags & CollisionFlags.Sides) != 0,
+                collidedAbove: (collisionFlags & CollisionFlags.Above) != 0,
+                collidedBelow: (collisionFlags & CollisionFlags.Below) != 0);
+            
         }
 
         public void SetYaw(float yaw)

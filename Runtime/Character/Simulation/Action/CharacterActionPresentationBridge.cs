@@ -39,7 +39,7 @@ namespace NiumaTPC.Character.Simulation
                 return;
             }
 
-            // 旧 Roll/Dodge 状态根据这个局部角度选择八方向动画。
+            // 旧 Roll/Dodge/Slide 状态根据这个局部角度选择八方向动画。
             data.DesiredLocalMoveAngle = ToLocalAngle(nextActionDirection);
 
             switch (nextActionType)
@@ -50,6 +50,10 @@ namespace NiumaTPC.Character.Simulation
 
                 case CharacterActionType.Dodge:
                     data.WantsToDodge = true;
+                    break;
+
+                case CharacterActionType.Slide:
+                    data.WantsToSlide = true;
                     break;
             }
         }
