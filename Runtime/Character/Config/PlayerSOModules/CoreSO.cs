@@ -13,8 +13,6 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
     {
         //别乱改这里的数值 一个小数点的偏差就能让整个控制手感完全变样 
         #region 游戏基本属性
-        [Tooltip("生命值上限")]
-        public float MaxHealth = 100f;
 
         [Tooltip("死亡动画")]
         public AnimationClip DeathAnim;
@@ -46,17 +44,6 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
 
         [Tooltip("旋转平滑时间")]
         public float RotationSmoothTime = 0.12f;
-
-        [Header("移动速度")]
-        
-        [Tooltip("行走速度")]
-        public float WalkSpeed = 2f;
-        
-        [Tooltip("慢跑速度")]
-        public float JogSpeed = 4f;
-        
-        [Tooltip("冲刺速度")]
-        public float SprintSpeed = 7f;
 
         [Header("物理与控制")]
         

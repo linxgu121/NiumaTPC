@@ -17,6 +17,14 @@ namespace NiumaTPC.Cameras
         [Header("虚拟相机")]
         [SerializeField] private CinemachineVirtualCamera _freeLookCam; // 探索
         [SerializeField] private CinemachineVirtualCamera _aimCam; // 瞄准
+        [Header("瞄准视野")]
+        [Tooltip("瞄准 FOV 相对于探索 FOV 的比例。越小放大越明显，必须小于 1，避免瞄准时视野反而扩大。")]
+        [SerializeField, Range(0.5f, 0.95f)]
+        private float _aimFovRatio = 0.75f;
+
+        [Tooltip("瞄准时允许的最大 FOV。实际值还会受探索 FOV 与瞄准比例限制。")]
+        [SerializeField, Range(10f, 60f)]
+        private float _aimMaxFov = 40f;
 
 
         [Header("探索模式缩放 (鼠标滚轮)")]
@@ -66,12 +74,12 @@ namespace NiumaTPC.Cameras
 
         private void OnEnable()
         {
-            if(ZoomAction != null)
+            if (ZoomAction != null)
             {
                 ZoomAction.action.Enable();
             }
 
-            if(CursorToggleAction != null)
+            if (CursorToggleAction != null)
             {
                 CursorToggleAction.action.Enable();
             }
@@ -117,7 +125,7 @@ namespace NiumaTPC.Cameras
             if (EnableFreeLookZoom && !isAiming && _freeLookCam != null)
             {
                 Vector2 rawScroll = ZoomAction != null ? ZoomAction.action.ReadValue<Vector2>() : Vector2.zero;
-                float scroll = rawScroll.y / Mathf.Max(1f,_scrollUnitsPerStep);
+                float scroll = rawScroll.y / Mathf.Max(1f, _scrollUnitsPerStep);
 
                 if (Mathf.Abs(scroll) > 0.0001f)
                 {
@@ -132,10 +140,25 @@ namespace NiumaTPC.Cameras
                 _freeLookCam.m_Lens.FieldOfView = newFov;
             }
 
-            // 优先级切换在 Update 中完成 以确保 CinemachineBrain 在 LateUpdate 做最终选择前已拥有正确优先级
+            // CinemachineBrain 负责两台相机之间的位置与镜头混合。
             if (isAiming)
             {
-                if (_aimCam != null) _aimCam.Priority = 20;
+                if (_aimCam != null)
+                {
+                    if (_freeLookCam != null)
+                    {
+                        float freeFov = _freeLookCam.m_Lens.FieldOfView;
+                        float ratio = Mathf.Clamp(_aimFovRatio, 0.5f, 0.95f);
+                        float aimFov = Mathf.Min(_aimMaxFov, freeFov * ratio);
+
+                        // 即使探索模式已经滚轮放大，进入瞄准也不会突然变广角。
+                        // 不再额外 SmoothDamp，避免与 Brain 的混合叠加造成迟钝。
+                        _aimCam.m_Lens.FieldOfView = Mathf.Clamp(aimFov, 1f, 179f);
+                    }
+
+                    _aimCam.Priority = 20;
+                }
+
                 if (_freeLookCam != null) _freeLookCam.Priority = 10;
             }
             else
@@ -151,15 +174,15 @@ namespace NiumaTPC.Cameras
         /// </summary>
         public void BindPlayer(NiumaCharacterController player)
         {
-            if(player == null)
+            if (player == null)
             {
                 return;
             }
 
             _player = player;
-            
+
             //重新绑定时重置 FOV 平滑，避免继承上一个观察目标的速度
-            if(_freeLookCam != null)
+            if (_freeLookCam != null)
             {
                 _targetFov = _freeLookCam.m_Lens.FieldOfView;
                 _fovVelocity = 0f;
@@ -173,7 +196,7 @@ namespace NiumaTPC.Cameras
         /// </summary>
         public void UnbindPlayer(NiumaCharacterController player)
         {
-            if(_player != player)
+            if (_player != player)
             {
                 return;
             }
@@ -191,7 +214,7 @@ namespace NiumaTPC.Cameras
         /// </summary>
         private void HandleCursorToggle()
         {
-            if(!AllowCursorToggle || CursorToggleAction == null)
+            if (!AllowCursorToggle || CursorToggleAction == null)
             {
                 return;
             }
@@ -247,12 +270,12 @@ namespace NiumaTPC.Cameras
         // 确保在脚本停用或应用退出时恢复鼠标状态 避免编辑器或系统丢失光标
         private void OnDisable()
         {
-            if(ZoomAction != null)
+            if (ZoomAction != null)
             {
                 ZoomAction.action.Disable();
             }
 
-            if(CursorToggleAction != null)
+            if (CursorToggleAction != null)
             {
                 CursorToggleAction.action.Disable();
             }

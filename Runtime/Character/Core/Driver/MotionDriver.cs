@@ -48,7 +48,7 @@ namespace NiumaTPC.Character.Core.Driver
         /// 是否由新的固定 Tick 模拟系统负责角色位移。
         /// 启用后，旧 MotionDriver 不再调用 CharacterController.Move。
         /// </summary>
-        public bool IsExternalSimulationActive {get; private set;}
+        public bool IsExternalSimulationActive { get; private set; }
         #endregion
 
         #region 上下文缓存
@@ -163,7 +163,7 @@ namespace NiumaTPC.Character.Core.Driver
         /// </summary>
         public void SetExternalSimulationActive(bool active)
         {
-            if(IsExternalSimulationActive == active)
+            if (IsExternalSimulationActive == active)
             {
                 return;
             }
@@ -288,7 +288,7 @@ namespace NiumaTPC.Character.Core.Driver
         /// <summary>
         /// 初始化扭曲运动（自动生成路径）
         /// </summary>
-         public void InitializeWarpData(WarpedMotionData data)
+        public void InitializeWarpData(WarpedMotionData data)
         {
             if (data?.WarpPoints == null || data.WarpPoints.Count == 0) return;
 
@@ -304,7 +304,7 @@ namespace NiumaTPC.Character.Core.Driver
         /// <summary>
         /// 更新扭曲运动（按动画进度执行位移）
         /// </summary>
-         public void UpdateWarpMotion(float normalizedTime)
+        public void UpdateWarpMotion(float normalizedTime)
         {
             if (IsExternalSimulationActive)
             {
@@ -542,12 +542,14 @@ namespace NiumaTPC.Character.Core.Driver
 
         /// <summary>
         /// 获取当前状态基础速度
+        /// 普通移动读取角色基础属性；瞄准移动仍读取专门的瞄准配置
+        /// (后面可以根据角色的基础属性替换默认瞄准配置)
         /// </summary>
         private float GetBaseSpeed(LocomotionState state, bool isAiming) => state switch
         {
-            LocomotionState.Walk => isAiming ? _config.Aiming.AimWalkSpeed : _config.Core.WalkSpeed,
-            LocomotionState.Jog => isAiming ? _config.Aiming.AimJogSpeed : _config.Core.JogSpeed,
-            LocomotionState.Sprint => isAiming ? _config.Aiming.AimSprintSpeed : _config.Core.SprintSpeed,
+            LocomotionState.Walk => isAiming ? _config.Aiming.AimWalkSpeed : _player.BaseStats.WalkSpeed,
+            LocomotionState.Jog => isAiming ? _config.Aiming.AimJogSpeed : _player.BaseStats.JogSpeed,
+            LocomotionState.Sprint => isAiming ? _config.Aiming.AimSprintSpeed : _player.BaseStats.SprintSpeed,
             _ => 0f
         };
 
@@ -675,12 +677,12 @@ namespace NiumaTPC.Character.Core.Driver
     /// <summary>
     /// 扩展方法：快速设置 Vector3.y
     /// </summary>
-     public static class Vector3Extensions
+    public static class Vector3Extensions
+    {
+        public static Vector3 SetY(this Vector3 vector, float y)
         {
-            public static Vector3 SetY(this Vector3 vector, float y)
-            {
-               vector.y = y;
-               return vector;
-            }
+            vector.y = y;
+            return vector;
         }
+    }
 }

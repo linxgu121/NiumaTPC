@@ -564,9 +564,14 @@ namespace NiumaTPC.FishNet
         /// </summary>
         private bool TryTakeSimulationOwnership()
         {
-            if(_player == null || _player.MotionDriver == null)
+            if (_player == null ||
+                _player.BaseStats == null ||
+                _player.CharacterController == null ||
+                _player.MotionDriver == null ||
+                _player.InputPipeline == null ||
+                _player.RuntimeData == null)
             {
-                Debug.LogError("[NiumaFishNet] NiumaCharacterController 尚未完成初始化，" + "无法取得模拟控制权。", this);
+                Debug.LogError("[NiumaFishNet] NiumaCharacterController 尚未完成初始化，无法取得模拟控制权。", this);
 
                 return false;
             }
@@ -583,6 +588,7 @@ namespace NiumaTPC.FishNet
             CharacterSimulationConfig config =
                 CharacterSimulationConfigFactory.Create(
                     _player.Config,
+                    _player.BaseStats,
                     tickDeltaTime);
 
             var body = new CharacterControllerSimulationBody(_player.CharacterController);

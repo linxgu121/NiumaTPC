@@ -119,14 +119,13 @@ namespace NiumaTPC.Character.Simulation
             }
 
             if (_player == null ||
+                _player.BaseStats == null ||
                 _player.CharacterController == null ||
                 _player.MotionDriver == null ||
                 _player.InputPipeline == null ||
                 _player.RuntimeData == null)
             {
-                Debug.LogError(
-                    "[离线模拟] NiumaCharacterController 尚未完成初始化。",
-                    this);
+                Debug.LogError("[离线模拟] NiumaCharacterController 尚未完成初始化。", this);
 
                 enableTickSimulation = false;
                 return;
@@ -134,9 +133,7 @@ namespace NiumaTPC.Character.Simulation
 
             if (_player.Config == null || _player.Config.Core == null)
             {
-                Debug.LogError(
-                    "[离线模拟] 玩家没有配置 PlayerSO 或 CoreSO。",
-                    this);
+                Debug.LogError("[离线模拟] 玩家没有配置 PlayerSO 或 CoreSO", this);
 
                 enableTickSimulation = false;
                 return;
@@ -144,9 +141,10 @@ namespace NiumaTPC.Character.Simulation
 
             float tickDeltaTime = 1f / tickRate;
 
-            CharacterSimulationConfig config =
+            CharacterSimulationConfig config = 
                 CharacterSimulationConfigFactory.Create(
                     _player.Config,
+                    _player.BaseStats,
                     tickDeltaTime);
 
             var body =
@@ -195,11 +193,11 @@ namespace NiumaTPC.Character.Simulation
                 // 恢复开始模拟前的跳跃接管状态。
                 _player.SetExternalJumpSimulationActive(_externalJumpSimulationBeforeStart);
 
-                if(_player.MotionDriver != null)
+                if (_player.MotionDriver != null)
                 {
                     _player.MotionDriver.SetExternalSimulationActive(false);
                 }
-                
+
             }
 
             _runner = null;
@@ -317,7 +315,7 @@ namespace NiumaTPC.Character.Simulation
             in CharacterInputCommand command,
             in CharacterSimulationState state)
         {
-            
+
             PlayerRuntimeData data = _player.RuntimeData;
 
             CharacterAimPresentationBridge.Apply(
@@ -338,10 +336,10 @@ namespace NiumaTPC.Character.Simulation
                 state.ActionType,
                 state.ActionTick,
                 state.ActionDirection);
-                
 
-            bool jumpStated = 
-                data.IsGrounded && 
+
+            bool jumpStated =
+                data.IsGrounded &&
                 !state.IsGrounded &&
                 state.VerticalVelocity > 0f;
 
@@ -356,7 +354,7 @@ namespace NiumaTPC.Character.Simulation
             data.SimulationStartDirection = state.StartDirection;
             data.SimulationStartLocomotionState = state.StartLocomotionState;
 
-            if(jumpStated)
+            if (jumpStated)
             {
                 data.WantsToJump = true;
             }

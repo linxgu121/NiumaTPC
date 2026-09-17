@@ -114,6 +114,13 @@ CharacterSimulationState
 
 状态注册表负责实例复用，`GlobalInterruptProcessor` 与 `UpperBodyInterruptProcessor` 统一执行打断检查。跳跃、下落、落地、瞄准、翻滚、闪避和翻越等进入条件由拦截器 SO 描述，避免把互斥规则散落在每个状态脚本中。
 
+#### 持枪动画遮罩与 IK 配置
+
+- `PlayerSO.Core.UpperBodyMask` 决定第 1 层装备动画覆盖哪些部位。当前示例使用 `Assets/Game/Player/Config/HeldItemArms.mask`：只启用双臂、手指和手部 IK，关闭 Body、Head、Root、双腿和足部 IK；Transform 列表为空，使用 Humanoid 部位映射，不绑定某个模型的骨骼路径。
+- 躯干继续播放第 0 层的走跑动作，保留迈步时的躯干反向调整。将 Body 纳入静态持枪层可能覆盖这部分动作，导致胸口和枪跟着骨盆一起左右侧倾。正常的跑步转体仍会保留，这个配置并不是锁死上半身。
+- 当前 `Player` 预制体的 `AimIK / Solver / Bones` 中，骨盆（`腰`）权重为 0，脊柱仍参与瞄准，避免枪口校正直接扭动下半身。`FullBodyBipedIK` 的骨盆引用仍需保留，不能因此删除。
+- `HoldPositionOffset` / `HoldRotationOffset` 调整枪相对右手挂点的位置与朝向；武器上的 `LeftHandGoal` 决定左手握点。这些值与角色骨架、枪模型有关，不能直接复制另一角色的数值。先验证遮罩，再单独调握点，避免用 IK 强拉去掩盖动画层配置问题。
+
 ### 5. 仲裁器管线
 
 `ArbiterPipeline` 为动作、生命、耐力和 LOD 请求提供统一决策入口。仲裁器处理冲突、优先级、资源条件与覆盖请求，再把被接受的结果写回黑板或提交给状态系统。

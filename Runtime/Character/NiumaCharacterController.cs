@@ -30,6 +30,8 @@ namespace NiumaTPC.Character
     /// - Awake: 只做一次性分配/依赖注入（对象池复用时不会重复调用）
     /// - OnSpawned: 每次从池取出时做“帧状态复位 + 重启”
     /// - OnDespawned: 每次回收时做“回调/引用清理”
+    /// 
+    /// TODO：随着框架越来越大，组件越来越多，后期对功能/模块进行分类便于管理
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     [RequireComponent(typeof(AnimancerComponent))]
@@ -72,43 +74,44 @@ namespace NiumaTPC.Character
         public EquippableItemSO DefaultEquipment3;
         public bool statedebug = false;
 
-         [Header("仲裁器开关")]
+        [Header("仲裁器开关")]
         [Tooltip("是否启用 LOD 仲裁器。关闭后将不会进行距离 LOD 降级（不会禁用 Animator,也不会 BlockIK/BlockFacial)。")]
         public bool EnableLODArbiter = true;
 
         //运行时核心引用
-        public StateMachine StateMachine {get; private set;}
-        public PlayerRuntimeData RuntimeData {get; private set;}
-        public GlobalInterruptProcessor InterruptProcessor {get; private set;}
-        public InputData InputData {get; private set;}
+        public StateMachine StateMachine { get; private set; }
+        public PlayerRuntimeData RuntimeData { get; private set; }
+        public CharacterBaseStats BaseStats { get; private set; }
+        public GlobalInterruptProcessor InterruptProcessor { get; private set; }
+        public InputData InputData { get; private set; }
 
         // 核心管线
         public InputPipeline InputPipeline { get; private set; }
-        public MainProcessorPipeline MainProcessorPipeline {get; private set; }
+        public MainProcessorPipeline MainProcessorPipeline { get; private set; }
 
         //子系统控制器
-        public UpperBodyController UpperBodyController {get; private set; }
-        public FacialController FacialController {get; private set;}
-        public IKController IKController {get; private set; }
+        public UpperBodyController UpperBodyController { get; private set; }
+        public FacialController FacialController { get; private set; }
+        public IKController IKController { get; private set; }
         public PlayerInventoryController InventoryController { get; private set; }
-        public ActionController ActionController {get; private set; }
-        public AudioController AudioController {get; private set;}
+        public ActionController ActionController { get; private set; }
+        public AudioController AudioController { get; private set; }
 
 
         //驱动器与外观层系统
-        public AnimancerComponent Animancer {get; private set;}
-        public CharacterController CharacterController {get; private set;}
-        public MotionDriver MotionDriver {get; private set; }
-        public EquipmentDriver EquipmentDriver {get; private set; }
-        public AnimationFacadeBase AnimationFacade {get; private set;}
-        public AudioDriver AudioDriver {get; private set; }
+        public AnimancerComponent Animancer { get; private set; }
+        public CharacterController CharacterController { get; private set; }
+        public MotionDriver MotionDriver { get; private set; }
+        public EquipmentDriver EquipmentDriver { get; private set; }
+        public AnimationFacadeBase AnimationFacade { get; private set; }
+        public AudioDriver AudioDriver { get; private set; }
 
 
         //状态注册表
-        public PlayerStateRegistry StateRegistry {get; private set; }
+        public PlayerStateRegistry StateRegistry { get; private set; }
 
         //仲裁器(后期需要注册表化)
-        public LODArbiter LODArbiter {get; private set; }
+        public LODArbiter LODArbiter { get; private set; }
         public ArbiterPipeline ArbiterPipeline { get; private set; }
 
 
@@ -117,6 +120,9 @@ namespace NiumaTPC.Character
         public event Action OnEquipmentChanged;
 
         private bool _booted;
+        // 标记初始化是否已经开始，防止初始化后再替换基础数值。
+        private bool _awakeStarted;
+
 
         //网络同步
 
@@ -131,20 +137,61 @@ namespace NiumaTPC.Character
         /// </summary>
         private bool _externalJumpSimulationActive;
 
-        
+        /// <summary>
+        /// 准备基础属性
+        /// </summary>
+        public bool TryPrepareBaseStats(CharacterBaseStats stats, out string error)
+        {
+            if (stats == null)
+            {
+                error = "基本属性为空";
+                return false;
+            }
 
+            if (_awakeStarted)
+            {
+                error = "初始化已开始，必须在Awake前准备";
+                return false;
+            }
+
+            if (BaseStats != null)
+            {
+                error = "基础数据已准备";
+                return false;
+            }
+
+            BaseStats = stats;
+            error = string.Empty;
+            return true;
+
+
+        }
+
+        #region 生命周期
 
         // Awake 负责内存分配、找组件、依赖注入 
         private void Awake()
         {
+            _awakeStarted = true;
+
+            // 基础属性必须由外部装配入口提前准备，不能回退读取旧 CoreSO。
+            if (BaseStats == null)
+            {
+                Debug.LogError("[PlayerController] 未准备基础属性，角色初始化已停止。请检查离线生成器或固定角色属性组件。",this);
+                enabled = false;
+                return;
+            }
+
             Animator = GetComponent<Animator>();
             Animancer = GetComponent<AnimancerComponent>();
             CharacterController = GetComponent<CharacterController>();
+            AnimationFacadeRef = GetComponent<AnimancerFacade>();
+            SfxSource = GetComponent<AudioSource>();
 
-            LeftHandBone=Animator.GetBoneTransform(HumanBodyBones.LeftHand);
-            RightHandBone=Animator.GetBoneTransform(HumanBodyBones.RightHand);
-            LeftFootBone=Animator.GetBoneTransform(HumanBodyBones.LeftFoot);
-            RightFootBone=Animator.GetBoneTransform(HumanBodyBones.RightFoot);
+            LeftHandBone = Animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            RightHandBone = Animator.GetBoneTransform(HumanBodyBones.RightHand);
+            LeftFootBone = Animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+            RightFootBone = Animator.GetBoneTransform(HumanBodyBones.RightFoot);
 
             EnsureWeaponContainer();
 
@@ -312,7 +359,7 @@ namespace NiumaTPC.Character
         // 逻辑与意图更新 (在动画引擎运算之前)
         private void Update()
         {
-            if (!_booted) return; 
+            if (!_booted) return;
 
             //Debug.Log(Animancer.Layers.Count);
 
@@ -352,7 +399,7 @@ namespace NiumaTPC.Character
                 MainProcessorPipeline.UpdateGameplayParameterProcessors();
             }
 
-           StateMachine.CurrentState.LogicUpdate();
+            StateMachine.CurrentState.LogicUpdate();
 
             UpperBodyController.Update();
 
@@ -361,7 +408,7 @@ namespace NiumaTPC.Character
             ActionController.Update();
 
             AudioController.Update();
-            
+
             //古法状态调试 已经被drawxxldebuger代替 打包注释掉
             if (statedebug && StateMachine.CurrentState != null && _lastState != null)
             {
@@ -395,6 +442,9 @@ namespace NiumaTPC.Character
             RuntimeData.ResetIntent();
         }
 
+        #endregion
+
+
         /// <summary>
         /// 通知装备已切换 / 改变
         /// </summary>
@@ -402,6 +452,7 @@ namespace NiumaTPC.Character
         {
             OnEquipmentChanged?.Invoke();
         }
+
 
         #region External Simulation State(外部模拟状态)
         /// <summary>
@@ -413,7 +464,7 @@ namespace NiumaTPC.Character
         /// 切换外部模拟状态驱动模式。
         /// 远端网络副本启用，本地拥有者保持关闭。
         /// </summary>
-        public void SetExternalSimulationStateDriven(bool enabled,bool clearLocalIntent = true)
+        public void SetExternalSimulationStateDriven(bool enabled, bool clearLocalIntent = true)
         {
             if (_externalSimulationStateDriven == enabled)
             {
@@ -464,7 +515,7 @@ namespace NiumaTPC.Character
         }
 
         #endregion
-        
+
         public bool IsInputBlocked => InputPipeline != null && InputPipeline.IsBlocked;
 
         public void SetInputBlocked(bool blocked, bool clearBufferedInput = true)
@@ -569,6 +620,6 @@ namespace NiumaTPC.Character
 
         #endregion
 
-    
+
     }
 }

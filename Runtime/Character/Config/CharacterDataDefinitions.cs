@@ -49,7 +49,7 @@ namespace NiumaTPC.Character.Config
     [Serializable]
     public class WarpPointDef
     {
-         [Tooltip("特征点识别名称")]
+        [Tooltip("特征点识别名称")]
         public string PointName;
 
         [Tooltip("触发该特征点的动画归一化时间 (0-1)")]

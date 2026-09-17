@@ -285,7 +285,7 @@ namespace NiumaTPC.Character.RuntimeData
 
         public PlayerRuntimeData(NiumaCharacterController player)
         {
-            CurrentHealth = player.Config.Core.MaxHealth;
+            CurrentHealth =  player.BaseStats.MaxHealth;
             CameraTransform = player.PlayerCamera;
             CurrentStamina = player.Config.Core.MaxStamina;
             Override.Clear();

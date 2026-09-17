@@ -2,24 +2,32 @@ using System;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Config.PlayerSOModules;
 using NiumaTPC.Character.Motion.MotionEnums;
+using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
 namespace NiumaTPC.Character.Simulation
 {
     /// <summary>
     /// 静态工厂模式
-    /// 把现有 PlayerSO 资源转换为角色模拟使用的纯数据配置。
-    /// 模拟层不直接持有或读取 ScriptableObject。
-    /// </summary>
+    /// 将角色基础属性与 PlayerSO 行为配置转换为固定 Tick 模拟配置
+    /// 模拟层只消费转换后的数据，不直接读取 ScriptableObject
     public static class CharacterSimulationConfigFactory
     {
         #region Public API
 
-        public static CharacterSimulationConfig Create(PlayerSO playerConfig, float tickDeltaTime)
+        public static CharacterSimulationConfig Create(
+            PlayerSO playerConfig,
+            CharacterBaseStats baseStats,
+            float tickDeltaTime)
         {
             if (playerConfig == null)
             {
                 throw new ArgumentNullException(nameof(playerConfig), "创建角色模拟配置时，PlayerSO 不能为空。");
+            }
+
+            if (baseStats == null)
+            {
+                throw new ArgumentNullException(nameof(baseStats), "创建角色模拟配置前必须准备角色基础属性。");
             }
 
             CoreSO core = playerConfig.Core;
@@ -123,9 +131,9 @@ namespace NiumaTPC.Character.Simulation
                 : default;
 
             return new CharacterSimulationConfig(
-                walkSpeed: core.WalkSpeed,
-                jogSpeed: core.JogSpeed,
-                sprintSpeed: core.SprintSpeed,
+                walkSpeed: baseStats.WalkSpeed,
+                jogSpeed: baseStats.JogSpeed,
+                sprintSpeed: baseStats.SprintSpeed,
                 moveSpeedSmoothTime: core.MoveSpeedSmoothTime,
                 rotationSmoothTime: core.RotationSmoothTime,
 
@@ -211,11 +219,11 @@ namespace NiumaTPC.Character.Simulation
             }
         }
 
-        private static void ValidateNonNegativeAimingValue(float value,string sourceName,string fieldName)
+        private static void ValidateNonNegativeAimingValue(float value, string sourceName, string fieldName)
         {
             if (!IsFinite(value) || value < 0f)
             {
-                throw new InvalidOperationException( $"“{sourceName}.{fieldName}”必须是非负有限值。");
+                throw new InvalidOperationException($"“{sourceName}.{fieldName}”必须是非负有限值。");
             }
         }
 
