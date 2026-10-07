@@ -177,7 +177,7 @@ namespace NiumaTPC.Character
             // 基础属性必须由外部装配入口提前准备，不能回退读取旧 CoreSO。
             if (BaseStats == null)
             {
-                Debug.LogError("[PlayerController] 未准备基础属性，角色初始化已停止。请检查离线生成器或固定角色属性组件。",this);
+                Debug.LogError("[PlayerController] 未准备基础属性，角色初始化已停止。请检查离线生成器或固定角色属性组件。", this);
                 enabled = false;
                 return;
             }
@@ -284,7 +284,11 @@ namespace NiumaTPC.Character
 
         private void BootIfNeeded()
         {
-            if (_booted) return;
+            // 初始化未完成时，不启动依赖运行数据和驱动器的子系统
+            if (_booted || BaseStats == null || RuntimeData == null || MotionDriver == null)
+            {
+                return;
+            }
 
             InitializeCamera();
             SetupAnimationLayers();
@@ -299,6 +303,11 @@ namespace NiumaTPC.Character
             // 对象池出池：确保启用状态下具备可运行的初始状态
 
             BootIfNeeded();
+
+            if (!_booted)
+            {
+                return;
+            }
 
             // 复位帧级意图，防止复用时继承上一轮输入/仲裁结果。
             RuntimeData.ResetIntent();

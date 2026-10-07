@@ -1,5 +1,6 @@
 using System;
 using NiumaTPC.Character;
+using NiumaTPC.Item;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,6 +13,16 @@ namespace NiumaTPC.Role
     public class OfflineCharacterSpawner : MonoBehaviour
     {
         public NiumaCharacterController CurrentPlayer { get; private set; }
+
+        [Header("离线射击")]
+
+        [SerializeField]
+        [Tooltip("绑定实际渲染玩家画面的 Camera 传给生成角色的 OfflineWeaponFireSource")]
+        private Camera shootingCamera;
+
+        [SerializeField]
+        [Tooltip("绑定场景中的 OfflineAmmunitionDriver 不要挂在每把枪上")]
+        private OfflineAmmunitionDriver ammunitionDriver;
 
         //未激活的创建容器，确保可以在角色 Awake 前准备属性
         private GameObject _inactiveRoot;
@@ -92,6 +103,12 @@ namespace NiumaTPC.Role
                 if (!player.TryPrepareBaseStats(baseStats, out error))
                 {
                     return false;
+                }
+
+                // 角色仍未激活，先完成场景引用注入
+                if (player.TryGetComponent(out OfflineWeaponFireSource fireSource))
+                {
+                    fireSource.Configure(shootingCamera, ammunitionDriver);
                 }
 
                 // 实例仍未激活，可以安全设置出生位置。

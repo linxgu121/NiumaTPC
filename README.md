@@ -6,6 +6,34 @@
 
 框架面向需要持续扩展的第三人称与动作类项目。当输入、状态切换、动画事件、装备、IK、音频和网络预测逐渐纠缠在一起时，NiumaTPC 将它们拆成职责明确、可以独立替换的层级，并让离线模式与联网模式复用同一套角色模拟规则。
 
+## 本次更新：脚本弹道与网络射击接入（2026-10-07）
+
+### 新增与调整
+
+- **脚本驱动弹道：** 新增 `AmmunitionState`、轨迹计算、碰撞查询、模拟器与 `AmmunitionWorld`，记录位置、速度、寿命、累计飞行距离和结束状态。支持射线/球形扫掠、初始重叠检测及曲线子步，不再由枪械给 Rigidbody 施加速度来驱动这条发射流程。
+- **通用枪械与弹药配置：** 将 `AKSO` 更名为 `GunWeaponSO` 并保留脚本 GUID；`RangedWeaponSO` 配置初速度、开火间隔与弹药引用，`AmmunitionDefinitionSO` 配置重力、碰撞半径、寿命和表现资源。`FireRate` 的单位仍是两次开火间隔的秒数。
+- **子弹及命中表现：** 新增 `AmmunitionView`、`AmmunitionImpactView`，通过对象池管理视觉子弹、拖尾、命中特效和弹坑，支持命中、寿命结束及组件停用时清理回收。命中音效单次播放，特效自身的 AudioSource 配置不由命中特效脚本覆盖。
+- **离线射击闭环：** 新增 `OfflineWeaponFireSource` 与 `OfflineAmmunitionDriver`，从当前玩家相机中心采样射线，登记逻辑子弹并统一推进；枪口只负责声光和后坐力表现。角色生成器在激活前注入射击相机与弹道驱动。
+- **武器独立运行时状态：** `ItemInstance` 持有弹匣与冷却状态，切换或回收武器模型不会重新补满弹药。`PlayerRuntimeData` 增加装备代次；请求包含序号、装备代次和瞄准快照，并提供拒绝原因及非法浮点数检查。
+- **FishNet 射击请求：** 新增 `INetworkWeaponFireRequestSender` 和 `NiumaFishNetWeaponDriver`，接入 Owner 提交、发送节流、ServerRpc 接收及 TargetRpc 回执。网络角色发送失败或断线时不会回退到离线发射，Runtime 不反向依赖 FishNet。
+- **服务器装备记录：** 服务器根据角色出生配置创建独立装备实例，向 Owner 同步实例 ID、配置 ID、槽位和装备代次；本地通过出生槽位对应表现实例，网络开火请求使用服务器确认的代次。
+- **初始化保护：** 角色基础属性、运行数据或运动驱动未准备好时，不再启动后续子系统或执行出池复位；补齐模拟配置工厂的文档注释。
+
+### 使用与配置
+
+1. **枪械与弹药：** 在 `GunWeaponSO` 上设置继承的 `ProjectileSpeed`、`FireRate`、`MaxAmmo` 与 `Ammunition`。弹药 `CollisionRadius=0` 使用射线，大于 0 使用球形扫掠；`GravityScale=0` 不受重力影响；`MaxLifetime` 控制逻辑子弹最大存活时间。
+2. **离线场景：** 放置一个 `OfflineAmmunitionDriver` 管理该物理世界的多种武器子弹，不要每把枪挂一个。`hitMask` 默认使用物理默认检测层，需包含墙体与目标；`triggerInteraction` 默认忽略 Trigger，使用触发器受击框时改为 Collide。配置视觉资源时必须绑定场景中的 `SimpleObjectPoolSystem` 到 `visualPool`；`maxActiveImpacts` 默认 128，设为 0 关闭命中特效，超限回收最早的效果。
+3. **离线角色：** 根节点挂 `OfflineWeaponFireSource`；在 `OfflineCharacterSpawner` 上绑定 `shootingCamera` 与 `ammunitionDriver`，由生成器注入。手动放置角色时直接绑定采样器的相机和驱动。相机必须是实际渲染玩家画面的启用透视 Camera。
+4. **表现预制体：** 弹药 `VisualPrefab` 根节点挂 `AmmunitionView`，其 TrailRenderer 可留空；`ImpactPrefab` 根节点挂 `AmmunitionImpactView`，`particleRoot` 留空可显示静态弹坑，`retainTime` 默认 5 秒，`surfaceOffset` 默认 0。未配置相应表现资源时不生成该表现；`ImpactSound` 为空时不播放命中音效。
+5. **网络角色：** 在角色根 NetworkObject 同物体挂 `NiumaFishNetWeaponDriver` 和 `OfflineWeaponFireSource`。`_requestSource` 绑定同根采样器，留空时尝试同物体查找；Owner 提交时自动注入 `Camera.main`，此阶段不需要给网络采样器绑定离线弹道驱动。`_logRequests` 默认开启，持续开火排查结束后可关闭；出生装备复用角色的 `DefaultEquipment1/2/3`，全部留空时服务器确认空手。
+
+### 当前阶段边界
+
+- **网络射击尚未完成服务器实弹执行。** 当前 ServerRpc 检查连接所有权、请求序号与瞄准数值并返回接收回执；服务器装备代次授权、角色动作限制、合法视点/时序验证、弹量冷却提交、逻辑子弹发射及网络表现广播仍待接入。收到回执不表示已经允许开火或造成伤害。
+- 网络路径暂不播放离线枪焰、音效、后坐力或生成离线子弹，避免把本地表现误当成服务器接受结果。完整装备切换授权、背包换槽和动态库存映射尚未接入，目前按固定出生槽位对应。
+- `AKSO` 到 `GunWeaponSO` 保留脚本 GUID，但旧刚体子弹资源仍需按上面的新弹药配置和视图组件接线；本仓库提交的是模块源码及文档，不包含外部项目的场景、武器资产或 Prefab 改动。
+- 本次提交未重新运行 Unity 编译或自动化测试，不将代码保存或提交视为网络阶段验收通过。
+
 ---
 
 ## 功能

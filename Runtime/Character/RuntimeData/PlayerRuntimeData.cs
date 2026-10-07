@@ -70,7 +70,7 @@ namespace NiumaTPC.Character.RuntimeData
 
         #region 下半身运动状态
 
-         /// <summary>是否瞄准 影响上身/动画树</summary>
+        /// <summary>是否瞄准 影响上身/动画树</summary>
         public bool IsAiming;
         /// <summary>上一帧运动状态</summary>
         public LocomotionState LastLocomotionState = LocomotionState.Idle;
@@ -130,8 +130,37 @@ namespace NiumaTPC.Character.RuntimeData
 
         /// <summary>快捷栏装备意图 -1无意图 >=0对应槽位</summary>
         public int WantsToEquipHotbarIndex = -1;
-        /// <summary>当前装备物品 null为空手</summary>
-        public ItemInstance CurrentItem;
+        
+        private ItemInstance _currentItem;
+
+        /// <summary>
+        /// 当前装备代次，仅在手持逻辑实例改变时递增
+        /// 不随每帧清理、模型回收或动画切换重置
+        /// </summary>
+        public uint EquipmentRevision { get; private set; }
+
+        /// <summary>
+        /// 当前装备物品，null 表示空手
+        /// </summary>
+        public ItemInstance CurrentItem
+        {
+            get => _currentItem;
+
+            set
+            {
+                // 重复设置同一个实例，不算重新切换装备
+                if (ReferenceEquals(_currentItem, value))
+                {
+                    return;
+                }
+
+                // 先计算再提交，溢出时不能绕回旧代次
+                uint nextRevision = checked(EquipmentRevision + 1u);
+
+                _currentItem = value;
+                EquipmentRevision = nextRevision;
+            }
+        }
         /// <summary>指向基准Transform </summary>
         public Transform CurrentAimReference;
 
@@ -143,7 +172,7 @@ namespace NiumaTPC.Character.RuntimeData
         public Vector3 TargetAimPoint;
         /// <summary>相机朝向向量 用于上身/动画</summary>
         public Vector3 CameraLookDirection;
-        
+
         /// <summary>本帧是否想跑</summary>
         public bool WantToRun;
         /// <summary>本帧是否想闪避</summary>
@@ -158,7 +187,7 @@ namespace NiumaTPC.Character.RuntimeData
         public bool WantsDoubleJump;
         /// <summary>二段跳方向</summary>
         public DoubleJumpDirection DoubleJumpDirection = DoubleJumpDirection.Up;
-        
+
         /// <summary>本帧是否想翻越</summary>
         public bool WantsToVault;
         /// <summary>是否低翻越</summary>
@@ -169,12 +198,12 @@ namespace NiumaTPC.Character.RuntimeData
         public VaultObstacleInfo CurrentVaultInfo;
         /// <summary>量化的移动方向(8向)</summary>
         public DesiredDirection QuantizedDirection;
-        
+
         /// <summary>本帧是否进入下落状态</summary>
         public bool WantsToFall;
         /// <summary>本帧是否想开火</summary>
         public bool WantsToFire;
-        
+
         /// <summary>表情1意图</summary>
         public bool WantsExpression1;
         /// <summary>表情2意图</summary>
@@ -285,13 +314,13 @@ namespace NiumaTPC.Character.RuntimeData
 
         public PlayerRuntimeData(NiumaCharacterController player)
         {
-            CurrentHealth =  player.BaseStats.MaxHealth;
+            CurrentHealth = player.BaseStats.MaxHealth;
             CameraTransform = player.PlayerCamera;
             CurrentStamina = player.Config.Core.MaxStamina;
             Override.Clear();
             Arbitration.Clear();
             ActionArbitration.Clear();
-            
+
             SfxQueue = new PlayerSfxEventQueue();
         }
 

@@ -16,13 +16,19 @@ namespace NiumaTPC.Item
         /// 绑定的离线配置
         /// 一旦赋值就不会改变 所有实例共享同一份配置 
         /// </summary>
-        public ItemDefinitionSO BaseData {get; private set; }
+        public ItemDefinitionSO BaseData { get; private set; }
 
         /// <summary>
         /// 当前的堆叠数量 对于无堆叠物品永远是 1 对于消耗品会逐次递减
         /// 当数量归零时 背包系统会将该实例从槽位移除
         /// </summary>
         public int CurrentAmount { get; set; }
+
+        /// <summary>
+        /// 当前远程武器实例独有的状态
+        /// 非远程武器为 null，不由模型对象池重置
+        /// </summary>
+        public RangedWeaponRuntimeState WeaponState { get; }
 
         /// <summary>
         /// 接收静态配置与初始数量 生成一个内存中的独立实例
@@ -36,9 +42,15 @@ namespace NiumaTPC.Item
             //初始化堆叠数量
             CurrentAmount = amount;
 
+            // 只在创建逻辑物品时初始化，不在装备或模型取出时初始化
+            if (baseData is RangedWeaponSO weapon)
+            {
+                WeaponState = new RangedWeaponRuntimeState(weapon.MaxAmmo);
+            }
+
         }
 
-         // 类型转换接口 安全地将配置强转为特定子类 
+        // 类型转换接口 安全地将配置强转为特定子类 
         public T GetSODataAs<T>() where T : ItemDefinitionSO
         {
             // 强转失败会返回 null 上游需自行处理 

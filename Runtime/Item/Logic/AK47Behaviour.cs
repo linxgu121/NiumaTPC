@@ -22,13 +22,19 @@ namespace NiumaTPC.Item
         // 实例数据
         private ItemInstance _instance;
         // 配置
-        private AKSO _akconfig;
-        // 射速
-        private float _fireRate = 0.1f;
+        private GunWeaponSO _akconfig;
+        // 装备时从当前持有者取得，不能跨对象池复用保留旧角色引用
+        private OfflineWeaponFireSource _fireSource;
+
+        // 网络角色提供此接口，枪械本身不引用 FishNet
+        private INetworkWeaponFireRequestSender _networkFireSender;
+
+        // 当前模型这次被装备时取得的代次
+        private uint _equipmentRevision;
+
         // 装备状态
         private bool _isEquipping;
         private float _equipEndTime;
-        private float _lastFireTime;
         // 上一帧瞄准状态
         private bool _wasAiming;
         // IK调度
@@ -41,18 +47,16 @@ namespace NiumaTPC.Item
         public void Initialize(ItemInstance instanceData)
         {
             _instance = instanceData;
-            _akconfig = _instance.BaseData as AKSO;
-            if (_akconfig != null)
-            {
-                float interval = _akconfig.ShootInterval > 0f ? _akconfig.ShootInterval : _akconfig.FireRate;
-                _fireRate = Mathf.Max(0.001f, interval);
-            }
+            _akconfig = instanceData?.BaseData as GunWeaponSO;
         }
 
         // 装备并设置IK
         public void OnEquipEnter(NiumaCharacterController player)
         {
             _player = player;
+            _equipmentRevision = _player != null && _player.RuntimeData != null ? _player.RuntimeData.EquipmentRevision : 0u;
+            _fireSource = _player != null ? _player.GetComponent<OfflineWeaponFireSource>() : null;
+            _networkFireSender = _player != null ? player.GetComponent<INetworkWeaponFireRequestSender>() : null;
             _isEquipping = true;
             if (_leftHandGoal != null && _player != null && _player.RuntimeData != null)
             {
@@ -68,14 +72,14 @@ namespace NiumaTPC.Item
                     _player.RuntimeData.WantsLeftHandIK = true;
                 }
             }
-            
+
             // 立刻设置 muzzle，不等瞄准时再设置
             // 这样 FinalIK 始终有有效的引用，避免切装备时 NullRef
             if (_muzzle != null && _player != null && _player.RuntimeData != null)
             {
                 _player.RuntimeData.CurrentAimReference = _muzzle;
             }
-            
+
             float equipAnimDuration = _akconfig.EquipEndTime;
             _equipEndTime = Time.time + equipAnimDuration;
             if (_akconfig != null && _akconfig.EquipAnim != null && _player != null)
@@ -159,8 +163,8 @@ namespace NiumaTPC.Item
                 }
                 _wasAiming = isAiming;
             }
-            bool isFiring = _player != null && _player.RuntimeData != null && 
-                           _player.RuntimeData.CurrentItem == _instance && 
+            bool isFiring = _player != null && _player.RuntimeData != null &&
+                           _player.RuntimeData.CurrentItem == _instance &&
                            _player.RuntimeData.WantsToFire;
             if (isAiming && isFiring)
             {
@@ -172,6 +176,7 @@ namespace NiumaTPC.Item
         public void OnForceUnequip()
         {
             _isEquipping = false;
+            _equipmentRevision = 0u;
             if (_muzzleFlash != null) _muzzleFlash.Stop();
 
             if (_akconfig != null)
@@ -192,9 +197,56 @@ namespace NiumaTPC.Item
         // 检查冷却并开火
         private void TryFire()
         {
-            if (Time.time - _lastFireTime < _fireRate) return;
-            _lastFireTime = Time.time;
-            if (_muzzleFlash != null) _muzzleFlash.Play();
+            if (_isEquipping || _player == null || _akconfig == null)
+            {
+                return;
+            }
+
+            // 有网络发送组件的角色始终走网络
+            // 发送失败、断线或组件禁用，都不能回退到离线射击
+            if (_networkFireSender != null)
+            {
+                // 缓存组件被销毁时也只停止，不转入离线分支
+                if (_networkFireSender is MonoBehaviour senderComponent &&
+                    senderComponent != null)
+                {
+                    _networkFireSender.TrySubmitFire(
+                        _instance,
+                        _equipmentRevision);
+                }
+
+                // 提交成功不等于开火成功
+                // 本步不执行下方离线登记、枪焰、音效或后坐力
+                return;
+            }
+
+            // 没有网络发送组件的离线角色，保持原有发射流程
+            if (_fireSource == null)
+            {
+                return;
+            }
+
+            if (!_fireSource.TryCreateRequest(
+                    _equipmentRevision,
+                    out WeaponFireRequest request))
+            {
+                return;
+            }
+
+            if (!_fireSource.TryFire(
+                    _instance,
+                    request,
+                    out _,
+                    out _))
+            {
+                return;
+            }
+
+            if (_muzzleFlash != null)
+            {
+                _muzzleFlash.Play();
+            }
+
             if (_akconfig != null && _akconfig.ShootSound != null && _muzzle != null)
             {
                 AudioSource.PlayClipAtPoint(_akconfig.ShootSound, _muzzle.position);
@@ -218,32 +270,6 @@ namespace NiumaTPC.Item
 
             ApplyRecoil();
 
-            if (_akconfig != null && _akconfig.ProjectilePrefab != null && _muzzle != null)
-            {
-                GameObject proj;
-                if (SimpleObjectPoolSystem.Shared != null)
-                {
-                    proj = SimpleObjectPoolSystem.Shared.Spawn(_akconfig.ProjectilePrefab);
-                    proj.transform.SetPositionAndRotation(_muzzle.position, _muzzle.rotation);
-                    proj.transform.SetParent(null, true);
-                }
-                else
-                {
-                    proj = Object.Instantiate(_akconfig.ProjectilePrefab, _muzzle.position, _muzzle.rotation);
-                    proj.transform.parent = null;
-                }
-
-                var rb = proj.GetComponent<Rigidbody>();
-                if (rb != null)
-                {
-                    rb.linearVelocity = _muzzle.forward * _akconfig.ProjectileSpeed;
-                }
-                var simple = proj.GetComponent<SimpleProjectile>();
-                if (simple != null)
-                {
-                    simple.hitSound = _akconfig.ProjectileHitSound;
-                }
-            }
         }
 
         // 应用后坐力
@@ -271,7 +297,11 @@ namespace NiumaTPC.Item
             _wasAiming = false;
             _ikEnableScheduled = false;
             _ikDisableScheduled = false;
-            _lastFireTime = 0f;
+
+            _fireSource = null;
+            _networkFireSender = null;
+            _equipmentRevision = 0u;
+            _player = null;
 
             if (_muzzleFlash != null) _muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
@@ -279,7 +309,15 @@ namespace NiumaTPC.Item
 
         public void OnDespawned()
         {
-            if (_muzzleFlash != null) _muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            if (_muzzleFlash != null)
+            {
+                _muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            }
+
+            _fireSource = null;
+            _networkFireSender = null;
+            _equipmentRevision = 0u;
+            _player = null;
 
         }
     }

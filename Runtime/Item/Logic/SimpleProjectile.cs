@@ -6,7 +6,7 @@ using UnityEngine;
 namespace NiumaTPC.Item
 {
     /// <summary>
-    /// 简单子弹（按当前项目约定重写）：
+    /// 简单子弹
     /// - 有生命时间：到点才回收自身
     /// - 命中指定 Layer：播放击中特效
     /// - 在配置范围内对 IDamageable 发送伤害请求（范围伤害）
@@ -15,6 +15,7 @@ namespace NiumaTPC.Item
     public sealed class SimpleProjectile : MonoBehaviour, IPoolable
     {
         [Header("Lifetime")]
+        [Tooltip("子弹存活时间")]
         [Min(0f)] public float lifeTime = 5f;
 
         [Header("Hit")]

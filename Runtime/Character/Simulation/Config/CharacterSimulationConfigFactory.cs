@@ -11,6 +11,7 @@ namespace NiumaTPC.Character.Simulation
     /// 静态工厂模式
     /// 将角色基础属性与 PlayerSO 行为配置转换为固定 Tick 模拟配置
     /// 模拟层只消费转换后的数据，不直接读取 ScriptableObject
+    /// </summary>
     public static class CharacterSimulationConfigFactory
     {
         #region Public API
