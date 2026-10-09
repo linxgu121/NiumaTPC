@@ -6,33 +6,64 @@
 
 框架面向需要持续扩展的第三人称与动作类项目。当输入、状态切换、动画事件、装备、IK、音频和网络预测逐渐纠缠在一起时，NiumaTPC 将它们拆成职责明确、可以独立替换的层级，并让离线模式与联网模式复用同一套角色模拟规则。
 
-## 本次更新：脚本弹道与网络射击接入（2026-10-07）
+## 脚本弹道与网络射击
 
-### 新增与调整
+射击采用“客户端提交意图、服务器模拟弹道、客户端播放表现”的结构。逻辑子弹由脚本按固定 Tick 推进，不依赖视觉预制体的 Rigidbody 速度或碰撞回调。射击请求从本地拥有者的相机准星采样，枪口用于枪焰与音效，不作为这条弹道的发射起点。
 
-- **脚本驱动弹道：** 新增 `AmmunitionState`、轨迹计算、碰撞查询、模拟器与 `AmmunitionWorld`，记录位置、速度、寿命、累计飞行距离和结束状态。支持射线/球形扫掠、初始重叠检测及曲线子步，不再由枪械给 Rigidbody 施加速度来驱动这条发射流程。
-- **通用枪械与弹药配置：** 将 `AKSO` 更名为 `GunWeaponSO` 并保留脚本 GUID；`RangedWeaponSO` 配置初速度、开火间隔与弹药引用，`AmmunitionDefinitionSO` 配置重力、碰撞半径、寿命和表现资源。`FireRate` 的单位仍是两次开火间隔的秒数。
-- **子弹及命中表现：** 新增 `AmmunitionView`、`AmmunitionImpactView`，通过对象池管理视觉子弹、拖尾、命中特效和弹坑，支持命中、寿命结束及组件停用时清理回收。命中音效单次播放，特效自身的 AudioSource 配置不由命中特效脚本覆盖。
-- **离线射击闭环：** 新增 `OfflineWeaponFireSource` 与 `OfflineAmmunitionDriver`，从当前玩家相机中心采样射线，登记逻辑子弹并统一推进；枪口只负责声光和后坐力表现。角色生成器在激活前注入射击相机与弹道驱动。
-- **武器独立运行时状态：** `ItemInstance` 持有弹匣与冷却状态，切换或回收武器模型不会重新补满弹药。`PlayerRuntimeData` 增加装备代次；请求包含序号、装备代次和瞄准快照，并提供拒绝原因及非法浮点数检查。
-- **FishNet 射击请求：** 新增 `INetworkWeaponFireRequestSender` 和 `NiumaFishNetWeaponDriver`，接入 Owner 提交、发送节流、ServerRpc 接收及 TargetRpc 回执。网络角色发送失败或断线时不会回退到离线发射，Runtime 不反向依赖 FishNet。
-- **服务器装备记录：** 服务器根据角色出生配置创建独立装备实例，向 Owner 同步实例 ID、配置 ID、槽位和装备代次；本地通过出生槽位对应表现实例，网络开火请求使用服务器确认的代次。
-- **初始化保护：** 角色基础属性、运行数据或运动驱动未准备好时，不再启动后续子系统或执行出池复位；补齐模拟配置工厂的文档注释。
+### 实现方式与解决的问题
 
-### 使用与配置
+| 实现方式 | 功能与作用 |
+| --- | --- |
+| `AmmunitionWorld` 与纯数据弹道状态 | 统一管理位置、速度、寿命、累计飞行距离和结束结果，避免每颗子弹各自推进刚体并决定命中 |
+| 射线、球形扫掠与曲线子步 | 检查子弹运动路径与初始重叠，减少高速子弹跨帧越过障碍物的问题 |
+| `WeaponDriver` 与 FishNet RPC | 服务器检查所有权、请求序号、装备代次、角色动作、弹量、冷却、时间窗和视点遮挡，客户端不直接决定实际发射 |
+| Owner 即时表现与预测弹 | 请求提交时播放枪焰、枪声、后坐力及视觉子弹，减少等待网络往返造成的开火迟钝 |
+| `ShotRequestKey` 与预测认领 | 用服务器武器实例、装备代次和请求序号关联预测弹；权威发射通知到达后复用视图并平滑校正，避免生成两颗视觉子弹 |
+| 弹量快照与在途请求预算 | 客户端预占未确认请求的弹量，服务器回执更新预算，避免连续开火重复使用同一份剩余弹量 |
+| `AmmunitionView.BindingId` 与对象池 | 将视图租用编号和服务器子弹编号分开，避免旧消息操作已经回收复用的对象 |
+| 发射、结束与回执分工 | 远端根据确认通知播放开火；Owner 不重复播放回执表现，拒绝、结束或预测超时会清理对应视觉对象 |
 
-1. **枪械与弹药：** 在 `GunWeaponSO` 上设置继承的 `ProjectileSpeed`、`FireRate`、`MaxAmmo` 与 `Ammunition`。弹药 `CollisionRadius=0` 使用射线，大于 0 使用球形扫掠；`GravityScale=0` 不受重力影响；`MaxLifetime` 控制逻辑子弹最大存活时间。
-2. **离线场景：** 放置一个 `OfflineAmmunitionDriver` 管理该物理世界的多种武器子弹，不要每把枪挂一个。`hitMask` 默认使用物理默认检测层，需包含墙体与目标；`triggerInteraction` 默认忽略 Trigger，使用触发器受击框时改为 Collide。配置视觉资源时必须绑定场景中的 `SimpleObjectPoolSystem` 到 `visualPool`；`maxActiveImpacts` 默认 128，设为 0 关闭命中特效，超限回收最早的效果。
-3. **离线角色：** 根节点挂 `OfflineWeaponFireSource`；在 `OfflineCharacterSpawner` 上绑定 `shootingCamera` 与 `ammunitionDriver`，由生成器注入。手动放置角色时直接绑定采样器的相机和驱动。相机必须是实际渲染玩家画面的启用透视 Camera。
-4. **表现预制体：** 弹药 `VisualPrefab` 根节点挂 `AmmunitionView`，其 TrailRenderer 可留空；`ImpactPrefab` 根节点挂 `AmmunitionImpactView`，`particleRoot` 留空可显示静态弹坑，`retainTime` 默认 5 秒，`surfaceOffset` 默认 0。未配置相应表现资源时不生成该表现；`ImpactSound` 为空时不播放命中音效。
-5. **网络角色：** 在角色根 NetworkObject 同物体挂 `NiumaFishNetWeaponDriver` 和 `OfflineWeaponFireSource`。`_requestSource` 绑定同根采样器，留空时尝试同物体查找；Owner 提交时自动注入 `Camera.main`，此阶段不需要给网络采样器绑定离线弹道驱动。`_logRequests` 默认开启，持续开火排查结束后可关闭；出生装备复用角色的 `DefaultEquipment1/2/3`，全部留空时服务器确认空手。
+`GunWeaponSO` 提供通用枪械资源，继承 `RangedWeaponSO` 的初速度、开火间隔、弹匣容量及弹药引用；`AmmunitionDefinitionSO` 提供弹药的重力、碰撞半径、寿命与视觉资源。武器运行时弹量和冷却保存在 `ItemInstance`，不是保存在可回收的枪械模型上。
 
-### 当前阶段边界
+### 场景接入
 
-- **网络射击尚未完成服务器实弹执行。** 当前 ServerRpc 检查连接所有权、请求序号与瞄准数值并返回接收回执；服务器装备代次授权、角色动作限制、合法视点/时序验证、弹量冷却提交、逻辑子弹发射及网络表现广播仍待接入。收到回执不表示已经允许开火或造成伤害。
-- 网络路径暂不播放离线枪焰、音效、后坐力或生成离线子弹，避免把本地表现误当成服务器接受结果。完整装备切换授权、背包换槽和动态库存映射尚未接入，目前按固定出生槽位对应。
-- `AKSO` 到 `GunWeaponSO` 保留脚本 GUID，但旧刚体子弹资源仍需按上面的新弹药配置和视图组件接线；本仓库提交的是模块源码及文档，不包含外部项目的场景、武器资产或 Prefab 改动。
-- 本次提交未重新运行 Unity 编译或自动化测试，不将代码保存或提交视为网络阶段验收通过。
+1. **角色对象：** 沿用移动接入的 `NiumaCharacterController` 与 `NiumaFishNetPredictionDriver`（文件 `PredictionDriver.cs`），在角色根 `NetworkObject` 同物体上挂 `WeaponDriver` 与 `OfflineWeaponFireSource`。采样器在这条链路中不启动离线弹道世界；`WeaponDriver._requestSource` 留空时查找同物体组件，采样使用 Owner 的 `Camera.main`，场景主相机必须属于本地玩家。
+2. **出生装备：** 角色的 `DefaultEquipment1/2/3` 为服务器创建独立装备实例提供定义，空槽保持原位置，全部留空表示空手。客户端使用服务器同步的装备身份发射，而不是把本地表现对象作为权威装备记录。
+3. **弹道世界：** 每个物理世界设置一个场景网络对象，同物体挂 `NetworkObject`、`AmmunitionDriver` 与 `AmmunitionPresenter`，并保证它对本局玩家可见。不要给每个玩家或视觉子弹各挂一个世界驱动，也不要同时运行 `OfflineAmmunitionDriver` 推进同一条发射流程。
+4. **对象池与弹药目录：** `AmmunitionPresenter._visualPool` 绑定场景 `SimpleObjectPoolSystem`；`_ammunitionDefinitions` 填本局全部可用弹药 SO，不是某个玩家的武器列表。每个弹药 `DefinitionId` 必须非空且唯一，两端配置 ID 与资源映射保持一致。
+5. **视觉子弹：** 弹药的 `VisualPrefab` 根节点挂 `AmmunitionView`，TrailRenderer 引用可以留空；它只跟随脚本计算的轨迹，不作为权威碰撞或伤害入口。
+6. **命中特效：** `ImpactPrefab` 根节点挂 `AmmunitionImpactView`，`particleRoot` 留空可用于静态弹坑，`retainTime` 默认 5 秒，`surfaceOffset` 默认 0。未配置对应 Prefab 时不生成该表现，`ImpactSound` 留空时不播放一次性命中音效。特效自带 AudioSource 的音频和循环配置由 Prefab 自己管理。
+7. **枪械表现：** `AK47Behaviour` 的 `_muzzle` 绑定视觉枪口，`_leftHandGoal` 绑定左手 IK 握点。`GunWeaponSO.MuzzleVFXPrefab` 和 `ShootSound` 可留空；每把已装备的枪复用一份池化枪焰，卸载或停用时回收。枪焰粒子使用 `Loop=false`、`PlayOnAwake=false`、`StopAction=None`，不挂自毁脚本、子弹视图或 NetworkObject。
+
+### 弹道与网络配置
+
+| 配置 | 含义 |
+| --- | --- |
+| `RangedWeaponSO.ProjectileSpeed` | 武器提供的子弹初速度，单位 m/s |
+| `RangedWeaponSO.FireRate` | 两次开火的间隔，单位秒，不是每秒发数 |
+| `RangedWeaponSO.MaxAmmo` / `Ammunition` | 弹匣容量与使用的弹药配置 |
+| `AmmunitionDefinitionSO.CollisionRadius` | 0 使用射线，大于 0 使用球形扫掠 |
+| `GravityScale` / `MaxLifetime` | 重力倍率与最大存活秒数；重力倍率为 0 时不下坠 |
+| `AmmunitionDriver._hitMask` | 权威弹道可命中的层，包含墙体、地形和目标碰撞体 |
+| `_triggerInteraction` | 默认 Ignore；使用 Trigger 受击框时设为 Collide |
+| `AmmunitionPresenter._visualBlockMask` | 只选服务器也会阻挡子弹的静态墙体与地形；Nothing 关闭画面遮挡检查，不改变服务器命中 |
+| `_predictionTimeout` | 默认 2 秒，等待权威发射通知的最长时间；超时只清理预测画面，不自行释放弹量预算 |
+| `_confirmationBlendTime` | 默认 0.08 秒，预测弹认领后消除视觉位置误差的时间；0 表示立即校正 |
+| `_maxActiveImpacts` | 默认 128，超限回收最早的特效；0 不生成命中特效 |
+| `WeaponDriver._maxRequestAge` / `_maxRequestFutureLead` | 默认 0.75 / 0.1 秒，限制请求落后及领先服务器的时间，不是历史回溯窗口 |
+| `_maxAimOriginDistance` | 默认 4 米，射击视点与服务器角色胶囊中心的最大距离 |
+| `_maxAimOriginLateralDistance` / `_maxAimOriginForwardDistance` | 默认 2 / 0.5 米，限制视点相对胶囊中心的侧向及前向偏移，容纳合法肩位视角 |
+| `_aimProbeRadius` / `_aimObstructionMask` | 默认探测半径 0.05 米；遮挡层须包含实体墙体与地形，不得为 Nothing，查询排除射手自身并忽略 Trigger |
+| `_logRequests` / `_logEnds` | 默认开启，分别打印请求处理与子弹结束信息，可按排查需要关闭 |
+
+### 职责与使用边界
+
+- `IWeaponFirePresentation` 只处理枪械表现，不发送请求、不生成权威子弹、不扣弹；后坐力只影响本地 Owner 的后续视角，不修改已经采样的本发射线
+- 实际命中由服务器弹道决定，客户端静态遮挡只控制飞行画面；伤害结算、装填和历史回溯不属于这里已提供的射击能力
+- 装备身份以服务器出生槽位记录为基础；动态库存映射、背包换槽和装备切换授权需要由游戏装备流程对接，不由客户端自行确认
+- 枪械模型不匹配时跳过该次表现，不强制切换装备；新加入客户端不补发此前的在途子弹
+- 枪械发射要求运行网络角色与弹道世界；本地单人射击也需要 Host，组件本身不负责自动启动 Host。缺少发送组件或断线时不会回退离线发射
+- 仓库提供模块源码与接入说明，使用项目需准备匹配的角色配置、动画、枪械和特效资源；Host 与客户端应使用兼容的 RPC 代码及配置
 
 ---
 
@@ -50,7 +81,7 @@
 - 普通跳跃、按移动状态区分的起跳速度、二段跳、下落和多级落地。
 - 翻滚与闪避，支持独立配置位移、持续时间、进度曲线和重力规则。
 - 低位与高位翻越，支持环境探测、目标对齐、固定 Tick 轨迹和玩法开关。
-- 滑铲输入、输入缓冲和配置结构；滑铲权威运动与表现状态仍在开发。
+- 滑铲固定 Tick 位移、速度衰减、最短持续时间与跳跃输入缓冲；跳跃继承剩余水平速度，低速或撞墙结束滑铲
 
 ### 角色表现
 
@@ -59,6 +90,12 @@
 - 瞄准、手部 IK、翻越 IK 与不同 IK 后端适配。
 - 相机跟随、自由观察、瞄准视角以及本地网络角色自动绑定。
 - 装备、背包、武器行为、音效请求和对象池基础能力。
+
+### 角色数据与选择
+
+- 角色定义、基础属性、展示资源和游戏预制体分别配置，通过目录服务按角色标识查询
+- 选角会话、队伍席位与确认状态分离，支持队伍重复角色限制和选择结果锁定
+- 角色预览和正式角色生成使用独立入口，界面展示不承担角色权威运动
 
 ### 网络同步
 
@@ -144,9 +181,9 @@ CharacterSimulationState
 
 #### 持枪动画遮罩与 IK 配置
 
-- `PlayerSO.Core.UpperBodyMask` 决定第 1 层装备动画覆盖哪些部位。当前示例使用 `Assets/Game/Player/Config/HeldItemArms.mask`：只启用双臂、手指和手部 IK，关闭 Body、Head、Root、双腿和足部 IK；Transform 列表为空，使用 Humanoid 部位映射，不绑定某个模型的骨骼路径。
+- `PlayerSO.Core.UpperBodyMask` 决定第 1 层装备动画覆盖哪些部位。持枪走跑可使用只启用双臂、手指和手部 IK 的 Humanoid 遮罩，关闭 Body、Head、Root、双腿和足部 IK，让躯干继续参与移动动画；遮罩资源由使用项目提供
 - 躯干继续播放第 0 层的走跑动作，保留迈步时的躯干反向调整。将 Body 纳入静态持枪层可能覆盖这部分动作，导致胸口和枪跟着骨盆一起左右侧倾。正常的跑步转体仍会保留，这个配置并不是锁死上半身。
-- 当前 `Player` 预制体的 `AimIK / Solver / Bones` 中，骨盆（`腰`）权重为 0，脊柱仍参与瞄准，避免枪口校正直接扭动下半身。`FullBodyBipedIK` 的骨盆引用仍需保留，不能因此删除。
+- `AimIK / Solver / Bones` 可将骨盆权重设为 0，保留脊柱参与瞄准，减少枪口校正直接扭动下半身；这不代表删除 `FullBodyBipedIK` 的骨盆引用，具体权重需按角色骨架和动画调整
 - `HoldPositionOffset` / `HoldRotationOffset` 调整枪相对右手挂点的位置与朝向；武器上的 `LeftHandGoal` 决定左手握点。这些值与角色骨架、枪模型有关，不能直接复制另一角色的数值。先验证遮罩，再单独调握点，避免用 IK 强拉去掩盖动画层配置问题。
 
 ### 5. 仲裁器管线

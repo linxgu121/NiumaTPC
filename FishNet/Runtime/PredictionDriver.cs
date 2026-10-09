@@ -14,15 +14,15 @@ using NiumaTPC.Character.Traversal;
 namespace NiumaTPC.FishNet
 {
     /// <summary>
-    /// NiumaTPC 与 FishNet 预测系统之间的适配器。
+    /// NiumaTPC 与 FishNet 预测系统之间的适配器
     ///
     /// 本类负责：
-    /// 1. 接收 FishNet 固定 Tick。
-    /// 2. 管理角色移动控制权。
-    /// 3. 后续提交 Replicate 与 Reconcile。
+    /// 1. 接收 FishNet 固定 Tick
+    /// 2. 管理角色移动控制权
+    /// 3. 后续提交 Replicate 与 Reconcile
     ///
-    /// 它不负责实现具体移动规则；
-    /// 具体移动仍由 CharacterSimulationRunner 执行。
+    /// 它不负责实现具体移动规则
+    /// 具体移动仍由 CharacterSimulationRunner 执行
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(NiumaCharacterController))]
@@ -34,7 +34,7 @@ namespace NiumaTPC.FishNet
         [SerializeField]
         [Tooltip("当前网络角色的 NiumaCharacterController；为空时会自动获取同物体组件。")]
         private NiumaCharacterController _player;
-        
+
         [SerializeField]
         [Tooltip("离线固定 Tick 驱动；网络启动时会自动禁用,防止离线驱动和 FishNet 同时移动角色。")]
         private OfflineCharacterSimulationDriver _offlineDriver;
@@ -62,20 +62,25 @@ namespace NiumaTPC.FishNet
 
         private CharacterSimulationRunner _runner;
 
+        // 只记录服务器正常推进后的结果
+        // 客户端预测和校正重放不能覆盖它
+        private CharacterSimulationState _serverSimulationState;
+        private bool _hasServerSimulationState;
+
         /// <summary>
-        /// FishNet 当前是否已经取得角色模拟控制权。
+        /// FishNet 当前是否已经取得角色模拟控制权
         /// </summary>
         private bool _networkSimulationActive;
 
         /// <summary>
-        /// 网络接管前，角色是否已经处于外部状态驱动模式。
-        /// 释放网络控制时需要恢复。
+        /// 网络接管前，角色是否已经处于外部状态驱动模式
+        /// 释放网络控制时需要恢复
         /// </summary>
         private bool _externalStateDrivenBeforeNetwork;
         private bool _networkAppliedExternalStateDrive;
 
         /// <summary>
-        /// 网络层是否已经为该角色应用本地输入所有权规则。
+        /// 网络层是否已经为该角色应用本地输入所有权规则
         /// </summary>
         private bool _inputOwnershipApplied;
 
@@ -120,16 +125,41 @@ namespace NiumaTPC.FishNet
 
         #endregion
 
+        #region 服务器模拟状态查询
+
+        /// <summary>
+        /// 获取服务器最近完成的一次模拟结果
+        /// 返回值副本，调用者不能借此修改模拟器
+        /// </summary>
+        public bool TryGetServerSimulationState(out CharacterSimulationState state)
+        {
+            state = default;
+
+            if (!isActiveAndEnabled ||
+                !IsServerInitialized ||
+                !_networkSimulationActive ||
+                _runner == null ||
+                !_hasServerSimulationState)
+            {
+                return false;
+            }
+
+            state = _serverSimulationState;
+            return true;
+        }
+
+        #endregion
+
         #region Unity Lifecycle(Unity的生命周期)
 
         private void Awake()
         {
-            if(_player == null)
+            if (_player == null)
             {
                 _player = GetComponent<NiumaCharacterController>();
             }
 
-            if(_offlineDriver == null)
+            if (_offlineDriver == null)
             {
                 TryGetComponent(out _offlineDriver);
             }
@@ -159,7 +189,7 @@ namespace NiumaTPC.FishNet
 
             ApplyInputOwnership();
 
-            Debug.Log( 
+            Debug.Log(
             $"[NiumaFishNet] 网络驱动已接管角色：" +
             $"ObjectId={ObjectId}, " +
             $"OwnerId={OwnerId}, " +
@@ -176,6 +206,22 @@ namespace NiumaTPC.FishNet
             ResetPresentationSnapshotTracking();
         }
 
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+
+            _serverSimulationState = default;
+            _hasServerSimulationState = false;
+        }
+
+        public override void OnStopServer()
+        {
+            _serverSimulationState = default;
+            _hasServerSimulationState = false;
+
+            base.OnStopServer();
+        }
+
         public override void OnOwnershipClient(NetworkConnection prevOwner)
         {
             if (!_networkSimulationActive)
@@ -190,6 +236,7 @@ namespace NiumaTPC.FishNet
             ReleaseInputOwnership();
             ApplyInputOwnership();
         }
+
 
         #endregion
 
@@ -223,7 +270,7 @@ namespace NiumaTPC.FishNet
                  * 远端副本不运行本地输入翻译器，
                  * 其移动黑板由 FishNet 模拟结果写入。
                  */
-                _player.SetExternalSimulationStateDriven(true,clearLocalIntent: false);
+                _player.SetExternalSimulationStateDriven(true, clearLocalIntent: false);
             }
 
             _inputOwnershipApplied = true;
@@ -232,7 +279,7 @@ namespace NiumaTPC.FishNet
                 $"[NiumaFishNet] 输入所有权：" +
                 $"ObjectId={ObjectId}, " +
                 $"LocalOwner={hasLocalInputAuthority}, " +
-                $"InputBlocked={_player.IsInputBlocked},"+
+                $"InputBlocked={_player.IsInputBlocked}," +
                 $"ExternalStateDriven=" +
                 $"{_player.IsExternalSimulationStateDriven}",
                 this);
@@ -279,17 +326,17 @@ namespace NiumaTPC.FishNet
 
             PrintTickHeartbeat();
 
-             /*
-             *
-             * 1. 拥有者构造 CharacterInputCommand。
-             * 2. 调用 FishNet Replicate。
-             * 3. 客户端与服务器执行同一个模拟器。
-             */
+            /*
+            *
+            * 1. 拥有者构造 CharacterInputCommand。
+            * 2. 调用 FishNet Replicate。
+            * 3. 客户端与服务器执行同一个模拟器。
+            */
 
-            NiumaReplicateData data =  BuildReplicateData();
+            NiumaReplicateData data = BuildReplicateData();
 
             PerformReplicate(data);
-            
+
         }
 
         protected override void TimeManager_OnPostTick()
@@ -298,7 +345,7 @@ namespace NiumaTPC.FishNet
             {
                 return;
             }
-            
+
             /*
              * Reconcile 负责修正拥有者的预测模拟
              * PresentationState 负责告诉观察者应该播放什么表现
@@ -316,23 +363,20 @@ namespace NiumaTPC.FishNet
         /// </summary>
         private NiumaReplicateData BuildReplicateData()
         {
-            if(!IsOwner || _commandBuilder == null || _player.InputPipeline == null || _player.RuntimeData == null)
+            if (!IsOwner || _commandBuilder == null || _player.InputPipeline == null || _player.RuntimeData == null)
             {
                 return default;
             }
 
             ProcessedInputData input = _player.InputPipeline.Current.currentFrameData.Processed;
 
-            /*
-             * 这里的 Tick 只是临时值。
-             * NiumaReplicateData 进入 FishNet 后，
-             * FishNet 会为其设置真正的网络 Tick。
-             */
+            // 新命令读取本地视角输入源
+            // 不读取会被历史重放覆盖的 Authority 朝向
             CharacterInputCommand command = _commandBuilder.Build(
                 tick: TimeManager.LocalTick,
                 input: in input,
-                viewYaw: _player.RuntimeData.AuthorityYaw,
-                viewPitch: _player.RuntimeData.AuthorityPitch,
+                viewYaw: _player.RuntimeData.ViewYaw,
+                viewPitch: _player.RuntimeData.ViewPitch,
                 pitchLimits: _player.Config.Core.PitchLimits);
 
             if (command.HasButton(CharacterInputButtons.Jump))
@@ -341,7 +385,7 @@ namespace NiumaTPC.FishNet
                 _player.InputPipeline.ConsumeJumpPressed();
             }
 
-             if (command.HasButton(CharacterInputButtons.Roll))
+            if (command.HasButton(CharacterInputButtons.Roll))
             {
                 _player.InputPipeline.ConsumeRollPressed();
             }
@@ -373,7 +417,7 @@ namespace NiumaTPC.FishNet
             ReplicateState replicateState = ReplicateState.Invalid,
             Channel channel = Channel.Unreliable)
         {
-            if(_runner == null || _player.RuntimeData == null)
+            if (_runner == null || _player.RuntimeData == null)
             {
                 return;
             }
@@ -383,21 +427,29 @@ namespace NiumaTPC.FishNet
             command = SanitizeCommand(in command);
 
             /*
-             * 能否冲刺由角色运行时属性决定，
-             * 不接受客户端在网络包中直接声明。
+             * 能否冲刺由角色运行时属性决定
+             * 不接受客户端在网络包中直接声明
              */
             bool canSprint = !_player.RuntimeData.IsStaminaDepleted && _player.RuntimeData.CurrentStamina > 0f;
-            
+
             bool isHandsEmpty = _player.RuntimeData.CurrentItem == null;
 
             float tickDeltaTime = (float)TimeManager.TickDelta;
 
-            CharacterSimulationState state = _runner.Simulate(in command, canSprint,isHandsEmpty ,tickDeltaTime);
+            CharacterSimulationState state = _runner.Simulate(in command, canSprint, isHandsEmpty, tickDeltaTime);
+
+            // 只保存服务器正常推进的结果
+            // 不接受客户端预测或校正重放产生的结果
+            if (IsServerInitialized && replicateState.ContainsTicked() && !replicateState.ContainsReplayed())
+            {
+                _serverSimulationState = state;
+                _hasServerSimulationState = true;
+            }
 
             /*
-             * 纯观察客户端仍需执行 FishNet 的远端模拟，
-             * 但不能用默认或推测的 Replicate 数据覆盖服务器表现快照。
-             * Owner 与服务器继续使用模拟结果驱动自己的表现黑板。
+             * 纯观察客户端仍需执行 FishNet 的远端模拟
+             * 但不能用默认或推测的 Replicate 数据覆盖服务器表现快照
+             * Owner 与服务器继续使用模拟结果驱动自己的表现黑板
              */
             if (!IsPureObserverClient)
             {
@@ -411,12 +463,12 @@ namespace NiumaTPC.FishNet
         #region Reconcile(状态调和)
 
         /// <summary>
-        /// 当前 Tick 模拟完成后创建权威状态。
-        /// FishNet 服务器会把它发送给拥有者客户端。
+        /// 当前 Tick 模拟完成后创建权威状态
+        /// FishNet 服务器会把它发送给拥有者客户端
         /// </summary>
         public override void CreateReconcile()
         {
-            if(!_networkSimulationActive || _runner == null)
+            if (!_networkSimulationActive || _runner == null)
             {
                 return;
             }
@@ -429,13 +481,13 @@ namespace NiumaTPC.FishNet
         }
 
         /// <summary>
-        /// 客户端收到服务器权威状态后恢复模拟器，
-        /// 随后 FishNet 会重新执行该 Tick 之后的输入。
+        /// 客户端收到服务器权威状态后恢复模拟器
+        /// 随后 FishNet 会重新执行该 Tick 之后的输入
         /// </summary>
         [Reconcile]
         private void PerformReconcile(NiumaReconcileData data, Channel channel = Channel.Unreliable)
         {
-            if(_runner == null)
+            if (_runner == null)
             {
                 return;
             }
@@ -445,8 +497,8 @@ namespace NiumaTPC.FishNet
             _runner.ApplyState(in state);
 
             /*
-             * Reconcile 始终恢复模拟器状态；
-             * 纯观察客户端的表现黑板只接受服务器表现快照。
+             * Reconcile 始终恢复模拟器状态
+             * 纯观察客户端的表现黑板只接受服务器表现快照
              */
             if (!IsPureObserverClient)
             {
@@ -464,7 +516,7 @@ namespace NiumaTPC.FishNet
         private bool IsPureObserverClient => IsClientInitialized && !IsServerInitialized && !Owner.IsLocalClient;
 
         /// <summary>
-        /// 判断 candidate Tick 是否比 current Tick 更新。
+        /// 判断 candidate Tick 是否比 current Tick 更新
         /// 使用 uint 环形序列比较，能够正确处理最大值回绕到 0
         /// </summary>
         private static bool IsTickNewer(uint candidate, uint current)
@@ -477,12 +529,12 @@ namespace NiumaTPC.FishNet
         }
 
         /// <summary>
-        /// 服务器按照配置的 Tick 间隔发送表现快照。
+        /// 服务器按照配置的 Tick 间隔发送表现快照
         /// 这里只发送高层状态，不发送动画片段或动画时间
         /// </summary>
         private void TrySendPresentationState()
         {
-            if(!IsServerInitialized || _runner == null)
+            if (!IsServerInitialized || _runner == null)
             {
                 return;
             }
@@ -491,7 +543,7 @@ namespace NiumaTPC.FishNet
 
             CharacterSimulationState simulationState = _runner.State;
 
-            if(simulationState.Tick % (uint)intervalTicks != 0u)
+            if (simulationState.Tick % (uint)intervalTicks != 0u)
             {
                 return;
             }
@@ -519,7 +571,7 @@ namespace NiumaTPC.FishNet
              * 2. 不是服务器或 Host 的服务器实例；
              * 3. 本机不是该角色的 Owner。
              */
-            if(!IsPureObserverClient || _player == null || _player.RuntimeData == null)
+            if (!IsPureObserverClient || _player == null || _player.RuntimeData == null)
             {
                 return;
             }
@@ -528,7 +580,7 @@ namespace NiumaTPC.FishNet
              * Unreliable 可能发生乱序。
              * 已接受过快照后，只允许更新的 Tick 继续进入。
              */
-            if(_hasReceivedPresentationSnapshot && !IsTickNewer(presentationState.Tick, _lastReceivedPresentationTick))
+            if (_hasReceivedPresentationSnapshot && !IsTickNewer(presentationState.Tick, _lastReceivedPresentationTick))
             {
                 return;
             }
@@ -538,7 +590,7 @@ namespace NiumaTPC.FishNet
 
             ApplyPresentationState(in presentationState);
 
-            PrintPresentationSnapshotDiagnostic(in presentationState,channel);
+            PrintPresentationSnapshotDiagnostic(in presentationState, channel);
         }
 
         /// <summary>
@@ -576,9 +628,9 @@ namespace NiumaTPC.FishNet
                 return false;
             }
 
-            if(_player.Config == null || _player.Config.Core == null)
+            if (_player.Config == null || _player.Config.Core == null)
             {
-                Debug.LogError("[NiumaFishNet] 网络角色没有配置 " + "PlayerSO 或 CoreSO。",this);
+                Debug.LogError("[NiumaFishNet] 网络角色没有配置 " + "PlayerSO 或 CoreSO。", this);
 
                 return false;
             }
@@ -604,7 +656,7 @@ namespace NiumaTPC.FishNet
              * 离线驱动只能用于无网络测试。
              * 网络启动后必须禁用，否则会出现一次 Tick 被移动两遍。
              */
-            if(_offlineDriver != null && _offlineDriver.enabled)
+            if (_offlineDriver != null && _offlineDriver.enabled)
             {
                 _offlineDriver.enabled = false;
 
@@ -632,14 +684,14 @@ namespace NiumaTPC.FishNet
                 return;
             }
 
-            if(_player != null)
+            if (_player != null)
             {
-                if(_networkAppliedExternalJumpSimulation)
+                if (_networkAppliedExternalJumpSimulation)
                 {
                     _player.SetExternalJumpSimulationActive(_externalJumpSimulationBeforeNetwork);
                 }
 
-                if(_player.MotionDriver != null)
+                if (_player.MotionDriver != null)
                 {
                     _player.MotionDriver.SetExternalSimulationActive(false);
                 }
@@ -652,13 +704,13 @@ namespace NiumaTPC.FishNet
             _commandBuilder = null;
             _networkSimulationActive = false;
 
-            Debug.Log( "[NiumaFishNet] 网络驱动已释放角色模拟控制权。",this);
+            Debug.Log("[NiumaFishNet] 网络驱动已释放角色模拟控制权。", this);
         }
 
         #endregion
 
         #region Validation(校验)
-        
+
         /// <summary>
         /// 客户端拥有对象不代表其提交的数据可信。
         /// 客户端预测与服务器模拟都使用同一份清洗结果。
@@ -667,7 +719,7 @@ namespace NiumaTPC.FishNet
         {
             Vector2 move = source.Move;
 
-            if(!IsFinite(move.x) || !IsFinite(move.y))
+            if (!IsFinite(move.x) || !IsFinite(move.y))
             {
                 move = Vector2.zero;
             }
@@ -684,11 +736,11 @@ namespace NiumaTPC.FishNet
 
             float maximumPitch = Mathf.Max(pitchLimits.x, pitchLimits.y);
 
-            float viewPitch = IsFinite(source.ViewPitch) ? 
-                Mathf.Clamp(source.ViewPitch,minimumPitch, maximumPitch) : 
-                Mathf.Clamp( _runner.State.ViewPitch,minimumPitch,maximumPitch);
+            float viewPitch = IsFinite(source.ViewPitch) ?
+                Mathf.Clamp(source.ViewPitch, minimumPitch, maximumPitch) :
+                Mathf.Clamp(_runner.State.ViewPitch, minimumPitch, maximumPitch);
 
-            CharacterInputButtons allowedButtons = 
+            CharacterInputButtons allowedButtons =
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
                 CharacterInputButtons.Jump | CharacterInputButtons.Dodge |
                 CharacterInputButtons.Roll | CharacterInputButtons.Slide |
@@ -696,7 +748,7 @@ namespace NiumaTPC.FishNet
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 
-            if((buttons & CharacterInputButtons.Sprint) != 0)
+            if ((buttons & CharacterInputButtons.Sprint) != 0)
             {
                 buttons &= ~CharacterInputButtons.Walk;
             }
@@ -714,16 +766,22 @@ namespace NiumaTPC.FishNet
 
         #region Runtime Data Bridge
 
+        /// <summary>
+        /// 为没有本地输入的服务器副本写入命令数据
+        /// 本地 Owner 的输入由输入管线维护，不接受历史重放覆盖
+        /// </summary>
         private void WriteInputToRuntimeData(in CharacterInputCommand command)
         {
+            if (Owner.IsLocalClient)
+            {
+                return;
+            }
+
             PlayerRuntimeData data = _player.RuntimeData;
 
-            _player.RuntimeData.MoveInput = command.Move;
+            data.MoveInput = command.Move;
 
-            /*
-             * 服务器副本没有本地 ViewRotationProcessor，
-             * 因此必须记录客户端经过校验后的视角 Yaw。
-             */
+            // 服务器上的远端角色没有本地视角输入处理器
             data.AuthorityYaw = Mathf.Repeat(command.ViewYaw, 360f);
         }
 
@@ -731,11 +789,15 @@ namespace NiumaTPC.FishNet
         {
             PlayerRuntimeData data = _player.RuntimeData;
 
+            bool useLocalView = Owner.IsLocalClient;
+
+            // 本地 Owner 的相机和 IK 跟随实时视角
+            // 服务器远端副本继续使用网络命令与模拟结果
             CharacterAimPresentationBridge.Apply(
                 data,
                 state.IsAiming,
-                data.AuthorityYaw,
-                state.ViewPitch);
+                useLocalView ? data.ViewYaw : data.AuthorityYaw,
+                useLocalView ? data.ViewPitch : state.ViewPitch);
 
             CharacterVaultPresentationBridge.Apply(
                 data,
@@ -750,7 +812,7 @@ namespace NiumaTPC.FishNet
                 state.ActionTick,
                 state.ActionDirection);
 
-            ApplyAirborneTransition(data,state.IsGrounded,state.VerticalVelocity);
+            ApplyAirborneTransition(data, state.IsGrounded, state.VerticalVelocity);
 
             ApplyDoubleJumpTransition(data, state.HasPerformedDoubleJumpInAir);
             /*
@@ -758,7 +820,7 @@ namespace NiumaTPC.FishNet
              * 因此必须由网络桥记录上一个运动档位。
              * PlayerStopState 会根据它选择走路、慢跑或冲刺停止动画。
             */
-            if(data.CurrentLocomotionState != state.LocomotionState)
+            if (data.CurrentLocomotionState != state.LocomotionState)
             {
                 data.LastLocomotionState = data.CurrentLocomotionState;
             }
@@ -805,12 +867,12 @@ namespace NiumaTPC.FishNet
             data.JustLeftGround = justLeftGround;
             data.JustLanded = justLanded;
 
-            if(justLeftGround && nextVerticalVelocity > 0f)
+            if (justLeftGround && nextVerticalVelocity > 0f)
             {
                 data.WantsToJump = true;
             }
 
-            if(nextIsGrounded)
+            if (nextIsGrounded)
             {
                 data.WantsToFall = false;
             }
@@ -828,7 +890,7 @@ namespace NiumaTPC.FishNet
         {
             bool justPerformedDoubleJump = !data.HasPerformedDoubleJumpInAir && nextHasPerformedDoubleJumpInAir;
 
-            if(!justPerformedDoubleJump)
+            if (!justPerformedDoubleJump)
             {
                 return;
             }
@@ -843,7 +905,7 @@ namespace NiumaTPC.FishNet
         /// </summary>
         private static Vector2 ConvertWorldDirectionToMoveInput(Vector3 worldDirection, float characterYaw)
         {
-            if(worldDirection.sqrMagnitude < 0.0001f)
+            if (worldDirection.sqrMagnitude < 0.0001f)
             {
                 return Vector2.zero;
             }
@@ -852,7 +914,7 @@ namespace NiumaTPC.FishNet
 
             Vector3 localDirection = inverseYaw * worldDirection;
 
-            return Vector2.ClampMagnitude(new Vector2(localDirection.x, localDirection.z),1f);
+            return Vector2.ClampMagnitude(new Vector2(localDirection.x, localDirection.z), 1f);
         }
 
         /// <summary>
@@ -898,7 +960,7 @@ namespace NiumaTPC.FishNet
             data.CurrentSpeed = presentationState.Speed;
 
             ApplyAirborneTransition(data, presentationState.IsGrounded, presentationState.VerticalVelocity);
-            ApplyDoubleJumpTransition(data,presentationState.HasPerformedDoubleJumpInAir);
+            ApplyDoubleJumpTransition(data, presentationState.HasPerformedDoubleJumpInAir);
             data.IsGrounded = presentationState.IsGrounded;
             data.HasPerformedDoubleJumpInAir = presentationState.HasPerformedDoubleJumpInAir;
             data.SimulationMotionPhase = presentationState.MotionPhase;
@@ -910,7 +972,7 @@ namespace NiumaTPC.FishNet
 
             worldDirection.y = 0f;
 
-            if(worldDirection.sqrMagnitude > 0.0001f)
+            if (worldDirection.sqrMagnitude > 0.0001f)
             {
                 worldDirection.Normalize();
             }
@@ -923,7 +985,7 @@ namespace NiumaTPC.FishNet
              * Stopping 阶段仍保留上一移动方向
              * 让停止动画知道角色原来朝哪里移动
              */
-            data.DesiredWorldMoveDir = presentationState.MotionPhase == CharacterMotionPhase.Idle? Vector3.zero : worldDirection;
+            data.DesiredWorldMoveDir = presentationState.MotionPhase == CharacterMotionPhase.Idle ? Vector3.zero : worldDirection;
 
             /*
              * Starting/Moving 才表示玩家仍有移动输入
@@ -932,7 +994,7 @@ namespace NiumaTPC.FishNet
             bool hasMoveInput = presentationState.MotionPhase == CharacterMotionPhase.Starting ||
                                 presentationState.MotionPhase == CharacterMotionPhase.Moving;
 
-            data.MoveInput = hasMoveInput ? ConvertWorldDirectionToMoveInput( worldDirection, presentationState.Yaw) : Vector2.zero;
+            data.MoveInput = hasMoveInput ? ConvertWorldDirectionToMoveInput(worldDirection, presentationState.Yaw) : Vector2.zero;
 
         }
 
@@ -949,12 +1011,12 @@ namespace NiumaTPC.FishNet
 
             ushort tickRate = TimeManager.TickRate;
 
-            if(tickRate == 0)
+            if (tickRate == 0)
             {
                 return;
             }
 
-            if(TimeManager.LocalTick % tickRate != 0)
+            if (TimeManager.LocalTick % tickRate != 0)
             {
                 return;
             }
@@ -1013,7 +1075,7 @@ namespace NiumaTPC.FishNet
                 $"Grounded={presentationState.IsGrounded}, " +
                 $"Channel={channel}",
                 this);
-       }
+        }
 
         #endregion
 

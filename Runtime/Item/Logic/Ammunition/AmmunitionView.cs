@@ -15,9 +15,10 @@ namespace NiumaTPC.Item
 
         private ParticleSystem[] _particles;
 
-        public ulong ShotId { get; private set; }
+        // 当前这次视觉对象租用的编号，不代表服务器 ShotId
+        public ulong BindingId { get; private set; }
 
-        public bool IsBound => ShotId != 0;
+        public bool IsBound => BindingId != 0;
 
         #region Unity 生命周期
 
@@ -40,15 +41,15 @@ namespace NiumaTPC.Item
         #endregion
 
         /// <summary>
-        /// 将已经激活的视图绑定到一颗逻辑子弹
+        /// 为本次视觉对象租用建立绑定
         /// 从对象池取出后，由调用方立即执行
         /// </summary>
         public bool Bind(
-            ulong shotId,
+            ulong bindingId,
             Vector3 position,
             Vector3 velocity)
         {
-            if (shotId == 0 || !isActiveAndEnabled)
+            if (bindingId == 0 || !isActiveAndEnabled)
             {
                 return false;
             }
@@ -56,7 +57,7 @@ namespace NiumaTPC.Item
             // 先停止旧拖尾，再移动到新的发射位置
             ClearBinding();
 
-            ShotId = shotId;
+            BindingId = bindingId;
 
             // 清除上一次复用留下的朝向
             transform.rotation = Quaternion.identity;
@@ -91,13 +92,13 @@ namespace NiumaTPC.Item
         /// 编号不匹配时拒绝更新，避免操作已经复用的视图
         /// </summary>
         public bool ApplyPose(
-            ulong shotId,
+            ulong bindingId,
             Vector3 position,
             Vector3 velocity)
         {
             if (!isActiveAndEnabled ||
                 !IsBound ||
-                ShotId != shotId)
+                BindingId != bindingId)
             {
                 return false;
             }
@@ -147,7 +148,7 @@ namespace NiumaTPC.Item
         {
             EnsureParticles();
 
-            ShotId = 0;
+            BindingId = 0;
 
             if (trail != null)
             {

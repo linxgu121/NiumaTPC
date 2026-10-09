@@ -5,15 +5,12 @@ using UnityEngine;
 namespace NiumaTPC.Item
 {
     // 步枪AK47行为 负责装备瞄准开火IK后坐力等
-    public class AK47Behaviour : MonoBehaviour, IHoldableItem, IPoolable
+    public class AK47Behaviour : MonoBehaviour, IHoldableItem, IPoolable, IWeaponFirePresentation
     {
         [Header("--- 表现与挂点 ---")]
         // 左手握点
         [Tooltip("左手应该握在哪里")]
         [SerializeField] private Transform _leftHandGoal;
-        // 枪口火焰
-        [Tooltip("枪口火焰特效")]
-        [SerializeField] private ParticleSystem _muzzleFlash;
         // 枪口投射点
         [Tooltip("枪口瞄准参考点")]
         [SerializeField] private Transform _muzzle;
@@ -23,9 +20,6 @@ namespace NiumaTPC.Item
         private ItemInstance _instance;
         // 配置
         private GunWeaponSO _akconfig;
-        // 装备时从当前持有者取得，不能跨对象池复用保留旧角色引用
-        private OfflineWeaponFireSource _fireSource;
-
         // 网络角色提供此接口，枪械本身不引用 FishNet
         private INetworkWeaponFireRequestSender _networkFireSender;
 
@@ -43,6 +37,19 @@ namespace NiumaTPC.Item
         private bool _ikDisableScheduled;
         private float _ikDisableTimePoint;
 
+        #region 枪口表现运行状态
+
+        // 当前这次装备持有一份枪焰对象，连续开火时复用
+        private GameObject _muzzleVfxObject;
+        private SimpleObjectPoolSystem _muzzleVfxPool;
+
+        private ParticleSystem[] _muzzleParticles = System.Array.Empty<ParticleSystem>();
+
+        // 配置或对象池缺失时，避免每发重复尝试并刷日志
+        private bool _muzzleSetupAttempted;
+
+        #endregion
+
         // 初始化实例和配置
         public void Initialize(ItemInstance instanceData)
         {
@@ -53,9 +60,10 @@ namespace NiumaTPC.Item
         // 装备并设置IK
         public void OnEquipEnter(NiumaCharacterController player)
         {
+            ReleaseMuzzle();
+
             _player = player;
             _equipmentRevision = _player != null && _player.RuntimeData != null ? _player.RuntimeData.EquipmentRevision : 0u;
-            _fireSource = _player != null ? _player.GetComponent<OfflineWeaponFireSource>() : null;
             _networkFireSender = _player != null ? player.GetComponent<INetworkWeaponFireRequestSender>() : null;
             _isEquipping = true;
             if (_leftHandGoal != null && _player != null && _player.RuntimeData != null)
@@ -177,7 +185,8 @@ namespace NiumaTPC.Item
         {
             _isEquipping = false;
             _equipmentRevision = 0u;
-            if (_muzzleFlash != null) _muzzleFlash.Stop();
+
+            ReleaseMuzzle();
 
             if (_akconfig != null)
             {
@@ -194,7 +203,7 @@ namespace NiumaTPC.Item
             }
         }
 
-        // 检查冷却并开火
+        // 单机与多人均提交网络意图，冷却和实际发射由服务器处理
         private void TryFire()
         {
             if (_isEquipping || _player == null || _akconfig == null)
@@ -202,75 +211,161 @@ namespace NiumaTPC.Item
                 return;
             }
 
-            // 有网络发送组件的角色始终走网络
-            // 发送失败、断线或组件禁用，都不能回退到离线射击
-            if (_networkFireSender != null)
-            {
-                // 缓存组件被销毁时也只停止，不转入离线分支
-                if (_networkFireSender is MonoBehaviour senderComponent &&
-                    senderComponent != null)
-                {
-                    _networkFireSender.TrySubmitFire(
-                        _instance,
-                        _equipmentRevision);
-                }
-
-                // 提交成功不等于开火成功
-                // 本步不执行下方离线登记、枪焰、音效或后坐力
-                return;
-            }
-
-            // 没有网络发送组件的离线角色，保持原有发射流程
-            if (_fireSource == null)
+            // 单机也运行本地 Host，不保留没有网络组件时的离线兜底
+            // 接口引用不会使用 Unity 的销毁判空，需要检查实际组件
+            if (!(_networkFireSender is MonoBehaviour senderComponent) ||
+                senderComponent == null ||
+                !senderComponent.isActiveAndEnabled)
             {
                 return;
             }
 
-            if (!_fireSource.TryCreateRequest(
-                    _equipmentRevision,
-                    out WeaponFireRequest request))
-            {
-                return;
-            }
-
-            if (!_fireSource.TryFire(
-                    _instance,
-                    request,
-                    out _,
-                    out _))
-            {
-                return;
-            }
-
-            if (_muzzleFlash != null)
-            {
-                _muzzleFlash.Play();
-            }
-
-            if (_akconfig != null && _akconfig.ShootSound != null && _muzzle != null)
-            {
-                AudioSource.PlayClipAtPoint(_akconfig.ShootSound, _muzzle.position);
-            }
-
-            if (_akconfig != null && _akconfig.MuzzleVFXPrefab != null && _muzzle != null)
-            {
-                GameObject muzzleVFX;
-                if (SimpleObjectPoolSystem.Shared != null)
-                {
-                    muzzleVFX = SimpleObjectPoolSystem.Shared.Spawn(_akconfig.MuzzleVFXPrefab);
-                    muzzleVFX.transform.SetPositionAndRotation(_muzzle.position, _muzzle.rotation);
-                    muzzleVFX.transform.SetParent(_muzzle, true);
-                }
-                else
-                {
-                    muzzleVFX = Object.Instantiate(_akconfig.MuzzleVFXPrefab, _muzzle.position, _muzzle.rotation);
-                    muzzleVFX.transform.parent = _muzzle;
-                }
-            }
-
-            ApplyRecoil();
-
+            // 网络驱动负责本地预表现，服务器仍决定是否真正发射
+            _networkFireSender.TrySubmitFire(_instance, _equipmentRevision);
         }
+
+        #region 开火表现
+
+        public bool TryPlayFire(
+            ItemInstance expectedItem,
+            bool applyRecoil)
+        {
+            var data = _player != null ? _player.RuntimeData : null;
+
+            if (!isActiveAndEnabled ||
+                expectedItem == null ||
+                data == null ||
+                _akconfig == null ||
+                _equipmentRevision == 0u ||
+                _equipmentRevision != data.EquipmentRevision ||
+                !ReferenceEquals(_instance, expectedItem) ||
+                !ReferenceEquals(data.CurrentItem, _instance))
+            {
+                return false;
+            }
+
+            // 表现失败不能撤销服务器已经提交的射击
+            PlayMuzzle();
+
+            if (_akconfig.ShootSound != null && _muzzle != null)
+            {
+                AudioSource.PlayClipAtPoint(
+                    _akconfig.ShootSound,
+                    _muzzle.position);
+            }
+
+            // 观察别人的射击时，不改变自己的摄像机
+            if (applyRecoil)
+            {
+                ApplyRecoil();
+            }
+
+            return true;
+        }
+
+        private void PlayMuzzle()
+        {
+            if (_muzzleVfxObject == null)
+            {
+                if (_muzzleSetupAttempted)
+                {
+                    return;
+                }
+
+                _muzzleSetupAttempted = true;
+
+                // 留空表示这把枪不需要枪焰
+                if (_akconfig.MuzzleVFXPrefab == null || _muzzle == null)
+                {
+                    return;
+                }
+
+                _muzzleVfxPool = SimpleObjectPoolSystem.Shared;
+
+                if (_muzzleVfxPool == null)
+                {
+                    Debug.LogWarning(
+                        "[枪械表现] 没有可用对象池，跳过枪口特效",
+                        this);
+                    return;
+                }
+
+                _muzzleVfxObject =
+                    _muzzleVfxPool.Spawn(_akconfig.MuzzleVFXPrefab);
+
+                if (_muzzleVfxObject == null)
+                {
+                    return;
+                }
+
+                _muzzleParticles =
+                    _muzzleVfxObject.GetComponentsInChildren<ParticleSystem>(true);
+
+                // 清除复用对象的旧粒子，再调整挂点
+                StopMuzzleParticles();
+
+                Transform effectTransform = _muzzleVfxObject.transform;
+                effectTransform.SetParent(_muzzle, false);
+                effectTransform.localPosition = Vector3.zero;
+                effectTransform.localRotation = Quaternion.identity;
+                effectTransform.localScale =
+                    _akconfig.MuzzleVFXPrefab.transform.localScale;
+            }
+
+            // 重新开始本发的短促枪焰，不让旧播放状态影响下一发
+            StopMuzzleParticles();
+
+            foreach (ParticleSystem particle in _muzzleParticles)
+            {
+                if (particle != null && particle.gameObject.activeInHierarchy)
+                {
+                    // 数组已经包含子粒子，不再递归播放
+                    particle.Play(false);
+                }
+            }
+        }
+
+        private void StopMuzzleParticles()
+        {
+            foreach (ParticleSystem particle in _muzzleParticles)
+            {
+                if (particle != null)
+                {
+                    particle.Stop(
+                        false,
+                        ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
+            }
+        }
+
+        private void ReleaseMuzzle()
+        {
+            StopMuzzleParticles();
+
+            GameObject instance = _muzzleVfxObject;
+            SimpleObjectPoolSystem pool = _muzzleVfxPool;
+
+            // 先清空持有记录，避免停用和回收回调重复处理
+            _muzzleVfxObject = null;
+            _muzzleVfxPool = null;
+            _muzzleParticles = System.Array.Empty<ParticleSystem>();
+            _muzzleSetupAttempted = false;
+
+            if (instance == null)
+            {
+                return;
+            }
+
+            // 回收的特效不能继续挂在武器下面
+            instance.transform.SetParent(null, true);
+
+            if (pool == null || !pool.TryDespawn(instance))
+            {
+                Destroy(instance);
+            }
+        }
+
+        #endregion
 
         // 应用后坐力
         private void ApplyRecoil()
@@ -288,37 +383,64 @@ namespace NiumaTPC.Item
                 _player.Config.Core.PitchLimits.x,
                 _player.Config.Core.PitchLimits.y
             );
+
+            // 同时刷新下一次输入采样和相机使用的方向
+            var data = _player.RuntimeData;
+            data.ViewYaw = Mathf.Repeat(data.ViewYaw, 360f);
+            data.AuthorityYaw = data.ViewYaw;
+            data.AuthorityPitch = data.ViewPitch;
+            data.AuthorityRotation = Quaternion.Euler(
+                data.AuthorityPitch,
+                data.AuthorityYaw,
+                0f);
         }
+
+        #region 池化与清理
 
         public void OnSpawned()
         {
-            // 保守复位（避免复用武器时残留）
+            ReleaseMuzzle();
+
             _isEquipping = false;
             _wasAiming = false;
             _ikEnableScheduled = false;
             _ikDisableScheduled = false;
 
-            _fireSource = null;
             _networkFireSender = null;
             _equipmentRevision = 0u;
+
             _player = null;
-
-            if (_muzzleFlash != null) _muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
+            _instance = null;
+            _akconfig = null;
         }
 
         public void OnDespawned()
         {
-            if (_muzzleFlash != null)
-            {
-                _muzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            }
+            ReleaseMuzzle();
 
-            _fireSource = null;
+            _isEquipping = false;
+            _wasAiming = false;
+            _ikEnableScheduled = false;
+            _ikDisableScheduled = false;
+
             _networkFireSender = null;
             _equipmentRevision = 0u;
-            _player = null;
 
+            _player = null;
+            _instance = null;
+            _akconfig = null;
         }
+
+        private void OnDisable()
+        {
+            ReleaseMuzzle();
+        }
+
+        private void OnDestroy()
+        {
+            ReleaseMuzzle();
+        }
+
+        #endregion
     }
 }

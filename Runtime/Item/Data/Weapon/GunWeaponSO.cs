@@ -18,7 +18,7 @@ namespace NiumaTPC.Item
         public AudioClip ShootSound;
 
         [Header("武器特效")]
-        [Tooltip("枪口火焰/火花的预制体 (会在装备时实例化到 muzzle 下并保持停用)")]
+        [Tooltip("首次确认射击时从对象池取得并挂到枪口，当前装备期间复用；留空不播放枪焰")]
         public GameObject MuzzleVFXPrefab;
 
         [Header("Recoil (后坐力)")]
