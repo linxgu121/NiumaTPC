@@ -32,7 +32,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
         // 全局物理帧计数器
         private ulong _frameIndex;
-        
+
         private bool _isBlocked;
 
         /// <summary>
@@ -158,30 +158,46 @@ namespace NiumaTPC.Character.ProcessingPipeline
             // 注：LookAxis属于Delta(增量)数据 绝对禁止在此处 SmoothDamp 直接原样透传给摄像机逻辑 不然视角会像弹簧一样回到原位
             currentFrame.Processed.Look = _rawData.LookAxis;
 
-            //  持续按压状态的继承
-            currentFrame.Processed.JumpHeld = _rawData.JumpHeld;
-            currentFrame.Processed.DodgeHeld = _rawData.DodgeHeld;
-            currentFrame.Processed.RollHeld = _rawData.RollHeld;
-            currentFrame.Processed.SprintHeld = _rawData.SprintHeld;
-            currentFrame.Processed.WalkHeld = _rawData.WalkHeld;
-            currentFrame.Processed.AimHeld = _rawData.AimHeld;
-            currentFrame.Processed.InteractHeld = _rawData.InteractHeld;
+            // 将原始按钮位转换成现有处理层接口
+            currentFrame.Processed.JumpHeld = _rawData.IsHeld(RawInputButtons.Jump);
 
-            currentFrame.Processed.LeftMouseHeld = _rawData.LeftMouseHeld;
-            currentFrame.Processed.FireHeld = _rawData.LeftMouseHeld;
+            currentFrame.Processed.DodgeHeld = _rawData.IsHeld(RawInputButtons.Dodge);
 
-            currentFrame.Processed.Expression1Held = _rawData.Expression1Held;
-            currentFrame.Processed.Expression2Held = _rawData.Expression2Held;
-            currentFrame.Processed.Expression3Held = _rawData.Expression3Held;
-            currentFrame.Processed.Expression4Held = _rawData.Expression4Held;
+            currentFrame.Processed.RollHeld = _rawData.IsHeld(RawInputButtons.Roll);
 
-            currentFrame.Processed.Number1Held = _rawData.Number1Held;
-            currentFrame.Processed.Number2Held = _rawData.Number2Held;
-            currentFrame.Processed.Number3Held = _rawData.Number3Held;
-            currentFrame.Processed.Number4Held = _rawData.Number4Held;
-            currentFrame.Processed.Number5Held = _rawData.Number5Held;
+            currentFrame.Processed.SprintHeld = _rawData.IsHeld(RawInputButtons.Sprint);
 
-            currentFrame.Processed.ActionHeld = _rawData.ActionHeld;
+            currentFrame.Processed.WalkHeld = _rawData.IsHeld(RawInputButtons.Walk);
+
+            currentFrame.Processed.AimHeld = _rawData.IsHeld(RawInputButtons.Aim);
+
+            currentFrame.Processed.InteractHeld = _rawData.IsHeld(RawInputButtons.Interact);
+
+            bool fireHeld = _rawData.IsHeld(RawInputButtons.Fire);
+
+            currentFrame.Processed.FireHeld = fireHeld;
+
+            currentFrame.Processed.LeftMouseHeld = fireHeld;
+
+            currentFrame.Processed.Expression1Held = _rawData.IsHeld(RawInputButtons.Expression1);
+
+            currentFrame.Processed.Expression2Held = _rawData.IsHeld(RawInputButtons.Expression2);
+
+            currentFrame.Processed.Expression3Held = _rawData.IsHeld(RawInputButtons.Expression3);
+
+            currentFrame.Processed.Expression4Held = _rawData.IsHeld(RawInputButtons.Expression4);
+
+            currentFrame.Processed.Number1Held = _rawData.IsHeld(RawInputButtons.Number1);
+
+            currentFrame.Processed.Number2Held = _rawData.IsHeld(RawInputButtons.Number2);
+
+            currentFrame.Processed.Number3Held = _rawData.IsHeld(RawInputButtons.Number3);
+
+            currentFrame.Processed.Number4Held = _rawData.IsHeld(RawInputButtons.Number4);
+
+            currentFrame.Processed.Number5Held = _rawData.IsHeld(RawInputButtons.Number5);
+
+            currentFrame.Processed.ActionHeld = _rawData.IsHeld(RawInputButtons.Action);
 
             // 动作缓存池调度
             // 一旦硬件触发 JustPressed 给对应的Timer充能 随后随时间衰减。
@@ -196,26 +212,39 @@ namespace NiumaTPC.Character.ProcessingPipeline
                 return newTimer;
             }
 
-            currentFrame.Processed.SlideBufferTimer = UpdateBuffer(lastProc.SlideBufferTimer, _rawData.WalkJustPressed);
-            currentFrame.Processed.JumpBufferTimer = UpdateBuffer(lastProc.JumpBufferTimer, _rawData.JumpJustPressed);
-            currentFrame.Processed.DodgeBufferTimer = UpdateBuffer(lastProc.DodgeBufferTimer, _rawData.DodgeJustPressed);
-            currentFrame.Processed.RollBufferTimer = UpdateBuffer(lastProc.RollBufferTimer, _rawData.RollJustPressed);
+            currentFrame.Processed.SlideBufferTimer = UpdateBuffer(lastProc.SlideBufferTimer, _rawData.WasPressed(RawInputButtons.Walk));
 
-            currentFrame.Processed.LeftMouseBufferTimer = UpdateBuffer(lastProc.LeftMouseBufferTimer, _rawData.LeftMouseJustPressed);
-            currentFrame.Processed.FireBufferTimer = currentFrame.Processed.LeftMouseBufferTimer;
+            currentFrame.Processed.JumpBufferTimer = UpdateBuffer(lastProc.JumpBufferTimer, _rawData.WasPressed(RawInputButtons.Jump));
 
-            currentFrame.Processed.Expression1BufferTimer = UpdateBuffer(lastProc.Expression1BufferTimer, _rawData.Expression1JustPressed);
-            currentFrame.Processed.Expression2BufferTimer = UpdateBuffer(lastProc.Expression2BufferTimer, _rawData.Expression2JustPressed);
-            currentFrame.Processed.Expression3BufferTimer = UpdateBuffer(lastProc.Expression3BufferTimer, _rawData.Expression3JustPressed);
-            currentFrame.Processed.Expression4BufferTimer = UpdateBuffer(lastProc.Expression4BufferTimer, _rawData.Expression4JustPressed);
+            currentFrame.Processed.DodgeBufferTimer = UpdateBuffer(lastProc.DodgeBufferTimer, _rawData.WasPressed(RawInputButtons.Dodge));
 
-            currentFrame.Processed.Number1BufferTimer = UpdateBuffer(lastProc.Number1BufferTimer, _rawData.Number1JustPressed);
-            currentFrame.Processed.Number2BufferTimer = UpdateBuffer(lastProc.Number2BufferTimer, _rawData.Number2JustPressed);
-            currentFrame.Processed.Number3BufferTimer = UpdateBuffer(lastProc.Number3BufferTimer, _rawData.Number3JustPressed);
-            currentFrame.Processed.Number4BufferTimer = UpdateBuffer(lastProc.Number4BufferTimer, _rawData.Number4JustPressed);
-            currentFrame.Processed.Number5BufferTimer = UpdateBuffer(lastProc.Number5BufferTimer, _rawData.Number5JustPressed);
+            currentFrame.Processed.RollBufferTimer = UpdateBuffer(lastProc.RollBufferTimer, _rawData.WasPressed(RawInputButtons.Roll));
 
-            currentFrame.Processed.ActionBufferTimer = UpdateBuffer(lastProc.ActionBufferTimer, _rawData.ActionJustPressed);
+            bool firePressed = _rawData.WasPressed(RawInputButtons.Fire);
+
+            currentFrame.Processed.FireBufferTimer = UpdateBuffer(lastProc.FireBufferTimer, firePressed);
+
+            currentFrame.Processed.LeftMouseBufferTimer = currentFrame.Processed.FireBufferTimer;
+
+            currentFrame.Processed.Expression1BufferTimer = UpdateBuffer(lastProc.Expression1BufferTimer, _rawData.WasPressed(RawInputButtons.Expression1));
+
+            currentFrame.Processed.Expression2BufferTimer = UpdateBuffer(lastProc.Expression2BufferTimer, _rawData.WasPressed(RawInputButtons.Expression2));
+
+            currentFrame.Processed.Expression3BufferTimer = UpdateBuffer(lastProc.Expression3BufferTimer, _rawData.WasPressed(RawInputButtons.Expression3));
+
+            currentFrame.Processed.Expression4BufferTimer = UpdateBuffer(lastProc.Expression4BufferTimer, _rawData.WasPressed(RawInputButtons.Expression4));
+
+            currentFrame.Processed.Number1BufferTimer = UpdateBuffer(lastProc.Number1BufferTimer, _rawData.WasPressed(RawInputButtons.Number1));
+
+            currentFrame.Processed.Number2BufferTimer = UpdateBuffer(lastProc.Number2BufferTimer, _rawData.WasPressed(RawInputButtons.Number2));
+
+            currentFrame.Processed.Number3BufferTimer = UpdateBuffer(lastProc.Number3BufferTimer, _rawData.WasPressed(RawInputButtons.Number3));
+
+            currentFrame.Processed.Number4BufferTimer = UpdateBuffer(lastProc.Number4BufferTimer, _rawData.WasPressed(RawInputButtons.Number4));
+
+            currentFrame.Processed.Number5BufferTimer = UpdateBuffer(lastProc.Number5BufferTimer, _rawData.WasPressed(RawInputButtons.Number5));
+
+            currentFrame.Processed.ActionBufferTimer = UpdateBuffer(lastProc.ActionBufferTimer, _rawData.WasPressed(RawInputButtons.Action));
 
             // 将局部计算完毕的纯净数据 一次性写回堆内存 供全局读取
             _inputData.currentFrameData = currentFrame;
@@ -228,7 +257,6 @@ namespace NiumaTPC.Character.ProcessingPipeline
         public void ConsumeJumpPressed() { var f = _inputData.currentFrameData; f.Processed.JumpBufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeDodgePressed() { var f = _inputData.currentFrameData; f.Processed.DodgeBufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeRollPressed() { var f = _inputData.currentFrameData; f.Processed.RollBufferTimer = 0f; _inputData.currentFrameData = f; }
-        public void ConsumeFirePressed() => ConsumeLeftMousePressed();
         public void ConsumeExpression1Pressed() { var f = _inputData.currentFrameData; f.Processed.Expression1BufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeExpression2Pressed() { var f = _inputData.currentFrameData; f.Processed.Expression2BufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeExpression3Pressed() { var f = _inputData.currentFrameData; f.Processed.Expression3BufferTimer = 0f; _inputData.currentFrameData = f; }
@@ -239,6 +267,15 @@ namespace NiumaTPC.Character.ProcessingPipeline
         public void ConsumeNumber4Pressed() { var f = _inputData.currentFrameData; f.Processed.Number4BufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeNumber5Pressed() { var f = _inputData.currentFrameData; f.Processed.Number5BufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeActionPressed() { var f = _inputData.currentFrameData; f.Processed.ActionBufferTimer = 0f; _inputData.currentFrameData = f; }
-        public void ConsumeLeftMousePressed() { var f = _inputData.currentFrameData; f.Processed.LeftMouseBufferTimer = 0f; _inputData.currentFrameData = f; }
+        
+        /// <summary>
+        /// 消费攻击按下缓存并同步清理旧鼠标字段
+        /// </summary>
+        public void ConsumeFirePressed() { var frame = _inputData.currentFrameData; frame.Processed.FireBufferTimer = 0f; frame.Processed.LeftMouseBufferTimer = 0f; _inputData.currentFrameData = frame; }
+
+        /// <summary>
+        /// 兼容仍在使用旧鼠标命名的调用方
+        /// </summary>
+        public void ConsumeLeftMousePressed() { ConsumeFirePressed(); }
     }
 }

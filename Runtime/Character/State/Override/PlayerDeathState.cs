@@ -49,9 +49,9 @@ namespace NiumaTPC.Character.State.Override
             }
         }
 
+        // 死亡表现状态不通过旧驱动追加重力位移
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateGravityOnly();
         }
 
         public override void Exit()

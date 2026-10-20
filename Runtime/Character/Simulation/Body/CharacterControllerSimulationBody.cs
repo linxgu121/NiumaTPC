@@ -25,13 +25,27 @@ namespace NiumaTPC.Character.Simulation
 
         public bool IsGrounded => _controller.isGrounded;
 
+        public float CollisionRadius
+        {
+            get
+            {
+                Vector3 scale = _transform.lossyScale;
+
+                float horizontalScale = Mathf.Max(
+                    Mathf.Abs(scale.x),
+                    Mathf.Abs(scale.z));
+
+                return _controller.radius * horizontalScale;
+            }
+        }
+
         #endregion
 
         #region Constructor(构造函数)
 
         public CharacterControllerSimulationBody(CharacterController controller)
         {
-            if(controller == null)
+            if (controller == null)
             {
                 throw new ArgumentNullException(nameof(controller), "角色模拟身体需要有效的 CharacterController。");
 
@@ -66,7 +80,7 @@ namespace NiumaTPC.Character.Simulation
                 collidedSides: (collisionFlags & CollisionFlags.Sides) != 0,
                 collidedAbove: (collisionFlags & CollisionFlags.Above) != 0,
                 collidedBelow: (collisionFlags & CollisionFlags.Below) != 0);
-            
+
         }
 
         public void SetYaw(float yaw)
@@ -114,9 +128,9 @@ namespace NiumaTPC.Character.Simulation
 
         private static float NormalizeYaw(float yaw)
         {
-            if(float.IsNaN(yaw) || float.IsInfinity(yaw))
+            if (float.IsNaN(yaw) || float.IsInfinity(yaw))
             {
-                throw new ArgumentOutOfRangeException(nameof(yaw),yaw,"角色 Yaw 必须是有限数值。");
+                throw new ArgumentOutOfRangeException(nameof(yaw), yaw, "角色 Yaw 必须是有限数值。");
 
             }
 
@@ -130,7 +144,7 @@ namespace NiumaTPC.Character.Simulation
 
             if (isInvalid)
             {
-                throw new ArgumentOutOfRangeException(parameterName,value,"角色位置或位移不能包含 NaN 或 Infinity。");
+                throw new ArgumentOutOfRangeException(parameterName, value, "角色位置或位移不能包含 NaN 或 Infinity。");
             }
 
         }

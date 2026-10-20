@@ -17,7 +17,7 @@ namespace NiumaTPC.Core.Combat
         /// 角色吸附参考位置
         /// 只用于选敌、朝向和接近方向计算
         /// </summary>
-        Vector3 MagnetismPosition { get; }
+        Vector3 AdsorptionPosition { get; }
 
         /// <summary>
         /// 目标角色水平碰撞半径

@@ -1,39 +1,24 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.RuntimeData;
-using UnityEngine;
 
 namespace NiumaTPC.Character.ProcessingPipeline.Intent
 {
     /// <summary>
-    /// 瞄准与开火意图处理器
+    /// 处理帧级开火意图
+    /// 瞄准输入由 Tick 命令读取，瞄准状态由模拟结果写回
     /// </summary>
     public class AimIntentProcessor
     {
         private readonly PlayerRuntimeData _data;
-        private bool _isAimHeld;
-        private bool _wasAimHeld;
 
         public AimIntentProcessor(PlayerRuntimeData data)
         {
             _data = data;
         }
 
-        public void Update(in ProcessedInputData input,bool writeAimState = true)
+        // 同时支持按下开火和持续按住，不直接修改瞄准状态
+        public void Update(in ProcessedInputData input)
         {
-            bool isAimHeldNow = input.AimHeld;
-            // 检查按住状态或瞬间按下 用于支持连续射击与精确射击
-            bool isFireHeldOrPressed = input.LeftMouseHeld || input.LeftMousePressed;
-
-            if(writeAimState)
-            {
-                _data.IsAiming = isAimHeldNow;
-            }
-            
-            _wasAimHeld = _isAimHeld;
-            _isAimHeld = isAimHeldNow;
-
-            if (isFireHeldOrPressed)
+            if (input.LeftMouseHeld || input.LeftMousePressed)
             {
                 _data.WantsToFire = true;
             }

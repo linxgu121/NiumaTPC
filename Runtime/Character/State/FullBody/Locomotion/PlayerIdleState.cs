@@ -1,10 +1,7 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Motion.MotionEnums;
-using NiumaTPC.Character.State.Core;
-using UnityEngine;
+
 
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
@@ -19,7 +16,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             ChooseOptionsAndPlay(config.LocomotionAnims.IdleAnim);
         }
 
-         // 更新状态逻辑 检测移动 触发状态切换
+        // 更新状态逻辑 检测移动 触发状态切换
         // 跳跃由全局拦截器统一处理，避免各状态重复判断
         protected override void UpdateStateLogic()
         {
@@ -45,7 +42,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                         data.NextStatePlayOptions = config.LocomotionAnims.FadeInSprintStartOptions;
                         break;
                     default:
-                        data.NextStatePlayOptions = AnimPlayOptions .Default;
+                        data.NextStatePlayOptions = AnimPlayOptions.Default;
                         break;
                 }
 
@@ -54,11 +51,9 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             }
         }
 
-        // 物理更新 空闲状态仍需驱动运动逻辑 防止角色浮空 接地状态异常
+        // 位移、重力和接地由固定 Tick 模拟处理，表现状态不重复推进
         public override void PhysicsUpdate()
         {
-            // 即使在空闲状态 也需要调用MotionDriver更新运动 重力 接地检测等
-            player.MotionDriver.UpdateMotion();
         }
 
         // 退出状态 空闲状态退出时无额外清理逻辑

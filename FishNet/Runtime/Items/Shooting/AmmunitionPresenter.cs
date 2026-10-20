@@ -5,7 +5,7 @@ using NiumaTPC.Item;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace NiumaTPC.FishNet
+namespace NiumaTPC.FishNet.Items
 {
     /// <summary>
     /// 网络弹道的客户端表现

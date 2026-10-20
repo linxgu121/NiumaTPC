@@ -1,20 +1,17 @@
 using NiumaTPC.Character.Simulation;
 using NiumaTPC.Character.Config;
-using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Motion.MotionEnums;
-using NiumaTPC.Character.RuntimeData;
 using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家翻越状态 
-    /// 负责执行翻越障碍物的动画和运动变形 根据输入或高度自动选择低翻或高翻
+    /// 翻越表现状态，播放对应动画并根据模拟结果重建手部 IK
+    /// 位移和翻越结束由固定 Tick 模拟决定
     /// </summary>
     public class PlayerVaultState : PlayerBaseState
     {
-        private float _stateDuration;
-        private bool _endTimeTriggered;
         private WarpedMotionData _selectedWarpData;
 
         public PlayerVaultState(NiumaCharacterController player) : base(player) { }
@@ -26,9 +23,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         public override void Enter()
         {
             //Debug.Log("Entered Vault State");
-            _stateDuration = 0f;
             data.IsVaulting = true;
-            _endTimeTriggered = false;
 
             // 根据明确的意图选择翻越动画
             if (data.WantsLowVault && config.Vaulting.lowVaultAnim != null)
@@ -73,52 +68,15 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
             ChooseOptionsAndPlay(_selectedWarpData.Clip);
 
-            /*
-             * 固定 Tick 已经负责完整翻越位移。
-             * 这里仅播放动画，不能再初始化旧 Motion Warp，
-             * 否则表现目标和权威位置会互相争夺。
-             */
-            if (player.MotionDriver.IsExternalSimulationActive)
-            {
-                InitializeExternalVaultIK();
-                return;
-            }
-
-            // 以下目标数组只供未启用固定 Tick 的旧 Motion Warp 链路使用。
-            VaultObstacleInfo info =
-                data.CurrentVaultInfo;
-
-            Vector3[] warpTargets =
-            {
-                info.LedgePoint,
-                info.ExpectedLandPoint
-            };
-
-            // 初始化 Motion Warping
-            player.MotionDriver.InitializeWarpData(_selectedWarpData, warpTargets);
-
-            data.IsWarping = true;
-            data.ActiveWarpData = _selectedWarpData;
-            data.NormalizedWarpTime = 0f;
-
-            // 注入手部IK目标
-            data.WarpIKTarget_LeftHand = data.CurrentVaultInfo.LeftHandPos;
-            data.WarpIKTarget_RightHand = data.CurrentVaultInfo.RightHandPos;
-            data.WarpIKRotation_Hand = data.CurrentVaultInfo.HandRot;
-
-            AnimationFacade.SetOnEndCallback(ExitToLocomotionState);
+            // 固定 Tick 已负责翻越路径
+            // 这里只根据模拟结果重建手部 IK，不初始化旧位移驱动
+            InitializeExternalVaultIK();
         }
 
         // 状态逻辑 翻越过程中一般不做任何中断检测
         protected override void UpdateStateLogic()
         {
-            if (!player.MotionDriver.IsExternalSimulationActive)
-            {
-                return;
-            }
-
-            // 动画不能决定权威翻越何时结束。
-            // 当固定 Tick 状态回到 None，表现状态才能退出。
+            // 表现层等待模拟翻越结束，不使用动画 EndTime 提前退出
             if (data.SimulationVaultType != VaultType.None)
             {
                 return;
@@ -130,43 +88,13 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 物理更新 计算运动变形时间 驱动Warp运动
         public override void PhysicsUpdate()
         {
-            if (player.MotionDriver.IsExternalSimulationActive)
+            if (_selectedWarpData == null)
             {
-                // IK 权重属于表现数据，可以跟随本地动画时间。
-                data.NormalizedWarpTime =
-                    Mathf.Clamp01(
-                        AnimationFacade.CurrentNormalizedTime);
-
                 return;
             }
 
-            if (_selectedWarpData == null) return;
-
-            float normalizedTime = Mathf.Clamp01(AnimationFacade.CurrentNormalizedTime);
-            data.NormalizedWarpTime = normalizedTime;
-
-            // 累计播放时长 用于 EndTime 检测
-            _stateDuration = AnimationFacade.CurrentTime;
-
-            // 检测是否可以提前切回运动循环
-            if (!_endTimeTriggered && data.CurrentLocomotionState != LocomotionState.Idle &&
-                _selectedWarpData.EndTime > 0f && _stateDuration >= _selectedWarpData.EndTime)
-            {
-                _endTimeTriggered = true;
-                if (data.MoveInput.sqrMagnitude > 0.01f)
-                {
-                    data.NextStatePlayOptions = AnimPlayOptions.Default;
-                    player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerMoveLoopState>());
-                }
-                else
-                {
-                    player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerIdleState>());
-                }
-                return;
-            }
-
-            // 驱动运动变形
-            player.MotionDriver.UpdateWarpMotion(normalizedTime);
+            // 动画时间只用于 IK 权重，不再用于角色位移
+            data.NormalizedWarpTime = Mathf.Clamp01(AnimationFacade.CurrentNormalizedTime);
         }
 
         // 退出状态 清理Warp数据和回调
@@ -178,7 +106,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             data.IsWarping = false;
             data.ActiveWarpData = null;
 
-            player.MotionDriver.ClearWarpData();
             _selectedWarpData = null;
         }
 
@@ -267,11 +194,8 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                     config.Vaulting
                         .HandRotationOffsetEuler);
 
-            /*
-             * 外部模拟下 IsWarping 只启用既有 IKController。
-             * MotionDriver.UpdateWarpMotion 已有外部模拟保护，
-             * 不会再次移动 CharacterController。
-             */
+            // IsWarping 在此只表示启用翻越手部 IK
+            // ActiveWarpData 提供权重曲线，不代表启用旧位移驱动
             data.IsWarping = true;
             data.ActiveWarpData = _selectedWarpData;
             data.NormalizedWarpTime = 0f;
@@ -298,6 +222,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             }
         }
 
-       #endregion
+        #endregion
     }
 }

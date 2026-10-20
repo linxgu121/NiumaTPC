@@ -5,36 +5,23 @@ using UnityEngine;
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
-    /// 玩家二段跳状态 
-    /// 负责在空中执行二段跳 选择对应的二段跳动画 标记已使用二段跳 最后落地
+    /// 二段跳表现状态，根据模拟结果播放对应动画并处理落地表现切换
+    /// 不施加速度、不消费输入、不修改二段跳次数
     /// </summary>
-     public class PlayerDoubleJumpState : PlayerBaseState
+    public class PlayerDoubleJumpState : PlayerBaseState
     {
         private MotionClipData _clipData;
         private bool _canCheckLand;
-        private float _jumpForce;
 
         public PlayerDoubleJumpState(NiumaCharacterController player) : base(player) { }
 
-        // 进入状态 选择二段跳动画 施加跳跃力量 标记已使用二段跳
+        // 进入表现状态，选择并播放二段跳动画
         public override void Enter()
         {
             _canCheckLand = false;
-            data.HasPerformedDoubleJumpInAir = true;
 
             SelectDoubleJumpAnimation();
             ChooseOptionsAndPlay(_clipData.Clip);
-
-            if(!player.IsExternalJumpSimulationActive)
-            {
-                //离线旧链仍由状态机施加跳跃力
-                PerformJumpPhysics();
-                player.InputPipeline?.ConsumeJumpPressed();
-            }
-            
-
-            // 消费跳跃输入 防止同帧重复触发
-            player.InputPipeline.ConsumeJumpPressed();
 
             AnimationFacade.SetOnEndCallback(() =>
             {
@@ -45,14 +32,13 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             });
         }
 
-        // 根据运动状态和装备选择对应的二段跳动画和力量
+        // 根据运动状态和装备选择二段跳动画
         private void SelectDoubleJumpAnimation()
         {
             bool isHandsEmpty = data.CurrentItem == null;
 
             // 根据当前运动状态和装备选择 
             MotionClipData baseClip = null;
-            float baseForce = config.JumpAndLanding.JumpForce;
 
             switch (data.CurrentLocomotionState)
             {
@@ -60,37 +46,25 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 case LocomotionState.Walk:
                 case LocomotionState.Jog:
                     baseClip = config.JumpAndLanding.DoubleJumpUp;
-                    baseForce = config.JumpAndLanding.DoubleJumpForceUp;
                     break;
 
                 case LocomotionState.Sprint:
                     if (isHandsEmpty)
                     {
                         baseClip = config.JumpAndLanding.DoubleJumpSprintRoll;
-                        baseForce = config.JumpAndLanding.DoubleJumpEmptyHandSprintForceUp;
                     }
                     else
                     {
                         baseClip = config.JumpAndLanding.DoubleJumpUp;
-                        baseForce = config.JumpAndLanding.DoubleJumpForceUp;
                     }
                     break;
 
                 default:
                     Debug.Log(" DoubleJumpUp 配置缺失 使用 JumpAirAnim 作为后备");
                     baseClip = config.JumpAndLanding.JumpAirAnim;
-                    baseForce = config.JumpAndLanding.DoubleJumpForceUp;
                     break;
             }
             _clipData = baseClip;
-            _jumpForce = baseForce;
-        }
-
-        // 施加二段跳力量 设置垂直速度和接地状态
-        private void PerformJumpPhysics()
-        {
-            data.VerticalVelocity = _jumpForce;
-            data.IsGrounded = false;
         }
 
         // 状态逻辑 检测落地时机
@@ -109,10 +83,9 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             }
         }
 
-        // 物理更新 委托 MotionDriver 处理重力
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateMotion(null, 0f);
+            // 二段跳位移和重力由固定 Tick 模拟推进
         }
 
         // 退出状态 清理回调和动画数据

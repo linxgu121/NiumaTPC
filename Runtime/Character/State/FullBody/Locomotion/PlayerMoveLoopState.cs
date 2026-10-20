@@ -39,7 +39,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            if (player.MotionDriver.IsExternalSimulationActive && data.SimulationMotionPhase == CharacterMotionPhase.Starting)
+            if (data.SimulationMotionPhase == CharacterMotionPhase.Starting)
             {
                 // 移动中突然反向时，固定 Tick 模拟会开启新一轮起步。
                 // 循环动画必须跟随这个权威阶段重新进入 MoveStart。
@@ -116,10 +116,9 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             UpdateFootPhase();
         }
 
-        // 物理更新 委托 MotionDriver 根据输入驱动运动
+        // 位移由固定 Tick 模拟推进，循环状态只维护动画表现
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateLocomotionFromInput();
         }
 
         // 退出状态 清理回调 避免残留

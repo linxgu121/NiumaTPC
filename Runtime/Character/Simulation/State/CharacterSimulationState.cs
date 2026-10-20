@@ -81,6 +81,17 @@ namespace NiumaTPC.Character.Simulation
         /// </summary>
         public bool IsGrounded;
 
+        // 当前空中过程达到的最高位置 Y，校正时必须一起恢复
+        public float AirborneApexY;
+
+        // 最近一次落地事件序号，0 表示尚未记录过落地
+        // 普通 Tick 不清零，供表现层识别新的落地事件
+        public uint LandingSequence;
+
+        // 最近一次落地对应的落差，单位为米
+        // 保留到下一次落地，不因下一 Tick 继续接地而清零
+        public float LastLandingFallHeight;
+
         /// <summary>
         /// 本轮置空是否已经消耗二连跳
         /// 必须进入权威状态，否则 Reconcile 后可能重复获得二段跳
@@ -137,7 +148,7 @@ namespace NiumaTPC.Character.Simulation
         /// 动作开始时归零，结束时也必须归零。
         /// </summary>
         public uint ActionTick;
-        
+
         /// <summary>
         /// 动作开始瞬间锁定的八方向。
         /// 动作过程中普通移动输入不能修改它
@@ -157,15 +168,21 @@ namespace NiumaTPC.Character.Simulation
         public bool PendingSlideJump;
 
         /// <summary>
+        /// 当前近战吸附的可回滚运行状态
+        /// 包含锁定目标位置、位移预算和已执行 Tick
+        /// </summary>
+        public MeleeAdsorptionSimulationState MeleeAdsorption;
+
+        /// <summary>
         /// 移动速度平滑后的当前值。
         /// 它会影响下一 Tick，不能只保存最终位置。
         /// </summary>
         public float SmoothSpeed;
 
-       /// <summary>
-       /// Mathf.SmoothDamp 内部使用的速度累计值。
-       /// 回滚时如果不恢复它，重演结果仍然可能不同
-       /// </summary>
+        /// <summary>
+        /// Mathf.SmoothDamp 内部使用的速度累计值。
+        /// 回滚时如果不恢复它，重演结果仍然可能不同
+        /// </summary>
         public float SpeedSmoothVelocity;
 
         /// <summary>
@@ -219,6 +236,10 @@ namespace NiumaTPC.Character.Simulation
             StartLocomotionState = startLocomotionState;
             LastMoveDirection = lastMoveDirection;
             IsGrounded = isGrounded;
+            // 从初始位置建立落差基准，构造时不生成落地事件
+            AirborneApexY = position.y;
+            LandingSequence = 0u;
+            LastLandingFallHeight = 0f;
             HasPerformedDoubleJumpInAir = hasPerformedDoubleJumpInAir;
             VaultType = vaultType;
             VaultTick = vaultTick;
@@ -233,6 +254,7 @@ namespace NiumaTPC.Character.Simulation
             ActionDirection = actionDirection;
             SlideSpeed = slideSpeed;
             PendingSlideJump = pendingSlideJump;
+            MeleeAdsorption = default;
             SmoothSpeed = smoothSpeed;
             SpeedSmoothVelocity = speedSmoothVelocity;
             RotationSmoothVelocity = rotationSmoothVelocity;

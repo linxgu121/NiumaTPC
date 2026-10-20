@@ -47,7 +47,7 @@ namespace NiumaTPC.Character.Combat
                 return false;
             }
 
-            Vector3 displacement = target.MagnetismPosition - origin;
+            Vector3 displacement = target.AdsorptionPosition - origin;
 
             float distance = displacement.magnitude;
 

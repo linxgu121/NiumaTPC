@@ -49,13 +49,12 @@ namespace NiumaTPC.Character.State.Core.Aiming
             }
         }
 
-        // 物理更新 在瞄准时仍需处理重力等基础运动
+        // 位移、重力和接地由固定 Tick 模拟处理，表现状态不重复推进
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateMotion(null, 0f);
         }
 
-         // 退出状态 无额外清理逻辑
+        // 退出状态 无额外清理逻辑
         public override void Exit()
         {
         }

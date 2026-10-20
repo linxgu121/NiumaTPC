@@ -1,7 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
@@ -29,10 +25,9 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             }
         }
 
-        // 物理更新 持续应用重力与运动逻辑
+        // 位移、重力和接地由固定 Tick 模拟处理，表现状态不重复推进
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateMotion();
         }
 
         // 退出状态 无额外清理逻辑

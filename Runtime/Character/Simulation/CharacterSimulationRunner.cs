@@ -45,7 +45,7 @@ namespace NiumaTPC.Character.Simulation
         #region Constructor(构造函数)
 
         public CharacterSimulationRunner(
-            ICharacterSimulationBody body, 
+            ICharacterSimulationBody body,
             ICharacterTraversalProbe traversalProbe,
             in CharacterSimulationConfig config
             )
@@ -92,24 +92,108 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
+        #region Melee Adsorption(近战吸附)
+
+        /// <summary>
+        /// 检查当前权威动作是否允许启动吸附，并冻结本次吸附数据
+        /// 翻越、Roll、Dodge 和 Slide 期间不能启动吸附
+        /// </summary>
+        public bool TryBeginMeleeAdsorption(
+            in MeleeAdsorptionSimulationRequest request,
+            in MeleeAdsorptionMotionProfile motionProfile)
+        {
+            bool hasConflictingAction =
+                _state.VaultType != VaultType.None ||
+                _state.ActionType != CharacterActionType.None;
+
+            if (_state.MeleeAdsorption.IsActive ||
+                hasConflictingAction)
+            {
+                return false;
+            }
+
+            if (!MeleeAdsorptionSimulationState.TryBegin(
+                    in request,
+                    in motionProfile,
+                    out MeleeAdsorptionSimulationState adsorptionState))
+            {
+                return false;
+            }
+
+            _state.MeleeAdsorption = adsorptionState;
+
+            return true;
+        }
+
+        /// <summary>
+        /// 取消当前近战吸附并清空冻结的运行数据
+        /// </summary>
+        public void CancelMeleeAdsorption()
+        {
+            _state.MeleeAdsorption.Stop();
+        }
+
+        #endregion
+
         #region Simulation(模拟核心逻辑)
 
-        public CharacterSimulationState Simulate(in CharacterInputCommand command, bool canSprint, bool isHandsEmpty, float tickDeltaTime)
+        public CharacterSimulationState Simulate(
+            in CharacterInputCommand command,
+            bool canSprint,
+            bool isHandsEmpty,
+            float tickDeltaTime)
         {
-            Vector3 displacement = CharacterMovementSimulator.Simulate(
-                ref _state,
-                in command,
-                in _config,
-                _traversalProbe,
-                canSprint,
-                isHandsEmpty,
-                tickDeltaTime
-            );
+            // 跳跃模拟会提前修改 IsGrounded，因此必须先保存移动前的状态
+            bool wasGroundedBeforeMove = _state.IsGrounded;
+            float previousPositionY = _state.Position.y;
+
+            bool wasAdsorbingDuringMove = _state.MeleeAdsorption.IsActive;
+
+            Vector3 displacement;
+
+            if (wasAdsorbingDuringMove)
+            {
+                bool adsorptionClaimedMovement =
+                    TrySimulateMeleeAdsorptionTick(
+                        in command,
+                        isHandsEmpty,
+                        tickDeltaTime,
+                        out displacement);
+
+                /*
+                 * 无效吸附状态会被模拟器主动清除
+                 * 当前 Tick 立即恢复普通移动
+                 */
+                if (!adsorptionClaimedMovement)
+                {
+                    wasAdsorbingDuringMove = false;
+
+                    displacement = CharacterMovementSimulator.Simulate(
+                        ref _state,
+                        in command,
+                        in _config,
+                        _traversalProbe,
+                        canSprint,
+                        isHandsEmpty,
+                        tickDeltaTime);
+                }
+            }
+            else
+            {
+                displacement = CharacterMovementSimulator.Simulate(
+                    ref _state,
+                    in command,
+                    in _config,
+                    _traversalProbe,
+                    canSprint,
+                    isHandsEmpty,
+                    tickDeltaTime);
+            }
 
             /*
              * CharacterMovementSimulator 可能在当前 Tick
-             * 自然结束 Slide 或通过 Jump 打断它。
-             * 这里只记录真正仍由 Slide 提交的位移。
+             * 自然结束 Slide 或通过 Jump 打断它
+             * 这里只记录真正仍由 Slide 提交的位移
              */
             bool wasSlidingDuringMove = _state.ActionType == CharacterActionType.Slide;
 
@@ -119,8 +203,16 @@ namespace NiumaTPC.Character.Simulation
 
             CharacterBodyMoveResult moveResult = _body.Move(displacement);
 
-            SynchronizeStateFromBody();
-            if (wasSlidingDuringMove)
+            SynchronizeStateFromBody(wasGroundedBeforeMove, previousPositionY);
+
+            if (wasAdsorbingDuringMove)
+            {
+                MeleeAdsorptionMovementSimulator
+                    .FinalizeAfterBodyMove(
+                        ref _state.MeleeAdsorption,
+                        in moveResult);
+            }
+            else if (wasSlidingDuringMove)
             {
                 FinalizeSlideAfterBodyMove(
                     in command,
@@ -129,7 +221,58 @@ namespace NiumaTPC.Character.Simulation
                     isHandsEmpty,
                     tickDeltaTime);
             }
+
             return _state;
+        }
+
+        /// <summary>
+        /// 检查活动吸附状态并生成本 Tick 的吸附水平位移与垂直重力
+        /// 吸附接管期间不会响应 Jump、Vault、Roll、Dodge 或 Slide
+        /// </summary>
+        private bool TrySimulateMeleeAdsorptionTick(
+            in CharacterInputCommand command,
+            bool isHandsEmpty,
+            float tickDeltaTime,
+            out Vector3 displacement)
+        {
+            displacement = Vector3.zero;
+
+            _state.Tick = command.Tick;
+
+            CharacterAimStateResolver.Update(
+                ref _state,
+                in command,
+                in _config);
+
+            bool simulatedAdsorption =
+                MeleeAdsorptionMovementSimulator.TrySimulate(
+                    ref _state.MeleeAdsorption,
+                    _state.Position,
+                    _state.Yaw,
+                    _body.CollisionRadius,
+                    tickDeltaTime,
+                    out Vector3 horizontalDisplacement,
+                    out float nextYaw);
+
+            if (!simulatedAdsorption)
+            {
+                return false;
+            }
+
+            _state.Yaw = nextYaw;
+
+            Vector3 verticalDisplacement = CharacterVerticalMovementSimulator.Simulate(
+                ref _state,
+                in command,
+                in _config,
+                isHandsEmpty,
+                allowJumpInput: false,
+                forceJumpInput: false,
+                tickDeltaTime: tickDeltaTime);
+
+            displacement = horizontalDisplacement + verticalDisplacement;
+
+            return true;
         }
 
         /// <summary>
@@ -143,7 +286,7 @@ namespace NiumaTPC.Character.Simulation
             bool isHandsEmpty,
             float tickDeltaTime)
         {
-            bool blockedByWall = IsSlideBlocked(in moveResult,in lockedSlideDirection);
+            bool blockedByWall = IsSlideBlocked(in moveResult, in lockedSlideDirection);
 
             bool leftGround = !_state.IsGrounded;
 
@@ -170,7 +313,7 @@ namespace NiumaTPC.Character.Simulation
              */
             if (hadPendingJump && _state.IsGrounded)
             {
-                ConsumePostMoveSlideJump(in command,isHandsEmpty,tickDeltaTime);
+                ConsumePostMoveSlideJump(in command, isHandsEmpty, tickDeltaTime);
             }
         }
 
@@ -182,6 +325,10 @@ namespace NiumaTPC.Character.Simulation
             bool isHandsEmpty,
             float tickDeltaTime)
         {
+            // 这是同一 Tick 内可能发生的第二次移动，单独记录它的起始状态
+            bool wasGroundedBeforeMove = _state.IsGrounded;
+            float previousPositionY = _state.Position.y;
+
             Vector3 jumpDisplacement = CharacterVerticalMovementSimulator.Simulate(
                 ref _state,
                 in command,
@@ -197,17 +344,66 @@ namespace NiumaTPC.Character.Simulation
              */
             _body.Move(jumpDisplacement);
 
-            SynchronizeStateFromBody();
+            SynchronizeStateFromBody(wasGroundedBeforeMove, previousPositionY);
         }
 
         /// <summary>
-        /// 物理体的最新状态同步回逻辑模拟状态
+        /// 读取碰撞移动后的实际身体状态，并记录接地转换和落差
         /// </summary>
-        private void SynchronizeStateFromBody()
+        private void SynchronizeStateFromBody(
+            bool wasGroundedBeforeMove,
+            float previousPositionY)
         {
             _state.Position = _body.Position;
             _state.Yaw = _body.Yaw;
             _state.IsGrounded = _body.IsGrounded;
+
+            UpdateFallTracking(wasGroundedBeforeMove, previousPositionY);
+        }
+
+        /// <summary>
+        /// 根据实际移动前后的接地状态维护最高点，并在落地时保存事件和落差
+        /// 不读取动画时间，不在普通接地 Tick 清除上一次落地结果
+        /// </summary>
+        private void UpdateFallTracking(
+            bool wasGroundedBeforeMove,
+            float previousPositionY)
+        {
+            float currentY = _state.Position.y;
+
+            if (!_state.IsGrounded)
+            {
+                if (wasGroundedBeforeMove)
+                {
+                    // 刚离地时纳入移动前高度，避免走出平台时少算第一段下降
+                    _state.AirborneApexY = Mathf.Max(previousPositionY, currentY);
+                }
+                else
+                {
+                    // 二段跳继续抬高最高点，不重新开始一段落差记录
+                    _state.AirborneApexY = Mathf.Max(_state.AirborneApexY, currentY);
+                }
+
+                return;
+            }
+
+            if (!wasGroundedBeforeMove)
+            {
+                float apexY = Mathf.Max(_state.AirborneApexY, previousPositionY);
+
+                _state.LastLandingFallHeight = Mathf.Max(0f, apexY - currentY);
+
+                // 每次实际落地递增，回绕时跳过表示“尚无事件”的 0
+                _state.LandingSequence = unchecked(_state.LandingSequence + 1u);
+
+                if (_state.LandingSequence == 0u)
+                {
+                    _state.LandingSequence = 1u;
+                }
+            }
+
+            // 接地期间更新下一次离地的高度基准
+            _state.AirborneApexY = currentY;
         }
 
         /// <summary>
@@ -237,7 +433,7 @@ namespace NiumaTPC.Character.Simulation
 
             requestedHorizontal.y = 0f;
 
-            float requestedForwardDistance = Vector3.Dot(requestedHorizontal,slideDirection);
+            float requestedForwardDistance = Vector3.Dot(requestedHorizontal, slideDirection);
 
             if (requestedForwardDistance <= SlideDistanceEpsilon)
             {
@@ -248,7 +444,7 @@ namespace NiumaTPC.Character.Simulation
 
             actualHorizontal.y = 0f;
 
-            float actualForwardDistance = Mathf.Max(0f, Vector3.Dot(actualHorizontal,slideDirection));
+            float actualForwardDistance = Mathf.Max(0f, Vector3.Dot(actualHorizontal, slideDirection));
 
             /*
              * 仅有 Sides 不足以认定正面撞墙。
@@ -263,7 +459,7 @@ namespace NiumaTPC.Character.Simulation
 
         public void ApplyState(in CharacterSimulationState authoritativeState)
         {
-             ValidateState(in authoritativeState);
+            ValidateState(in authoritativeState);
 
             _body.SetPose(
                 authoritativeState.Position,
@@ -289,12 +485,17 @@ namespace NiumaTPC.Character.Simulation
 
         #region Validation(校验)
 
+        /// <summary>
+        /// 检查权威状态中的数值、枚举与互斥动作是否可安全用于校正
+        /// </summary>
         private static void ValidateState(in CharacterSimulationState state)
         {
-            bool hasInvalidNumber = 
+            bool hasInvalidNumber =
                 !IsFiniteVector(state.Position) ||
                 !IsFinite(state.Yaw) ||
                 !IsFinite(state.VerticalVelocity) ||
+                !IsFinite(state.AirborneApexY) ||
+                !IsFinite(state.LastLandingFallHeight) ||
                 !IsFiniteVector(state.LastMoveDirection) ||
                 !IsFinite(state.SlideSpeed) ||
                 !IsFinite(state.SmoothSpeed) ||
@@ -311,6 +512,12 @@ namespace NiumaTPC.Character.Simulation
             if (hasInvalidNumber)
             {
                 throw new ArgumentException("权威角色状态包含 NaN 或 Infinity。", nameof(state));
+            }
+
+            // 落差可以为零，但不能为负数
+            if (state.LastLandingFallHeight < 0f)
+            {
+                throw new ArgumentException("权威角色状态中的落地落差不能为负数", nameof(state));
             }
 
             if (!Enum.IsDefined(typeof(LocomotionState), state.LocomotionState))
@@ -330,19 +537,17 @@ namespace NiumaTPC.Character.Simulation
 
             if (!Enum.IsDefined(typeof(LocomotionState), state.StartLocomotionState))
             {
-                throw new ArgumentException(
-                    $"未知的起步速度档位：{state.StartLocomotionState}。",
-                    nameof(state));
+                throw new ArgumentException($"未知的起步速度档位：{state.StartLocomotionState}。",nameof(state));
             }
 
-            if (!Enum.IsDefined(typeof(VaultType),state.VaultType))
+            if (!Enum.IsDefined(typeof(VaultType), state.VaultType))
             {
-                throw new ArgumentException($"未知的翻越类型：{state.VaultType}。",nameof(state));
+                throw new ArgumentException($"未知的翻越类型：{state.VaultType}。", nameof(state));
             }
 
             if (state.VaultType == VaultType.None && state.VaultTick != 0u)
             {
-                throw new ArgumentException("没有执行翻越时，VaultTick 必须为 0。",nameof(state));
+                throw new ArgumentException("没有执行翻越时，VaultTick 必须为 0。", nameof(state));
             }
 
             if (state.VaultType != VaultType.None && state.ActionType != CharacterActionType.None)
@@ -355,26 +560,41 @@ namespace NiumaTPC.Character.Simulation
                 throw new ArgumentException($"未知的角色动作类型：{state.ActionType}。", nameof(state));
             }
 
-            if (!Enum.IsDefined(typeof(CharacterActionDirection),state.ActionDirection))
+            if (!Enum.IsDefined(typeof(CharacterActionDirection), state.ActionDirection))
             {
-                throw new ArgumentException($"未知的角色动作方向：{state.ActionDirection}。",nameof(state));
+                throw new ArgumentException($"未知的角色动作方向：{state.ActionDirection}。", nameof(state));
             }
 
             if (state.ActionType == CharacterActionType.None && state.ActionTick != 0u)
             {
-                throw new ArgumentException("角色没有执行动作时，ActionTick 必须为 0。",nameof(state));
+                throw new ArgumentException("角色没有执行动作时，ActionTick 必须为 0。", nameof(state));
             }
 
-            if(state.ActionType == CharacterActionType.Slide && state.SlideSpeed < 0)
+            if (state.ActionType == CharacterActionType.Slide && state.SlideSpeed < 0)
             {
-                throw new ArgumentException("滑铲速度不能为负数。",nameof(state));
+                throw new ArgumentException("滑铲速度不能为负数。", nameof(state));
             }
 
             bool hasStaleSlideState = state.ActionType != CharacterActionType.Slide && (Mathf.Abs(state.SlideSpeed) > 0.0001f || state.PendingSlideJump);
 
-            if(hasStaleSlideState)
+            if (hasStaleSlideState)
             {
-               throw new ArgumentException("未执行滑铲时，滑铲速度与缓存跳跃必须已经清空。",nameof(state)); 
+                throw new ArgumentException("未执行滑铲时，滑铲速度与缓存跳跃必须已经清空。", nameof(state));
+            }
+
+            if (!state.MeleeAdsorption.IsValid)
+            {
+                throw new ArgumentException("近战吸附状态包含无效请求、运动参数或累计数据", nameof(state));
+            }
+
+            bool adsorptionConflictsWithAction =
+                state.MeleeAdsorption.IsActive &&
+                (state.VaultType != VaultType.None ||
+                 state.ActionType != CharacterActionType.None);
+
+            if (adsorptionConflictsWithAction)
+            {
+                throw new ArgumentException("近战吸附不能与翻越、Roll、Dodge 或 Slide 同时存在", nameof(state));
             }
 
         }
@@ -385,7 +605,7 @@ namespace NiumaTPC.Character.Simulation
                    IsFinite(value.y) &&
                    IsFinite(value.z);
         }
-        
+
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);

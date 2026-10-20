@@ -1,10 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.Simulation;
-using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
@@ -18,7 +15,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         private WarpedMotionData _selectedData;
 
         // 累计播放时长和是否已触发 EndTime 逻辑 防止重复执行
-        private float _stateDuration;
         private bool _endTimeTriggered;
 
         public PlayerDodgeState(NiumaCharacterController player) : base(player) { }
@@ -35,7 +31,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             // 写入音频意图（由 AudioController 统一消费）
             data.SfxQueue.Enqueue(PlayerSfxEvent.Dodge);
 
-            _stateDuration = 0f;
             _endTimeTriggered = false;
 
             // 根据方向选择闪避数据
@@ -48,25 +43,8 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            // 初始化运动变形
-            player.MotionDriver.InitializeWarpData(_selectedData);
-
             ChooseOptionsAndPlay(_selectedData.Clip);
 
-            /*
-             * 固定 Tick 模式由模拟动作状态控制退出；
-             * 纯净版继续使用动画结束回调。
-             */
-            if(!player.MotionDriver.IsExternalSimulationActive)
-            {
-                // 设置结束回调 如果提前触发EndTime则忽略此回调
-                player.AnimationFacade.SetOnEndCallback(() =>
-                {
-                    if (_endTimeTriggered) return;
-                    HandleDodgeEnd();
-                });
-
-            }
             // 记录末相位确保后续状态能正确选择脚位
             data.ExpectedFootPhase = _selectedData.EndPhase;
         }
@@ -79,29 +57,15 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 物理更新 计算运动变形时间 驱动Warp运动
         public override void PhysicsUpdate()
         {
-            if (_selectedData == null) return;
-
-            if(player.MotionDriver.IsExternalSimulationActive)
+            if (_selectedData == null || _endTimeTriggered)
             {
-                if(data.SimulationActionType != CharacterActionType.Dodge)
-                {
-                    HandleDodgeEnd();
-                }
-
                 return;
             }
 
-            float normalizedTime = player.AnimationFacade.CurrentNormalizedTime;
-            player.MotionDriver.UpdateWarpMotion(normalizedTime);
-
-            // 累计播放时长 检查是否到达 EndTime 提前切换
-            _stateDuration = player.AnimationFacade.CurrentTime;
-
-            if (!_endTimeTriggered && _selectedData.EndTime > 0f && _stateDuration >= _selectedData.EndTime)
+            // 动画播放完成不能提前结束模拟动作
+            if (data.SimulationActionType != CharacterActionType.Dodge)
             {
-                _endTimeTriggered = true;
                 HandleDodgeEnd();
-                return;
             }
         }
 
@@ -110,8 +74,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         {
             data.IsDodging = false;
             data.WantsToDodge = false;
-
-            player.MotionDriver.ClearWarpData();
 
             player.AnimationFacade.ClearOnEndCallback();
 

@@ -133,7 +133,7 @@ namespace NiumaTPC.Character.Combat
                     continue;
                 }
 
-                Vector3 toCandidate = candidate.MagnetismPosition - origin;
+                Vector3 toCandidate = candidate.AdsorptionPosition - origin;
 
                 toCandidate.y = 0f;
 

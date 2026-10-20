@@ -5,7 +5,7 @@ using NiumaTPC.Item;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace NiumaTPC.FishNet
+namespace NiumaTPC.FishNet.Items
 {
     /// <summary>
     /// 一个物理世界中的服务器弹道驱动

@@ -10,6 +10,9 @@ using FishNet.Transporting;
 using FishNet.Connection;
 using FishNet.Object;
 using NiumaTPC.Character.Traversal;
+using NiumaTPC.Character.Combat;
+using NiumaTPC.Item;
+using NiumaTPC.FishNet.Items;
 
 namespace NiumaTPC.FishNet
 {
@@ -36,8 +39,8 @@ namespace NiumaTPC.FishNet
         private NiumaCharacterController _player;
 
         [SerializeField]
-        [Tooltip("离线固定 Tick 驱动；网络启动时会自动禁用,防止离线驱动和 FishNet 同时移动角色。")]
-        private OfflineCharacterSimulationDriver _offlineDriver;
+        [Tooltip("当前网络角色的近战选敌组件，未绑定时自动获取")]
+        private MeleeTargetingController _meleeTargeting;
 
         [Header("观察者表现同步")]
         [SerializeField]
@@ -59,6 +62,8 @@ namespace NiumaTPC.FishNet
         #region Runtime State(运行时状态)
 
         private CharacterInputCommandBuilder _commandBuilder;
+
+        private WeaponDriver _weaponDriver;
 
         private CharacterSimulationRunner _runner;
 
@@ -86,17 +91,6 @@ namespace NiumaTPC.FishNet
 
         private bool _inputWasBlockedBeforeNetwork;
         private bool _networkBlockedInput;
-
-        //FishNet 驱动接管和归还跳跃
-        /// <summary>
-        /// 保存网络驱动接管前，IsExternalJumpSimulationActive 原本的值。
-        /// </summary>
-        private bool _externalJumpSimulationBeforeNetwork;
-        /// <summary>
-        /// 记录“网络驱动是否真的执行过接管”
-        /// 防止初始化失败、重复退出或尚未进入网络时，错误地恢复角色状态
-        /// </summary>
-        private bool _networkAppliedExternalJumpSimulation;
 
         //远端观察者
 
@@ -159,10 +153,12 @@ namespace NiumaTPC.FishNet
                 _player = GetComponent<NiumaCharacterController>();
             }
 
-            if (_offlineDriver == null)
+            if (_meleeTargeting == null)
             {
-                TryGetComponent(out _offlineDriver);
+                _meleeTargeting = GetComponent<MeleeTargetingController>();
             }
+
+            _weaponDriver = GetComponent<WeaponDriver>();
 
             /*
              * Tick：
@@ -333,7 +329,7 @@ namespace NiumaTPC.FishNet
             * 3. 客户端与服务器执行同一个模拟器。
             */
 
-            NiumaReplicateData data = BuildReplicateData();
+            ReplicateData data = BuildReplicateData();
 
             PerformReplicate(data);
 
@@ -359,16 +355,20 @@ namespace NiumaTPC.FishNet
         #region Input Construction(输入构建)
 
         /// <summary>
-        /// 只有本地拥有者读取当前设备输入。
+        /// 只有本地拥有者读取当前设备输入
         /// </summary>
-        private NiumaReplicateData BuildReplicateData()
+        private ReplicateData BuildReplicateData()
         {
-            if (!IsOwner || _commandBuilder == null || _player.InputPipeline == null || _player.RuntimeData == null)
+            if (!IsOwner ||
+                _commandBuilder == null ||
+                _player.InputPipeline == null ||
+                _player.RuntimeData == null)
             {
                 return default;
             }
 
-            ProcessedInputData input = _player.InputPipeline.Current.currentFrameData.Processed;
+            ProcessedInputData input =
+                _player.InputPipeline.Current.currentFrameData.Processed;
 
             // 新命令读取本地视角输入源
             // 不读取会被历史重放覆盖的 Authority 朝向
@@ -379,9 +379,15 @@ namespace NiumaTPC.FishNet
                 viewPitch: _player.RuntimeData.ViewPitch,
                 pitchLimits: _player.Config.Core.PitchLimits);
 
+            BuildMeleeReplicateInput(
+                in input,
+                ref command,
+                out int meleeTargetObjectId,
+                out Vector3 meleeTargetPosition,
+                out float meleeTargetCollisionRadius);
+
             if (command.HasButton(CharacterInputButtons.Jump))
             {
-                // 命令已经保存了跳跃事实，可以清除本地帧输入缓冲。
                 _player.InputPipeline.ConsumeJumpPressed();
             }
 
@@ -400,7 +406,84 @@ namespace NiumaTPC.FishNet
                 _player.InputPipeline.ConsumeSlidePressed();
             }
 
-            return new NiumaReplicateData(command.Move, command.ViewYaw, command.ViewPitch, command.Buttons);
+            return new ReplicateData(
+                command.Move,
+                command.ViewYaw,
+                command.ViewPitch,
+                command.Buttons,
+                meleeTargetObjectId,
+                meleeTargetPosition,
+                meleeTargetCollisionRadius);
+        }
+
+        /// <summary>
+        /// 为近战攻击写入按钮状态和预测使用的冻结目标快照
+        /// </summary>
+        private void BuildMeleeReplicateInput(
+            in ProcessedInputData input,
+            ref CharacterInputCommand command,
+            out int targetObjectId,
+            out Vector3 targetPosition,
+            out float targetCollisionRadius)
+        {
+            targetObjectId = NetworkObject.UNSET_OBJECTID_VALUE;
+            targetPosition = Vector3.zero;
+            targetCollisionRadius = 0f;
+
+            if (!input.FirePressed)
+            {
+                return;
+            }
+
+            ItemInstance currentItem = _player.RuntimeData.CurrentItem;
+
+            MeleeWeaponSO meleeWeapon = currentItem?.BaseData as MeleeWeaponSO;
+
+            // 远程武器输入继续交给 WeaponDriver
+            if (meleeWeapon == null)
+            {
+                return;
+            }
+
+            command.Buttons |= CharacterInputButtons.MeleeAttack;
+
+            // 命令已经保存攻击边沿
+            // 无论是否找到吸附目标都只消费一次
+            _player.InputPipeline.ConsumeFirePressed();
+
+            if (!meleeWeapon.EnableAdsorption ||
+                _meleeTargeting == null)
+            {
+                return;
+            }
+
+            if (!_meleeTargeting.TryCreateAdsorptionIntent(
+                    command.Tick,
+                    meleeWeapon.AdsorptionMaximumTravelDistance,
+                    out MeleeIntent intent))
+            {
+                return;
+            }
+
+            Transform targetRoot = intent.Target.RootTransform;
+
+            NetworkObject targetNetworkObject =
+                targetRoot != null
+                    ? targetRoot.GetComponentInParent<NetworkObject>()
+                    : null;
+
+            // 联机吸附目标必须具有有效的网络身份
+            if (targetNetworkObject == null ||
+                !targetNetworkObject.IsSpawned ||
+                targetNetworkObject.ObjectId ==
+                NetworkObject.UNSET_OBJECTID_VALUE)
+            {
+                return;
+            }
+
+            targetObjectId = targetNetworkObject.ObjectId;
+            targetPosition = intent.SampledTargetPosition;
+            targetCollisionRadius = intent.TargetCollisionRadius;
         }
 
         #endregion
@@ -413,7 +496,7 @@ namespace NiumaTPC.FishNet
         /// </summary>
         [Replicate]
         private void PerformReplicate(
-            NiumaReplicateData data,
+            ReplicateData data,
             ReplicateState replicateState = ReplicateState.Invalid,
             Channel channel = Channel.Unreliable)
         {
@@ -436,6 +519,8 @@ namespace NiumaTPC.FishNet
 
             float tickDeltaTime = (float)TimeManager.TickDelta;
 
+            TryBeginMeleeAdsorption(in data, in command, replicateState, tickDeltaTime);
+
             CharacterSimulationState state = _runner.Simulate(in command, canSprint, isHandsEmpty, tickDeltaTime);
 
             // 只保存服务器正常推进的结果
@@ -456,6 +541,154 @@ namespace NiumaTPC.FishNet
                 WriteInputToRuntimeData(in command);
                 WriteStateToRuntimeData(in state);
             }
+        }
+
+        /// <summary>
+        /// 检查当前 Replicate 是否包含真实近战攻击边沿并启动对应模拟
+        /// 丢包补帧产生的非 Created 数据不能重复触发攻击
+        /// </summary>
+        private bool TryBeginMeleeAdsorption(
+            in ReplicateData data,
+            in CharacterInputCommand command,
+            ReplicateState replicateState,
+            float tickDeltaTime)
+        {
+            if (!replicateState.ContainsCreated() || !command.HasButton(CharacterInputButtons.MeleeAttack))
+            {
+                return false;
+            }
+
+            if (IsServerInitialized)
+            {
+                return TryBeginServerMeleeAdsorption(
+                    in data,
+                    in command,
+                    tickDeltaTime);
+            }
+
+            // 纯观察客户端不使用客户端目标快照启动玩法模拟
+            if (!Owner.IsLocalClient)
+            {
+                return false;
+            }
+
+            return TryBeginOwnerMeleeAdsorption(
+                in data,
+                in command,
+                tickDeltaTime);
+        }
+
+        /// <summary>
+        /// 检查 Owner 本地装备与冻结快照并启动即时预测
+        /// 服务器拒绝后会由 Reconcile 撤销错误预测
+        /// </summary>
+        private bool TryBeginOwnerMeleeAdsorption(
+            in ReplicateData data,
+            in CharacterInputCommand command,
+            float tickDeltaTime)
+        {
+            if (data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE)
+            {
+                return false;
+            }
+
+            ItemInstance currentItem = _player.RuntimeData.CurrentItem;
+
+            MeleeWeaponSO meleeWeapon = currentItem?.BaseData as MeleeWeaponSO;
+
+            if (meleeWeapon == null ||
+                !meleeWeapon.TryCreateAdsorptionMotionProfile(
+                    tickDeltaTime,
+                    out MeleeAdsorptionMotionProfile motionProfile))
+            {
+                return false;
+            }
+
+            var request = new MeleeAdsorptionSimulationRequest(
+                command.Tick,
+                data.MeleeTargetPosition,
+                data.MeleeTargetCollisionRadius,
+                meleeWeapon.AdsorptionMaximumTravelDistance);
+
+            if (!request.IsValid)
+            {
+                return false;
+            }
+
+            return _runner.TryBeginMeleeAdsorption(in request,in motionProfile);
+        }
+
+        /// <summary>
+        /// 使用服务器装备和服务器选敌结果重新校验近战吸附
+        /// 客户端目标 ID 只用于确认双方选择的是同一目标
+        /// </summary>
+        private bool TryBeginServerMeleeAdsorption(
+            in ReplicateData data,
+            in CharacterInputCommand command,
+            float tickDeltaTime)
+        {
+            if (data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE ||
+                _weaponDriver == null ||
+                _meleeTargeting == null)
+            {
+                return false;
+            }
+
+            if (!_weaponDriver.TryGetServerEquippedItem(
+                    out ItemInstance serverItem,
+                    out _))
+            {
+                return false;
+            }
+
+            MeleeWeaponSO meleeWeapon =
+                serverItem.BaseData as MeleeWeaponSO;
+
+            if (meleeWeapon == null ||
+                !meleeWeapon.TryCreateAdsorptionMotionProfile(
+                    tickDeltaTime,
+                    out MeleeAdsorptionMotionProfile motionProfile))
+            {
+                return false;
+            }
+
+            /*
+             * 重新执行服务器自己的候选排序、角度和遮挡检查
+             * 不使用客户端提交的位置或碰撞半径
+             */
+            if (!_meleeTargeting.TryCreateAdsorptionIntent(
+                    command.Tick,
+                    meleeWeapon.AdsorptionMaximumTravelDistance,
+                    out MeleeIntent authoritativeIntent))
+            {
+                return false;
+            }
+
+            Transform targetRoot =
+                authoritativeIntent.Target.RootTransform;
+
+            NetworkObject targetNetworkObject =
+                targetRoot != null
+                    ? targetRoot.GetComponentInParent<NetworkObject>()
+                    : null;
+
+            if (targetNetworkObject == null ||
+                !targetNetworkObject.IsSpawned ||
+                targetNetworkObject.ObjectId !=
+                data.MeleeTargetObjectId)
+            {
+                return false;
+            }
+
+            if (!authoritativeIntent.TryCreateSimulationRequest(
+                    out MeleeAdsorptionSimulationRequest request))
+            {
+                return false;
+            }
+
+            return _runner.TryBeginMeleeAdsorption(
+                in request,
+                in motionProfile);
         }
 
         #endregion
@@ -612,14 +845,13 @@ namespace NiumaTPC.FishNet
         #region Simulation Ownership(模拟执行者)
 
         /// <summary>
-        /// 初始化网络模拟器，并让它成为角色位移的唯一执行者
+        /// 检查角色模拟依赖和配置是否齐全，再创建网络 Tick 模拟器并接管位移
         /// </summary>
         private bool TryTakeSimulationOwnership()
         {
             if (_player == null ||
                 _player.BaseStats == null ||
                 _player.CharacterController == null ||
-                _player.MotionDriver == null ||
                 _player.InputPipeline == null ||
                 _player.RuntimeData == null)
             {
@@ -652,30 +884,20 @@ namespace NiumaTPC.FishNet
             _commandBuilder = new CharacterInputCommandBuilder();
 
 
-            /*
-             * 离线驱动只能用于无网络测试。
-             * 网络启动后必须禁用，否则会出现一次 Tick 被移动两遍。
-             */
-            if (_offlineDriver != null && _offlineDriver.enabled)
-            {
-                _offlineDriver.enabled = false;
-
-                Debug.Log("[NiumaFishNet] 已禁用离线固定 Tick 驱动。", this);
-            }
-
-            _player.MotionDriver.SetExternalSimulationActive(true);
-
-            _externalJumpSimulationBeforeNetwork = _player.IsExternalJumpSimulationActive;
-
-            _player.SetExternalJumpSimulationActive(true);
-            _networkAppliedExternalJumpSimulation = true;
+            // 开始模拟前清除残留的跳跃和翻越表现意图
+            // 不清除 InputPipeline，避免丢失尚未进入 Tick 的按键输入
+            _player.RuntimeData.WantsToJump = false;
+            _player.RuntimeData.WantsDoubleJump = false;
+            _player.RuntimeData.WantsToVault = false;
+            _player.RuntimeData.WantsLowVault = false;
+            _player.RuntimeData.WantsHighVault = false;
 
             _networkSimulationActive = true;
             return true;
         }
 
         /// <summary>
-        /// 网络对象停止时归还角色移动控制权
+        /// 网络对象停止时释放 Tick 模拟器，不恢复旧帧级移动逻辑
         /// </summary>
         private void ReleaseSimulationOwnership()
         {
@@ -683,22 +905,6 @@ namespace NiumaTPC.FishNet
             {
                 return;
             }
-
-            if (_player != null)
-            {
-                if (_networkAppliedExternalJumpSimulation)
-                {
-                    _player.SetExternalJumpSimulationActive(_externalJumpSimulationBeforeNetwork);
-                }
-
-                if (_player.MotionDriver != null)
-                {
-                    _player.MotionDriver.SetExternalSimulationActive(false);
-                }
-            }
-
-            _externalJumpSimulationBeforeNetwork = false;
-            _networkAppliedExternalJumpSimulation = false;
 
             _runner = null;
             _commandBuilder = null;
@@ -744,7 +950,7 @@ namespace NiumaTPC.FishNet
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
                 CharacterInputButtons.Jump | CharacterInputButtons.Dodge |
                 CharacterInputButtons.Roll | CharacterInputButtons.Slide |
-                CharacterInputButtons.Aim;
+                CharacterInputButtons.Aim | CharacterInputButtons.MeleeAttack;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
 

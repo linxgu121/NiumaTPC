@@ -11,17 +11,23 @@ namespace NiumaTPC.Character.Simulation
         /// <summary>
         /// 碰撞处理后的真实世界坐标
         /// </summary>
-        Vector3 Position {get; }
+        Vector3 Position { get; }
 
         /// <summary>
         /// 当前角色的世界 Yaw
         /// </summary>
-        float Yaw {get; }
+        float Yaw { get; }
 
         /// <summary>
         /// 最近一次移动后是否着地
         /// </summary>
-        bool IsGrounded {get; }
+        bool IsGrounded { get; }
+
+        /// <summary>
+        /// 世界空间水平碰撞半径
+        /// 已包含角色缩放，用于计算吸附停止距离
+        /// </summary>
+        float CollisionRadius { get; }
 
         /// <summary>
         /// 提交本 Tick 的世界空间位移，

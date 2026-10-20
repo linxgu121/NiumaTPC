@@ -24,9 +24,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
         private float _apexY;
         private bool _wasGroundedLastFrame;
 
-        // 下落意图计算状态 累积空中时间判断是否应该进入下落动画
-        private float _airborneTime;
-
         // 记录上一次瞄准状态
         private bool _lastAiming = false;
 
@@ -44,7 +41,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
 
             _apexY = _playerTransform.position.y;
             _wasGroundedLastFrame = _data.IsGrounded;
-            _airborneTime = 0f;
         }
 
         /// <summary>
@@ -61,7 +57,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
         public void UpdateGameplay()
         {
             UpdateFallHeight();
-            UpdateFallIntent();
         }
 
         /// <summary>
@@ -170,26 +165,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             }
 
             _wasGroundedLastFrame = isGrounded;
-        }
-
-        /// <summary>
-        /// 空中时间，判断是否播放下落动画
-        /// </summary>
-        private void UpdateFallIntent()
-        {
-            bool isGrounded = _data.IsGrounded;
-
-            if (isGrounded)
-            {
-                _airborneTime = 0f;
-                _data.WantsToFall = false;
-            }
-            else
-            {
-                _airborneTime += Time.deltaTime;
-                float fallTimeThreshold = _config.LocomotionAnims.AirborneTimeThresholdForFall;
-                _data.WantsToFall = _airborneTime >= fallTimeThreshold;
-            }
         }
 
         private void CalculateFallHeightLevel(float height)

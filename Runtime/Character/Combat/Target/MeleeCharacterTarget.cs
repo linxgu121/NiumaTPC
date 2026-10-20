@@ -20,7 +20,7 @@ namespace NiumaTPC.Character.Combat
 
         public Transform RootTransform => _character != null ? _character.transform : transform;
 
-        public Vector3 MagnetismPosition
+        public Vector3 AdsorptionPosition
         {
             get
             {

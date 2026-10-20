@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NiumaTPC.Core.Combat;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace NiumaTPC.Character.Combat
 {
@@ -60,11 +61,9 @@ namespace NiumaTPC.Character.Combat
 
         #region Public API
 
-        public float MaxAngleFromForward =>
-            maxAngleFromForward;
+        public float MaxAngleFromForward => maxAngleFromForward;
 
-        public MeleeTargetSensor TargetSensor =>
-            targetSensor;
+        public MeleeTargetSensor TargetSensor => targetSensor;
 
         /// <summary>
         /// 按优先级检查当前候选并返回第一名无遮挡目标
@@ -139,6 +138,45 @@ namespace NiumaTPC.Character.Combat
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 选择无遮挡目标并创建一次带目标快照的近战吸附意图
+        /// 最大位移由具体攻击配置传入，选敌控制器不决定武器规则
+        /// </summary>
+        public bool TryCreateAdsorptionIntent(
+            uint attackTick,
+            float maximumTravelDistance,
+            out MeleeIntent intent)
+        {
+            intent = default;
+
+            bool invalidMaximumDistance =
+                maximumTravelDistance <= 0f ||
+                float.IsNaN(maximumTravelDistance) ||
+                float.IsInfinity(maximumTravelDistance);
+
+            if (invalidMaximumDistance)
+            {
+                return false;
+            }
+
+            if (!TrySelectTarget(
+                    out IMeleeTarget target,
+                    out _,
+                    out _))
+            {
+                return false;
+            }
+
+            intent = new MeleeIntent(
+                target,
+                attackTick,
+                target.AdsorptionPosition,
+                target.CollisionRadius,
+                maximumTravelDistance);
+
+            return intent.IsValid;
         }
 
         #endregion

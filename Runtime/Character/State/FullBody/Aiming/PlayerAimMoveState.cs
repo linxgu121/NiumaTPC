@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.State.Core.Locomotion;
@@ -61,12 +59,11 @@ namespace NiumaTPC.Character.State.Core.Aiming
             AnimationFacade.SetMixerParameter(new Vector2(data.CurrentAnimBlendX, data.CurrentAnimBlendY));
         }
 
-        // 物理更新 在瞄准时仍需处理重力
+        // 位移、重力和接地由固定 Tick 模拟处理，表现状态不重复推进
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateMotion(null, 0f);
         }
-
+        
         public override void Exit()
         {
             // 保持原先的风格：Aim状态下由状态机管理IK开关

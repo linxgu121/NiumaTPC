@@ -6,11 +6,13 @@ namespace NiumaTPC.Character.State.Core.Interceptors
 {
     /// <summary>
     /// 下落全局拦截器
-    /// 负责检测下落意图 当空中时间过长且向下速度大于配置值时自动触发下落动画 优先级较高
+    /// 根据模拟结果产生的下落意图和垂直速度切入下落动画
+    /// 不再累计滞空时间
     /// </summary>
     [CreateAssetMenu(fileName = "FallInterceptor", menuName = "NiumaTPC/Player/Interceptors/Fall")]
     public class FallInterceptorSO : StateInterceptorSO
     {
+        // 检查下落意图与速度阈值，避免重复进入下落状态或打断翻越
         public override bool TryIntercept(NiumaCharacterController player, PlayerBaseState currentState, out PlayerBaseState nextState)
         {
             nextState = null;

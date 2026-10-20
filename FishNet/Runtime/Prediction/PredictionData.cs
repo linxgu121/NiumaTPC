@@ -13,7 +13,7 @@ namespace NiumaTPC.FishNet.Prediction
     /// 2. 服务器权威模拟。
     /// 3. 校正后重新执行历史输入。
     /// </summary>
-    public struct NiumaReplicateData : IReplicateData
+    public struct ReplicateData : IReplicateData
     {
         #region Input Data
 
@@ -39,6 +39,24 @@ namespace NiumaTPC.FishNet.Prediction
         /// </summary>
         public CharacterInputButtons Buttons;
 
+        /// <summary>
+        /// 客户端选择的近战目标 NetworkObject ID
+        /// 服务器只把它当作目标提示，不直接认可
+        /// </summary>
+        public int MeleeTargetObjectId;
+
+        /// <summary>
+        /// Owner 预测与历史重演使用的冻结目标位置
+        /// 服务器不会把该位置作为权威目标位置
+        /// </summary>
+        public Vector3 MeleeTargetPosition;
+
+        /// <summary>
+        /// Owner 预测与历史重演使用的冻结目标碰撞半径
+        /// 服务器会从权威目标组件重新读取
+        /// </summary>
+        public float MeleeTargetCollisionRadius;
+
         #endregion
 
         #region FishNet Tick
@@ -53,16 +71,25 @@ namespace NiumaTPC.FishNet.Prediction
 
         #region Constructor
 
-        public NiumaReplicateData(
+        public ReplicateData(
             Vector2 move,
             float viewYaw,
             float viewPitch,
-            CharacterInputButtons buttons)
+            CharacterInputButtons buttons,
+            int meleeTargetObjectId,
+            Vector3 meleeTargetPosition,
+            float meleeTargetCollisionRadius)
         {
             Move = move;
             ViewYaw = viewYaw;
             ViewPitch = viewPitch;
             Buttons = buttons;
+
+            MeleeTargetObjectId = meleeTargetObjectId;
+
+            MeleeTargetPosition = meleeTargetPosition;
+
+            MeleeTargetCollisionRadius = meleeTargetCollisionRadius;
 
             _tick = 0u;
         }
@@ -112,7 +139,7 @@ namespace NiumaTPC.FishNet.Prediction
     /// 不能只发送 Position，因为速度平滑、旋转平滑和重力
     /// 都会影响后续 Tick 的执行结果。
     /// </summary>
-    public struct NiumaReconcileData: IReconcileData
+    public struct NiumaReconcileData : IReconcileData
     {
         #region Authoritative State
 
@@ -213,6 +240,61 @@ namespace NiumaTPC.FishNet.Prediction
         /// </summary>
         public bool PendingSlideJump;
 
+        /// <summary>
+        /// 服务器确认的近战吸附活动状态
+        /// </summary>
+        public bool MeleeAdsorptionIsActive;
+
+        /// <summary>
+        /// 吸附所属的攻击开始 Tick
+        /// </summary>
+        public uint MeleeAdsorptionAttackTick;
+
+        /// <summary>
+        /// 吸附开始时冻结的目标世界位置
+        /// </summary>
+        public Vector3 MeleeAdsorptionTargetPosition;
+
+        /// <summary>
+        /// 目标的世界空间水平碰撞半径
+        /// </summary>
+        public float MeleeAdsorptionTargetCollisionRadius;
+
+        /// <summary>
+        /// 本次吸附允许产生的最大总位移
+        /// </summary>
+        public float MeleeAdsorptionMaximumTravelDistance;
+
+        /// <summary>
+        /// 吸附最大水平速度
+        /// </summary>
+        public float MeleeAdsorptionMaximumSpeed;
+
+        /// <summary>
+        /// 吸附最多持续的固定 Tick 数
+        /// </summary>
+        public uint MeleeAdsorptionDurationTicks;
+
+        /// <summary>
+        /// 双方碰撞表面之外保留的停止间隔
+        /// </summary>
+        public float MeleeAdsorptionStoppingSurfaceGap;
+
+        /// <summary>
+        /// 吸附期间每秒允许修正的最大朝向角度
+        /// </summary>
+        public float MeleeAdsorptionMaximumTurnSpeedDegreesPerSecond;
+
+        /// <summary>
+        /// 已经完成的吸附模拟 Tick 数
+        /// </summary>
+        public uint MeleeAdsorptionElapsedTicks;
+
+        /// <summary>
+        /// 吸附期间已经产生的实际水平位移
+        /// </summary>
+        public float MeleeAdsorptionAccumulatedTravelDistance;
+
         public float SmoothSpeed;
 
         public float SpeedSmoothVelocity;
@@ -261,6 +343,17 @@ namespace NiumaTPC.FishNet.Prediction
             ActionDirectionValue = (byte)state.ActionDirection;
             SlideSpeed = state.SlideSpeed;
             PendingSlideJump = state.PendingSlideJump;
+            MeleeAdsorptionIsActive = state.MeleeAdsorption.IsActive;
+            MeleeAdsorptionAttackTick = state.MeleeAdsorption.Request.AttackTick;
+            MeleeAdsorptionTargetPosition = state.MeleeAdsorption.Request.TargetPosition;
+            MeleeAdsorptionTargetCollisionRadius = state.MeleeAdsorption.Request.TargetCollisionRadius;
+            MeleeAdsorptionMaximumTravelDistance = state.MeleeAdsorption.Request.MaximumTravelDistance;
+            MeleeAdsorptionMaximumSpeed = state.MeleeAdsorption.MotionProfile.MaximumSpeed;
+            MeleeAdsorptionDurationTicks = state.MeleeAdsorption.MotionProfile.DurationTicks;
+            MeleeAdsorptionStoppingSurfaceGap = state.MeleeAdsorption.MotionProfile.StoppingSurfaceGap;
+            MeleeAdsorptionMaximumTurnSpeedDegreesPerSecond = state.MeleeAdsorption.MotionProfile.MaximumTurnSpeedDegreesPerSecond;
+            MeleeAdsorptionElapsedTicks = state.MeleeAdsorption.ElapsedTicks;
+            MeleeAdsorptionAccumulatedTravelDistance = state.MeleeAdsorption.AccumulatedTravelDistance;
             SmoothSpeed = state.SmoothSpeed;
             SpeedSmoothVelocity = state.SpeedSmoothVelocity;
             RotationSmoothVelocity = state.RotationSmoothVelocity;
@@ -272,41 +365,69 @@ namespace NiumaTPC.FishNet.Prediction
         #region Conversion
 
         /// <summary>
-        /// 将服务器数据恢复成完整模拟状态。
+        /// 将服务器数据恢复成完整模拟状态
+        /// 同时恢复会影响后续 Tick 的吸附阶段数据
         /// </summary>
         public CharacterSimulationState ToSimulationState()
         {
-            return new CharacterSimulationState(
-                tick: GetTick(),
-                position: Position,
-                yaw: Yaw,
-                viewPitch: ViewPitch,
-                isAiming: IsAiming,
-                verticalVelocity: VerticalVelocity,
-                locomotionState: (LocomotionState)LocomotionStateValue,
-                motionPhase:(CharacterMotionPhase)MotionPhaseValue,
-                motionPhaseTick: MotionPhaseTick,
-                startDirection:(CharacterStartDirection)StartDirectionValue,
-                startLocomotionState:(LocomotionState)StartLocomotionStateValue,
-                lastMoveDirection: LastMoveDirection,
-                isGrounded: IsGrounded,
-                hasPerformedDoubleJumpInAir:HasPerformedDoubleJumpInAir,
-                vaultType: (VaultType)VaultTypeValue,
-                vaultTick: VaultTick,
-                vaultStartPosition: VaultStartPosition,
-                vaultStartYaw: VaultStartYaw,
-                vaultWallNormal: VaultWallNormal,
-                vaultLedgePoint: VaultLedgePoint,
-                vaultLandPoint: VaultLandPoint,
-                vaultTargetYaw: VaultTargetYaw,
-                actionType: (CharacterActionType)ActionTypeValue,
-                actionTick: ActionTick,
-                actionDirection:(CharacterActionDirection)ActionDirectionValue,
-                slideSpeed: SlideSpeed,
-                pendingSlideJump: PendingSlideJump,
-                smoothSpeed: SmoothSpeed,
-                speedSmoothVelocity: SpeedSmoothVelocity,
-                rotationSmoothVelocity: RotationSmoothVelocity);
+            CharacterSimulationState state =
+                new CharacterSimulationState(
+                    tick: GetTick(),
+                    position: Position,
+                    yaw: Yaw,
+                    viewPitch: ViewPitch,
+                    isAiming: IsAiming,
+                    verticalVelocity: VerticalVelocity,
+                    locomotionState: (LocomotionState)LocomotionStateValue,
+                    motionPhase: (CharacterMotionPhase)MotionPhaseValue,
+                    motionPhaseTick: MotionPhaseTick,
+                    startDirection: (CharacterStartDirection)StartDirectionValue,
+                    startLocomotionState: (LocomotionState)StartLocomotionStateValue,
+                    lastMoveDirection: LastMoveDirection,
+                    isGrounded: IsGrounded,
+                    hasPerformedDoubleJumpInAir: HasPerformedDoubleJumpInAir,
+                    vaultType: (VaultType)VaultTypeValue,
+                    vaultTick: VaultTick,
+                    vaultStartPosition: VaultStartPosition,
+                    vaultStartYaw: VaultStartYaw,
+                    vaultWallNormal: VaultWallNormal,
+                    vaultLedgePoint: VaultLedgePoint,
+                    vaultLandPoint: VaultLandPoint,
+                    vaultTargetYaw: VaultTargetYaw,
+                    actionType: (CharacterActionType)ActionTypeValue,
+                    actionTick: ActionTick,
+                    actionDirection: (CharacterActionDirection)ActionDirectionValue,
+                    slideSpeed: SlideSpeed,
+                    pendingSlideJump: PendingSlideJump,
+                    smoothSpeed: SmoothSpeed,
+                    speedSmoothVelocity: SpeedSmoothVelocity,
+                    rotationSmoothVelocity: RotationSmoothVelocity);
+
+            if (MeleeAdsorptionIsActive)
+            {
+                state.MeleeAdsorption = new MeleeAdsorptionSimulationState
+                {
+                    IsActive = true,
+
+                    Request = new MeleeAdsorptionSimulationRequest(
+                            MeleeAdsorptionAttackTick,
+                            MeleeAdsorptionTargetPosition,
+                            MeleeAdsorptionTargetCollisionRadius,
+                            MeleeAdsorptionMaximumTravelDistance),
+
+                    MotionProfile = new MeleeAdsorptionMotionProfile(
+                            MeleeAdsorptionMaximumSpeed,
+                            MeleeAdsorptionDurationTicks,
+                            MeleeAdsorptionStoppingSurfaceGap,
+                            MeleeAdsorptionMaximumTurnSpeedDegreesPerSecond),
+
+                    ElapsedTicks = MeleeAdsorptionElapsedTicks,
+
+                    AccumulatedTravelDistance = MeleeAdsorptionAccumulatedTravelDistance
+                };
+            }
+
+            return state;
         }
 
         #endregion

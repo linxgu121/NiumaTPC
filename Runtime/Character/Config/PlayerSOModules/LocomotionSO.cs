@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using Animancer;
 using NiumaTPC.Character.Core.Animation;
 using UnityEngine;
@@ -66,15 +64,6 @@ namespace NiumaTPC.Character.Config.PlayerSOModules
         
         [Tooltip("移动中闪避的淡入选项")]
         public AnimPlayOptions FadeInMoveDodgeOptions = AnimPlayOptions.Default;
-
-        #endregion
-
-        #region 下落检测
-
-        [Header("下落检测")]
-
-         [Tooltip("触发下落的滞空时间阈值")]
-        public float AirborneTimeThresholdForFall = 0.3f;
 
         #endregion
 

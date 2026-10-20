@@ -2,7 +2,6 @@ using NiumaTPC.Character.Config;
 using NiumaTPC.Character.ProcessingPipeline.Intent;
 using NiumaTPC.Character.ProcessingPipeline.Parameter;
 using NiumaTPC.Character.RuntimeData;
-using NiumaTPC.Character.Traversal;
 
 
 namespace NiumaTPC.Character.ProcessingPipeline
@@ -20,9 +19,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
         private readonly PlayerSO _config;
 
         // 持有各意图处理器
-        private readonly LocomotionIntentProcessor _locomotionIntentProcessor;
         private readonly AimIntentProcessor _aimIntentProcessor;
-        private readonly JumpOrVaultIntentProcessor _jumpOrVaultIntentProcessor;
         private readonly EojIntentProcessor _eojIntentProcessor;
         private readonly HotbarIntentProcessor _hotbarIntentProcessor;
         private readonly ActionIntentProcessor _actionIntentProcessor;
@@ -37,9 +34,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
             _config = player.Config;
 
             _aimIntentProcessor = new AimIntentProcessor(_runtimeData);
-            _locomotionIntentProcessor = new LocomotionIntentProcessor(_runtimeData, _config);
-            ICharacterTraversalProbe traversalProbe = new PhysicsCharacterTraversalProbe(_config.Vaulting,player.CharacterController);
-            _jumpOrVaultIntentProcessor = new JumpOrVaultIntentProcessor(_runtimeData, _config, player.transform, traversalProbe);
+
             _eojIntentProcessor = new EojIntentProcessor(_runtimeData, _inputPipeline);
             _hotbarIntentProcessor = new HotbarIntentProcessor(_runtimeData);
             _actionIntentProcessor = new ActionIntentProcessor(_runtimeData);
@@ -50,24 +45,16 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
 
         // 翻译机集群遍历
-        public void UpdateIntentProcessors(
-            bool processJumpOrVaultIntent = true,
-            bool processActionMovementIntent = true,
-            bool writeAimState = true)
+
+        // 更新视角、开火及其他帧级意图
+        // 运动档位和移动动作由固定 Tick 模拟决定
+        public void UpdateIntentProcessors()
         {
-            // 注:ref readonly 的语义上只读引用 让编译器强制禁止在 Processor 内部对 inputSnapshot 的任何修改行为
-            // 同时避免INPUTDATA的复制开销 
             ref readonly ProcessedInputData inputSnapshot = ref _inputPipeline.Current.currentFrameData.Processed;
 
             _viewRotationProcessor.Update(in inputSnapshot);
-            _aimIntentProcessor.Update(in inputSnapshot,writeAimState);
-            _locomotionIntentProcessor.Update(in inputSnapshot,processActionMovementIntent);
+            _aimIntentProcessor.Update(in inputSnapshot);
 
-            if(processJumpOrVaultIntent)
-            {
-                _jumpOrVaultIntentProcessor.Update(in inputSnapshot);
-            }
-            
             _eojIntentProcessor.Update(in inputSnapshot);
             _hotbarIntentProcessor.Update(in inputSnapshot);
             _actionIntentProcessor.Update(in inputSnapshot);
@@ -75,7 +62,7 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
         // 参数降维与混合树驱动运算
         // 此阶段已彻底脱离 Input 快照 纯粹基于黑板中的 Intent 意图 进行数学运算
-        
+
         /// <summary>
         /// 更新动画、IK等纯表现参数。
         /// 本地地角色和远端角色都必须执行。

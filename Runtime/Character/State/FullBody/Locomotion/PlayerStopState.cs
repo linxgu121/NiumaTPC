@@ -47,10 +47,9 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
         }
 
-        // 物理更新 停止状态下仍需更新重力和接地检测
+        // 位移、重力和接地由固定 Tick 模拟处理，表现状态不重复推进
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateMotion();
         }
 
         // 退出状态 清理回调

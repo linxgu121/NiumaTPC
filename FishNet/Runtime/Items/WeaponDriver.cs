@@ -6,7 +6,7 @@ using NiumaTPC.Character.Simulation;
 using NiumaTPC.Item;
 using UnityEngine;
 
-namespace NiumaTPC.FishNet
+namespace NiumaTPC.FishNet.Items
 {
     /// <summary>
     /// 武器请求的 FishNet 适配入口
@@ -19,8 +19,8 @@ namespace NiumaTPC.FishNet
         #region Inspector
 
         [SerializeField]
-        [Tooltip("绑定同根节点的 OfflineWeaponFireSource，本步只复用它采样请求；为空时获取同物体组件")]
-        private OfflineWeaponFireSource _requestSource;
+        [Tooltip("绑定同根节点的 WeaponFireRequestSource本步只复用它采样请求；为空时获取同物体组件")]
+        private WeaponFireRequestSource _requestSource;
 
         [SerializeField]
         [Tooltip("打印请求提交、服务器接收与拥有者回执；接入连续开火后建议关闭")]
@@ -140,7 +140,7 @@ namespace NiumaTPC.FishNet
 
             if (_requestSource == null)
             {
-                _requestSource = GetComponent<OfflineWeaponFireSource>();
+                _requestSource = GetComponent<WeaponFireRequestSource>();
             }
         }
 
@@ -298,6 +298,33 @@ namespace NiumaTPC.FishNet
             }
 
             SendEquipmentSnapshotToOwner();
+
+            return true;
+        }
+
+        /// <summary>
+        /// 检查并返回服务器当前确认且仍然有效的装备实例
+        /// 不读取客户端 RuntimeData 或表现装备
+        /// </summary>
+        public bool TryGetServerEquippedItem(
+            out ItemInstance equippedItem,
+            out uint equipmentRevision)
+        {
+            equippedItem = null;
+            equipmentRevision = 0u;
+
+            if (!IsServerInitialized ||
+                _serverEquipmentRevision == 0u ||
+                _serverEquippedItem == null ||
+                _serverEquippedItem.CurrentAmount <= 0 ||
+                !(_serverEquippedItem.BaseData is EquippableItemSO) ||
+                FindServerEquipmentSlot(_serverEquippedItem) < 0)
+            {
+                return false;
+            }
+
+            equippedItem = _serverEquippedItem;
+            equipmentRevision = _serverEquipmentRevision;
 
             return true;
         }

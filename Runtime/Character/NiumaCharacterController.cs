@@ -101,7 +101,6 @@ namespace NiumaTPC.Character
         //驱动器与外观层系统
         public AnimancerComponent Animancer { get; private set; }
         public CharacterController CharacterController { get; private set; }
-        public MotionDriver MotionDriver { get; private set; }
         public EquipmentDriver EquipmentDriver { get; private set; }
         public AnimationFacadeBase AnimationFacade { get; private set; }
         public AudioDriver AudioDriver { get; private set; }
@@ -131,11 +130,6 @@ namespace NiumaTPC.Character
         /// 本地帧输入处理器不得再覆盖这些状态。
         /// </summary>
         private bool _externalSimulationStateDriven;
-
-        /// <summary>
-        /// 跳跃输入是否由外部固定 Tick 模拟接管
-        /// </summary>
-        private bool _externalJumpSimulationActive;
 
         /// <summary>
         /// 准备基础属性
@@ -242,7 +236,6 @@ namespace NiumaTPC.Character
             // 实例化所有系统控制器与驱动器 
             StateMachine = new StateMachine();
             InterruptProcessor = new GlobalInterruptProcessor(this);
-            MotionDriver = new MotionDriver(this);
             EquipmentDriver = new EquipmentDriver(this);
             LODArbiter = new LODArbiter(this);
 
@@ -285,7 +278,7 @@ namespace NiumaTPC.Character
         private void BootIfNeeded()
         {
             // 初始化未完成时，不启动依赖运行数据和驱动器的子系统
-            if (_booted || BaseStats == null || RuntimeData == null || MotionDriver == null)
+            if (_booted || BaseStats == null || RuntimeData == null)
             {
                 return;
             }
@@ -390,10 +383,9 @@ namespace NiumaTPC.Character
                 //只有本地输入拥有者才能读取设备输入并产生玩法意图
                 InputPipeline.Update();
 
-                MainProcessorPipeline.UpdateIntentProcessors(
-                    processJumpOrVaultIntent: !_externalJumpSimulationActive,
-                    processActionMovementIntent: !MotionDriver.IsExternalSimulationActive,
-                    writeAimState: !MotionDriver.IsExternalSimulationActive);
+                // 动作移动和瞄准状态由固定 Tick 模拟写入
+                // 帧级处理器不覆盖固定 Tick 产生的动作和瞄准状态
+                MainProcessorPipeline.UpdateIntentProcessors();
             }
 
             InventoryController.Update();
@@ -418,6 +410,7 @@ namespace NiumaTPC.Character
 
             AudioController.Update();
 
+#if UNITY_EDITOR
             //古法状态调试 已经被drawxxldebuger代替 打包注释掉
             if (statedebug && StateMachine.CurrentState != null && _lastState != null)
             {
@@ -426,7 +419,7 @@ namespace NiumaTPC.Character
                     Debug.Log($"[State] {_lastState.GetType().Name} -> {StateMachine.CurrentState.GetType().Name}");
                 }
             }
-
+#endif
 
         }
 
@@ -436,6 +429,12 @@ namespace NiumaTPC.Character
         // Unity 的生命周期中 Animator 的骨骼结算发生在 Update 之后 LateUpdate 之前
         // 如果把 PhysicsUpdate 放在 Update 里 拿到的永远是上一帧的动画时间 导致角色的物理位置永远比动作快一帧 
         // 这会引发视觉上的抽搐问题 尤其是在低帧数的环境下 对那些带有转向的动画非常明显
+
+        // 以上是单机版本的说法但对于整体设计与实现仍有作用，以下是网络同步版本的说法
+        // 因为网络同步版本已经移除了MotionDriver由模拟层进行控制移动
+
+        // 动画求值后更新状态表现和 IK
+        // 角色位移由固定 Tick 模拟推进，不在这里重复执行
 
         //物理与表现层的更新 (在动画引擎运算之后)
         private void LateUpdate()
@@ -486,40 +485,6 @@ namespace NiumaTPC.Character
             {
                 InputPipeline?.ClearBufferedInput();
                 RuntimeData?.ResetIntent();
-            }
-        }
-
-        #endregion
-
-        #region 子模块外部驱动
-
-        /// <summary>
-        /// 跳跃输入是否由外部固定 Tick 模拟接管。
-        /// 核心层不关心外部是 FishNet、离线模拟器还是其他网络库。
-        /// </summary>
-        public bool IsExternalJumpSimulationActive => _externalJumpSimulationActive;
-
-        /// <summary>
-        /// 切换跳跃逻辑的实现链路
-        /// </summary>
-        public void SetExternalJumpSimulationActive(bool active)
-        {
-            if (_externalJumpSimulationActive == active)
-            {
-                return;
-            }
-
-            _externalJumpSimulationActive = active;
-
-            if (active && RuntimeData != null)
-            {
-                // 只清理旧状态机产生的意图。
-                // 不能清理 InputPipeline，否则网络模拟器会拿不到 JumpPressed。
-                RuntimeData.WantsToJump = false;
-                RuntimeData.WantsDoubleJump = false;
-                RuntimeData.WantsToVault = false;
-                RuntimeData.WantsLowVault = false;
-                RuntimeData.WantsHighVault = false;
             }
         }
 

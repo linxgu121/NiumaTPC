@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Motion.MotionEnums;
@@ -10,9 +8,9 @@ using UnityEngine;
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
-    /// 玩家起步状态 
-    /// 负责根据运动状态和移动方向选择8方向起步动画 并驱动角色初始移动 
-    /// 动画结束后切换到循环移动状态
+    /// 玩家起步表现状态
+    /// 根据模拟器给出的方向和速度档位播放起步动画
+    /// 模拟进入持续移动阶段后切换到循环移动状态
     /// </summary>
     public class PlayerMoveStartState : PlayerBaseState
     {
@@ -22,46 +20,17 @@ namespace NiumaTPC.Character.State.Core.Locomotion
 
         public PlayerMoveStartState(NiumaCharacterController player) : base(player) { }
 
-        // 进入状态 选择对应方向的起步动画并注册结束回调
+        // 根据模拟器确定的起步方向和速度档位选择动画
         public override void Enter()
         {
-            bool usesFixedTickSimulation =
-                player.MotionDriver.IsExternalSimulationActive;
+            _startLocomotionState = data.SimulationStartLocomotionState;
+            _startDirection = data.SimulationStartDirection;
 
-            _startLocomotionState = usesFixedTickSimulation
-                ? data.SimulationStartLocomotionState
-                : data.CurrentLocomotionState;
-
-            _startDirection = usesFixedTickSimulation
-                ? data.SimulationStartDirection
-                : CharacterStartDirectionResolver.ResolveLocalAngle(
-                    data.DesiredLocalMoveAngle);
-
-            // 固定 Tick 模式下，动画和位移曲线必须使用同一方向、同一速度档位。
+            // 动画与位移模拟使用同一组起步数据
             PlayStartAnimation(_startDirection, _startLocomotionState);
-
-            if(!usesFixedTickSimulation)
-            {
-                // End 回调 切换到 MoveLoop
-                AnimationFacade.SetOnEndCallback(() =>
-                {
-                    // 应用自定义淡入时间
-                    var nextOptions = data.CurrentLocomotionState switch
-                    {
-                        LocomotionState.Walk => config.LocomotionAnims.FadeInWalkLoopOptions,
-                        LocomotionState.Jog => config.LocomotionAnims.FadeInRunLoopOptions,
-                        LocomotionState.Sprint => config.LocomotionAnims.FadeInSprintLoopOptions,
-                        _ => AnimPlayOptions.Default
-                    };
-                data.NextStatePlayOptions = nextOptions;
-
-                player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerMoveLoopState>());
-            });
-            }
-            
         }
 
-         // 状态逻辑 检测瞄准 空闲等打断条件
+        // 状态逻辑 检测瞄准 空闲等打断条件
         // 跳跃由全局拦截器统一处理，避免状态内重复判断
         protected override void UpdateStateLogic()
         {
@@ -73,19 +42,19 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            if(player.MotionDriver.IsExternalSimulationActive && data.SimulationMotionPhase == CharacterMotionPhase.Moving)
+            if (data.SimulationMotionPhase == CharacterMotionPhase.Moving)
             {
                 data.NextStatePlayOptions =
                    data.CurrentLocomotionState switch
                    {
-                    LocomotionState.Walk => config.LocomotionAnims.FadeInWalkLoopOptions,
+                       LocomotionState.Walk => config.LocomotionAnims.FadeInWalkLoopOptions,
 
-                    LocomotionState.Jog => config.LocomotionAnims.FadeInRunLoopOptions,
+                       LocomotionState.Jog => config.LocomotionAnims.FadeInRunLoopOptions,
 
-                    LocomotionState.Sprint => config.LocomotionAnims.FadeInSprintLoopOptions,
+                       LocomotionState.Sprint => config.LocomotionAnims.FadeInSprintLoopOptions,
 
-                    _ => AnimPlayOptions.Default
-                     
+                       _ => AnimPlayOptions.Default
+
                    };
 
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerMoveLoopState>());
@@ -101,10 +70,8 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             {
                 player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerIdleState>());
             }
-            else if (player.MotionDriver.IsExternalSimulationActive &&
-                     data.SimulationMotionPhase == CharacterMotionPhase.Starting &&
-                     (data.SimulationStartDirection != _startDirection ||
-                      data.SimulationStartLocomotionState != _startLocomotionState))
+            else if (data.SimulationMotionPhase == CharacterMotionPhase.Starting &&
+            (data.SimulationStartDirection != _startDirection || data.SimulationStartLocomotionState != _startLocomotionState))
             {
                 // 起步过程中突然反向时，模拟器会开启新一轮 Starting。
                 // 表现层立即改播新的锁定方向，不能继续播放旧起步动画。
@@ -124,25 +91,16 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             }
         }
 
-        // 物理更新 委托 MotionDriver 根据烘焙曲线驱动角色移动
+        // 位移由固定 Tick 模拟推进，表现状态不重复驱动角色
         public override void PhysicsUpdate()
         {
-            if (_currentClipData == null) return;
-
-            float stateTime = AnimationFacade.CurrentTime;
-
-            // 委托 将所有复杂的物理计算交给 MotionDriver
-            player.MotionDriver.UpdateMotion(_currentClipData, stateTime);
         }
 
-         // 退出状态 清理回调 中断曲线驱动 防止下一个起步瞬移
+        // 退出时清理动画缓存，并为后续循环动画设置混合值
         public override void Exit()
         {
             AnimationFacade.ClearOnEndCallback();
             _currentClipData = null;
-
-            // 清掉上一次的曲线增量旋转缓存 避免下次进入继承旧角度导致瞬回
-            player.MotionDriver.InterruptClipDrivenMotion();
 
             float targetY = data.CurrentLocomotionState switch
             {

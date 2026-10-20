@@ -1,139 +1,81 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 namespace NiumaTPC.Character.RuntimeData
 {
     /// <summary>
-    /// 原始输入数据（只记录硬件输入）
+    /// 原始输入中的逻辑按钮集合
+    /// 每一位代表一个逻辑动作，不绑定键盘、鼠标或手柄
+    /// </summary>
+    [Flags]
+    public enum RawInputButtons : uint
+    {
+        None = 0u,
+
+        Jump = 1u << 0,
+        Dodge = 1u << 1,
+        Roll = 1u << 2,
+        Sprint = 1u << 3,
+        Walk = 1u << 4,
+        Aim = 1u << 5,
+        Interact = 1u << 6,
+        Fire = 1u << 7,
+
+        Expression1 = 1u << 8,
+        Expression2 = 1u << 9,
+        Expression3 = 1u << 10,
+        Expression4 = 1u << 11,
+
+        Number1 = 1u << 12,
+        Number2 = 1u << 13,
+        Number3 = 1u << 14,
+        Number4 = 1u << 15,
+        Number5 = 1u << 16,
+
+        Action = 1u << 17
+    }
+
+    /// <summary>
+    /// 原始输入数据
+    /// 只记录输入设备在当前帧产生的事实
     /// </summary>
     public struct RawInputData
     {
         /// <summary>
-        /// 记录移动输入轴
+        /// 移动输入轴
         /// </summary>
         public Vector2 MoveAxis;
+
         /// <summary>
-        /// 记录视角移动轴
+        /// 视角输入轴
         /// </summary>
         public Vector2 LookAxis;
-        /// <summary>
-        /// 跳（长按）
-        /// </summary>
-        public bool JumpHeld;
-        /// <summary>
-        /// 闪避（长按）
-        /// </summary>
-        public bool DodgeHeld;
-        /// <summary>
-        /// 翻滚（长按）
-        /// </summary>
-        public bool RollHeld;
-        /// <summary>
-        /// 奔跑（长按）
-        /// </summary>
-        public bool SprintHeld;
-        /// <summary>
-        /// 走（长按）
-        /// </summary>
-        public bool WalkHeld;
-        /// <summary>
-        /// 瞄准（长按）
-        /// </summary>
-        public bool AimHeld;
-        /// <summary>
-        /// 交互（长按）
-        /// </summary>
-        public bool InteractHeld;
-        /// <summary>
-        /// 开火(长按)
-        /// </summary>
-        public bool FireHeld;
-        
-        /// <summary>
-        /// 表情1（长按）
-        /// </summary>
-        public bool Expression1Held;
-        /// <summary>
-        /// 表情2（长按）
-        /// </summary>
-        public bool Expression2Held;
-        /// <summary>
-        /// 表情3（长按）
-        /// </summary>
-        public bool Expression3Held;
-        /// <summary>
-        /// 表情4（长按）
-        /// </summary>
-        public bool Expression4Held;
-        public bool Number1Held;
-        public bool Number2Held;
-        public bool Number3Held;
-        public bool Number4Held;
-        public bool Number5Held;
-        /// <summary>
-        /// 动作（长按）
-        /// </summary>
-        public bool ActionHeld;
-        /// <summary>
-        /// 鼠标右键（长按）
-        /// </summary>
-        public bool LeftMouseHeld;
 
         /// <summary>
-        /// 走路键本帧刚按下，同时作为滑铲输入边沿
+        /// 当前仍然按住的逻辑按钮集合
         /// </summary>
-        public bool WalkJustPressed;
+        public RawInputButtons HeldButtons;
 
         /// <summary>
-        /// 跳（按下）
+        /// 当前帧刚按下的逻辑按钮集合
         /// </summary>
-        public bool JumpJustPressed;
-        /// <summary>
-        /// 闪避（按下）
-        /// </summary>
-        public bool DodgeJustPressed;
-        /// <summary>
-        /// 翻滚（按下）
-        /// </summary>
-        public bool RollJustPressed;
-        /// <summary>
-        /// 开火（按下）
-        /// </summary>
-        public bool FireJustPressed;
+        public RawInputButtons PressedButtons;
 
         /// <summary>
-        /// 表情1（按下）
+        /// 检查指定逻辑按钮当前是否仍被按住
         /// </summary>
-        public bool Expression1JustPressed;
-        /// <summary>
-        /// 表情2（按下）
-        /// </summary>
-        public bool Expression2JustPressed;
-        /// <summary>
-        /// 表情3（按下）
-        /// </summary>
-        public bool Expression3JustPressed;
-        /// <summary>
-        /// 表情4（按下）
-        /// </summary>
-        public bool Expression4JustPressed;
-
-        public bool Number1JustPressed;
-        public bool Number2JustPressed;
-        public bool Number3JustPressed;
-        public bool Number4JustPressed;
-        public bool Number5JustPressed;
+        public bool IsHeld(RawInputButtons button)
+        {
+            return (HeldButtons & button) != 0u;
+        }
 
         /// <summary>
-        /// 动作（按下）
+        /// 检查指定逻辑按钮是否在当前帧刚按下
         /// </summary>
-        public bool ActionJustPressed;
-        /// <summary>
-        /// 鼠标右键（按下）
-        /// </summary>
-        public bool LeftMouseJustPressed;
-
+        public bool WasPressed(RawInputButtons button)
+        {
+            return (PressedButtons & button) != 0u;
+        }
     }
 
     /// <summary>
@@ -150,7 +92,7 @@ namespace NiumaTPC.Character.RuntimeData
         /// 处理后的视角移动轴
         /// </summary>
         public Vector2 Look;
-        
+
         /// <summary>
         /// 跳（长按）
         /// </summary>
@@ -183,8 +125,8 @@ namespace NiumaTPC.Character.RuntimeData
         /// 开火(长按)
         /// </summary>
         public bool FireHeld;
-        
-         /// <summary>
+
+        /// <summary>
         /// 表情1（长按）
         /// </summary>
         public bool Expression1Held;

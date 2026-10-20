@@ -1,6 +1,6 @@
 using System;
 
-namespace NiumaTPC.FishNet
+namespace NiumaTPC.FishNet.Items
 {
     /// <summary>
     /// 关联一次开火请求与服务器子弹

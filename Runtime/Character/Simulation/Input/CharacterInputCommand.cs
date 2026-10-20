@@ -19,13 +19,15 @@ namespace NiumaTPC.Character.Simulation
 
         Jump = 1 << 2,
 
-        Dodge = 1 <<3,
+        Dodge = 1 << 3,
 
         Roll = 1 << 4,
 
         Slide = 1 << 5,
 
-        Aim = 1 << 6
+        Aim = 1 << 6,
+
+        MeleeAttack = 1 << 7
     }
 
     /// <summary>
@@ -49,7 +51,7 @@ namespace NiumaTPC.Character.Simulation
         /// 玩家期望面对的世界Y轴角度
         /// </summary>
         public float ViewYaw;
-        
+
         /// <summary>
         /// 玩家期望的视角俯仰角。
         /// 保留正负方向，不进行 360 度循环。
@@ -79,8 +81,8 @@ namespace NiumaTPC.Character.Simulation
         {
             return (Buttons & button) != 0;
         }
-            
-    
+
+
 
     }
 

@@ -1,24 +1,21 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.Simulation;
-using UnityEngine;
 
 namespace NiumaTPC.Character.State.Core.Locomotion
 {
     /// <summary>
     /// 玩家翻滚状态
-    /// 负责执行翻滚动画和运动变形 根据移动方向选择8方向翻滚 最后回到移动或空闲状态
+    /// 翻滚表现状态，选择八方向动画，并在模拟动作结束后切回移动或空闲
+    /// 不根据动画时间推进角色位移
     /// </summary>
     public class PlayerRollState : PlayerBaseState
     {
         //缓存当前选中的翻滚数据
+        // 防止模拟动作结束后重复提交表现状态切换
         private WarpedMotionData _selectedData;
 
-        // 累计播放时长和是否已触发 EndTime 逻辑 防止重复执行
-        private float _stateDuration;
         private bool _endTimeTriggered;
 
         public PlayerRollState(NiumaCharacterController player) : base(player) { }
@@ -34,7 +31,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             // 写入音频意图（由 AudioController 统一消费）
             data.SfxQueue.Enqueue(PlayerSfxEvent.Roll);
 
-            _stateDuration = 0f;
             _endTimeTriggered = false;
 
             // 根据方向选择翻滚数据
@@ -47,24 +43,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 return;
             }
 
-            // 初始化运动变形
-            player.MotionDriver.InitializeWarpData(_selectedData);
-
             ChooseOptionsAndPlay(_selectedData.Clip);
-
-            /*
-             * 纯净版仍由动画结束回调退出。
-             * 固定 Tick 模式必须等待权威动作状态结束，不能让动画提前结束动作表现。
-             */
-            if(!player.MotionDriver.IsExternalSimulationActive)
-            {
-                // 设置结束回调 如果提前触发EndTime则忽略此回调
-                player.AnimationFacade.SetOnEndCallback(() =>
-                {
-                    if (_endTimeTriggered) return;
-                    HandleRollEnd();
-                });
-            }
 
             // 记录末相位确保后续状态能正确选择脚位
             data.ExpectedFootPhase = _selectedData.EndPhase;
@@ -78,33 +57,16 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 物理更新 计算运动变形时间 驱动Warp运动
         public override void PhysicsUpdate()
         {
-            if (_selectedData == null) return;
-
-            if (player.MotionDriver.IsExternalSimulationActive)
+            if (_selectedData == null || _endTimeTriggered)
             {
-                /*
-                 * 外部模拟期间不再读取动画时间产生位移。
-                 * 当固定 Tick 状态退出 Roll 时，再结束动画状态。
-                 */
-                if (data.SimulationActionType != CharacterActionType.Roll)
-                {
-                    HandleRollEnd();
-                }
-
                 return;
             }
 
-            float normalizedTime = player.AnimationFacade.CurrentNormalizedTime;
-            player.MotionDriver.UpdateWarpMotion(normalizedTime);
-
-            // 累计播放时长 检查是否到达 EndTime 提前切换
-            _stateDuration = player.AnimationFacade.CurrentTime;
-
-            if (!_endTimeTriggered && _selectedData.EndTime > 0f && _stateDuration >= _selectedData.EndTime && data.CurrentLocomotionState != LocomotionState.Idle)
+            // 位移由固定 Tick 推进
+            // 模拟动作结束后，表现层再选择后续动画
+            if (data.SimulationActionType != CharacterActionType.Roll)
             {
-                _endTimeTriggered = true;
                 HandleRollEnd();
-                return;
             }
         }
 
@@ -112,8 +74,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         public override void Exit()
         {
             data.WantsToRoll = false;
-
-            player.MotionDriver.ClearWarpData();
 
             player.AnimationFacade.ClearOnEndCallback();
 

@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
@@ -14,7 +12,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
     /// </summary>
     public class PlayerLandState : PlayerBaseState
     {
-         private int level;
+        private int level;
         private MotionClipData _currentClip;
         private bool _endTimeTriggered;
 
@@ -25,9 +23,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         {
             level = 0;
             _endTimeTriggered = false;
-
-            // 重置本次空中的二段跳标记 为下次空中做准备
-            data.HasPerformedDoubleJumpInAir = false;
 
             bool wantToMove = data.CurrentLocomotionState != LocomotionState.Idle;
 
@@ -75,7 +70,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         protected override void UpdateStateLogic()
         {
             // 如果权威运动状态不为 Idle 允许按 EndTime 提前切回 MoveLoop
-            if (!_endTimeTriggered && data.CurrentLocomotionState != LocomotionState.Idle && 
+            if (!_endTimeTriggered && data.CurrentLocomotionState != LocomotionState.Idle &&
                 _currentClip != null && _currentClip.EndTime > 0f && AnimationFacade.CurrentTime >= _currentClip.EndTime)
             {
                 _endTimeTriggered = true;
@@ -89,10 +84,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 物理更新 委托 MotionDriver 根据烘焙曲线驱动运动
         public override void PhysicsUpdate()
         {
-            if (_currentClip == null) return;
-
-            float stateTime = AnimationFacade.CurrentTime;
-            player.MotionDriver.UpdateMotion(_currentClip, stateTime);
+            // 落地动画只负责表现，不再按渲染帧或动画曲线推进角色位移
         }
 
         // 退出状态 清理回调 并根据等级设置下一个状态的淡入参数

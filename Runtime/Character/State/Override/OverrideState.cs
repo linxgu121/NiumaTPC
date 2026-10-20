@@ -49,12 +49,9 @@ namespace NiumaTPC.Character.State.Override
             if (!_applied) Apply();
         }
 
+        // 覆盖状态只维护动画表现，不通过旧驱动追加重力位移
         public override void PhysicsUpdate()
         {
-            if (!data.Override.IsActive) return;
-
-            if (data.Override.Request.ApplyGravity)
-                player.MotionDriver.UpdateGravityOnly();
         }
 
         // 允许外部在不切换状态的情况下强制重播新请求

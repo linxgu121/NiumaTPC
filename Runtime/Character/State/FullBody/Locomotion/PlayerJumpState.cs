@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.Motion.MotionEnums;
@@ -11,7 +9,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
     {
         private MotionClipData _clipData;
         private bool _canCheckLand;
-        private float _jumpForce;
 
         public PlayerJumpState(NiumaCharacterController player) : base(player) { }
 
@@ -42,14 +39,6 @@ namespace NiumaTPC.Character.State.Core.Locomotion
                 else player.StateMachine.ChangeState(player.StateRegistry.GetState<PlayerFallState>());
             });
 
-            if(!player.IsExternalJumpSimulationActive)
-            {
-                PerformJumpPhysics();
-
-                // 旧链路由状态机消费；固定 Tick 链路此前已经消费。
-                player.InputPipeline?.ConsumeJumpPressed();
-            }
-
         }
 
         // 根据当前运动状态和装备情况选择对应的跳跃动画和跳跃力量
@@ -61,40 +50,28 @@ namespace NiumaTPC.Character.State.Core.Locomotion
             {
                 case LocomotionState.Idle:
                     _clipData = config.JumpAndLanding.JumpAirAnim;
-                    _jumpForce = config.JumpAndLanding.JumpForce;
                     break;
                 case LocomotionState.Walk:
                 case LocomotionState.Jog:
                     _clipData = config.JumpAndLanding.JumpAirAnimWalk ?? config.JumpAndLanding.JumpAirAnim;
-                    _jumpForce = config.JumpAndLanding.JumpForceWalk;
                     break;
 
                 case LocomotionState.Sprint:
                     if (isHandsEmpty)
                     {
                         _clipData = config.JumpAndLanding.JumpAirAnimSprintEmpty ?? config.JumpAndLanding.JumpAirAnim;
-                        _jumpForce = config.JumpAndLanding.JumpForceSprintEmpty;
                     }
                     else
                     {
                         _clipData = config.JumpAndLanding.JumpAirAnimSprint ?? config.JumpAndLanding.JumpAirAnim;
-                        _jumpForce = config.JumpAndLanding.JumpForceSprint;
                     }
                     break;
 
                 default:
                     Debug.Log(" JumpAirAnim 配置缺失 使用默认跳跃动画");
                     _clipData = config.JumpAndLanding.JumpAirAnim;
-                    _jumpForce = config.JumpAndLanding.JumpForce;
                     break;
             }
-        }
-
-        // 施加跳跃力量 设置垂直速度和接地状态
-        private void PerformJumpPhysics()
-        {
-            data.VerticalVelocity = _jumpForce;
-            data.IsGrounded = false;
         }
 
         // 状态逻辑 检测二段跳和落地条件
@@ -123,7 +100,7 @@ namespace NiumaTPC.Character.State.Core.Locomotion
         // 物理更新 委托 MotionDriver 处理重力等运动
         public override void PhysicsUpdate()
         {
-            player.MotionDriver.UpdateMotion(null, 0f);
+            // 位移和重力由固定 Tick 模拟推进，动画状态不再调用 MotionDriver
         }
 
         // 退出状态 清理回调和动画数据
