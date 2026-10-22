@@ -67,6 +67,9 @@ namespace NiumaTPC.FishNet
 
         private CharacterSimulationRunner _runner;
 
+        // 每个角色独立记录已经处理过的落地表现
+        private readonly CharacterLandingPresentationBridge _landingPresentation = new CharacterLandingPresentationBridge();
+
         // 只记录服务器正常推进后的结果
         // 客户端预测和校正重放不能覆盖它
         private CharacterSimulationState _serverSimulationState;
@@ -519,7 +522,7 @@ namespace NiumaTPC.FishNet
 
             float tickDeltaTime = (float)TimeManager.TickDelta;
 
-            TryBeginMeleeAdsorption(in data, in command, replicateState, tickDeltaTime);
+            TryProcessMeleeAttack(in data, in command, replicateState, tickDeltaTime);
 
             CharacterSimulationState state = _runner.Simulate(in command, canSprint, isHandsEmpty, tickDeltaTime);
 
@@ -544,97 +547,109 @@ namespace NiumaTPC.FishNet
         }
 
         /// <summary>
-        /// 检查当前 Replicate 是否包含真实近战攻击边沿并启动对应模拟
+        /// 检查当前 Replicate 是否包含真实攻击边沿并交给对应权威分支
         /// 丢包补帧产生的非 Created 数据不能重复触发攻击
         /// </summary>
-        private bool TryBeginMeleeAdsorption(
+        private bool TryProcessMeleeAttack(
             in ReplicateData data,
             in CharacterInputCommand command,
             ReplicateState replicateState,
             float tickDeltaTime)
         {
-            if (!replicateState.ContainsCreated() || !command.HasButton(CharacterInputButtons.MeleeAttack))
+            if (!replicateState.ContainsCreated() ||
+                !command.HasButton(
+                    CharacterInputButtons.MeleeAttack))
             {
                 return false;
             }
 
             if (IsServerInitialized)
             {
-                return TryBeginServerMeleeAdsorption(
+                return TryProcessServerMeleeAttack(
                     in data,
                     in command,
                     tickDeltaTime);
             }
 
-            // 纯观察客户端不使用客户端目标快照启动玩法模拟
+            // 纯观察客户端不处理本地攻击预测
             if (!Owner.IsLocalClient)
             {
                 return false;
             }
 
-            return TryBeginOwnerMeleeAdsorption(
+            return TryProcessOwnerMeleeAttack(
                 in data,
                 in command,
                 tickDeltaTime);
         }
 
         /// <summary>
-        /// 检查 Owner 本地装备与冻结快照并启动即时预测
-        /// 服务器拒绝后会由 Reconcile 撤销错误预测
+        /// 检查 Owner 本地装备与预测冷却并成立一次近战攻击
+        /// 吸附失败不会撤销已经成立的挥击
         /// </summary>
-        private bool TryBeginOwnerMeleeAdsorption(
+        private bool TryProcessOwnerMeleeAttack(
             in ReplicateData data,
             in CharacterInputCommand command,
             float tickDeltaTime)
         {
-            if (data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE)
-            {
-                return false;
-            }
-
             ItemInstance currentItem = _player.RuntimeData.CurrentItem;
 
             MeleeWeaponSO meleeWeapon = currentItem?.BaseData as MeleeWeaponSO;
 
-            if (meleeWeapon == null ||
-                !meleeWeapon.TryCreateAdsorptionMotionProfile(
+            if (meleeWeapon == null)
+            {
+                return false;
+            }
+
+            uint cooldownTicks = meleeWeapon.GetAttackCooldownTickCount(tickDeltaTime);
+
+            if (!_runner.TryBeginMeleeAttack(command.Tick, cooldownTicks))
+            {
+                return false;
+            }
+
+            // 没有吸附目标仍然是一刀合法攻击
+            if (data.MeleeTargetObjectId ==
+                NetworkObject.UNSET_OBJECTID_VALUE)
+            {
+                return true;
+            }
+
+            if (!meleeWeapon.TryCreateAdsorptionMotionProfile(
                     tickDeltaTime,
                     out MeleeAdsorptionMotionProfile motionProfile))
             {
-                return false;
+                return true;
             }
 
-            var request = new MeleeAdsorptionSimulationRequest(
-                command.Tick,
-                data.MeleeTargetPosition,
-                data.MeleeTargetCollisionRadius,
-                meleeWeapon.AdsorptionMaximumTravelDistance);
+            var request =
+                new MeleeAdsorptionSimulationRequest(
+                    command.Tick,
+                    data.MeleeTargetPosition,
+                    data.MeleeTargetCollisionRadius,
+                    meleeWeapon.AdsorptionMaximumTravelDistance);
 
             if (!request.IsValid)
             {
-                return false;
+                return true;
             }
 
-            return _runner.TryBeginMeleeAdsorption(in request,in motionProfile);
+            _runner.TryBeginMeleeAdsorption(in request, in motionProfile);
+
+            return true;
         }
 
         /// <summary>
-        /// 使用服务器装备和服务器选敌结果重新校验近战吸附
-        /// 客户端目标 ID 只用于确认双方选择的是同一目标
+        /// 使用服务器确认装备和服务器冷却成立近战攻击
+        /// 吸附目标继续由服务器重新选择和校验
         /// </summary>
-        private bool TryBeginServerMeleeAdsorption(
+        private bool TryProcessServerMeleeAttack(
             in ReplicateData data,
             in CharacterInputCommand command,
             float tickDeltaTime)
         {
-            if (data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE ||
-                _weaponDriver == null ||
-                _meleeTargeting == null)
-            {
-                return false;
-            }
-
-            if (!_weaponDriver.TryGetServerEquippedItem(
+            if (_weaponDriver == null ||
+                !_weaponDriver.TryGetServerEquippedItem(
                     out ItemInstance serverItem,
                     out _))
             {
@@ -644,12 +659,36 @@ namespace NiumaTPC.FishNet
             MeleeWeaponSO meleeWeapon =
                 serverItem.BaseData as MeleeWeaponSO;
 
-            if (meleeWeapon == null ||
-                !meleeWeapon.TryCreateAdsorptionMotionProfile(
+            if (meleeWeapon == null)
+            {
+                return false;
+            }
+
+            uint cooldownTicks =
+                meleeWeapon.GetAttackCooldownTickCount(
+                    tickDeltaTime);
+
+            if (!_runner.TryBeginMeleeAttack(
+                    command.Tick,
+                    cooldownTicks))
+            {
+                return false;
+            }
+
+            /*
+             * 攻击已经成立
+             * 后续任意目标问题都只会取消吸附，不会取消挥击
+             */
+            if (data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE || _meleeTargeting == null)
+            {
+                return true;
+            }
+
+            if (!meleeWeapon.TryCreateAdsorptionMotionProfile(
                     tickDeltaTime,
                     out MeleeAdsorptionMotionProfile motionProfile))
             {
-                return false;
+                return true;
             }
 
             /*
@@ -661,11 +700,10 @@ namespace NiumaTPC.FishNet
                     meleeWeapon.AdsorptionMaximumTravelDistance,
                     out MeleeIntent authoritativeIntent))
             {
-                return false;
+                return true;
             }
 
-            Transform targetRoot =
-                authoritativeIntent.Target.RootTransform;
+            Transform targetRoot = authoritativeIntent.Target.RootTransform;
 
             NetworkObject targetNetworkObject =
                 targetRoot != null
@@ -677,18 +715,20 @@ namespace NiumaTPC.FishNet
                 targetNetworkObject.ObjectId !=
                 data.MeleeTargetObjectId)
             {
-                return false;
+                return true;
             }
 
             if (!authoritativeIntent.TryCreateSimulationRequest(
                     out MeleeAdsorptionSimulationRequest request))
             {
-                return false;
+                return true;
             }
 
-            return _runner.TryBeginMeleeAdsorption(
+            _runner.TryBeginMeleeAdsorption(
                 in request,
                 in motionProfile);
+
+            return true;
         }
 
         #endregion
@@ -818,6 +858,12 @@ namespace NiumaTPC.FishNet
                 return;
             }
 
+            // 观察者首次看到角色时，不补播该角色加入视野前的落地
+            if (!_hasReceivedPresentationSnapshot)
+            {
+                _landingPresentation.SetBaseline(presentationState.LandingSequence);
+            }
+
             _lastReceivedPresentationTick = presentationState.Tick;
             _hasReceivedPresentationSnapshot = true;
 
@@ -827,7 +873,7 @@ namespace NiumaTPC.FishNet
         }
 
         /// <summary>
-        /// 重置表现快照
+        /// 重置快照与落地表现历史，清除上一次网络生命周期留下的标记
         /// </summary>
         private void ResetPresentationSnapshotTracking()
         {
@@ -837,6 +883,23 @@ namespace NiumaTPC.FishNet
             _lastPresentationDiagnosticSnapshot = default;
             _hasPresentationDiagnosticSnapshot = false;
             _nextPresentationDiagnosticTime = 0f;
+
+            _landingPresentation.Reset();
+
+            // 所有权切换时模拟器可能仍存在，以当前历史重新建立基线
+            if (_runner != null)
+            {
+                _landingPresentation.SetBaseline(_runner.State.LandingSequence);
+            }
+
+            if (_player != null && _player.RuntimeData != null)
+            {
+                PlayerRuntimeData data = _player.RuntimeData;
+
+                data.JustLanded = false;
+                data.JustLeftGround = false;
+                data.FallHeightLevel = 0;
+            }
         }
 
         #endregion
@@ -880,6 +943,9 @@ namespace NiumaTPC.FishNet
             var traversalProbe = new PhysicsCharacterTraversalProbe(_player.Config.Vaulting, _player.CharacterController);
 
             _runner = new CharacterSimulationRunner(body, traversalProbe, in config);
+
+            // 在首次模拟前建立基线，避免漏掉第一次真实落地
+            _landingPresentation.SetBaseline(_runner.State.LandingSequence);
 
             _commandBuilder = new CharacterInputCommandBuilder();
 
@@ -1018,7 +1084,21 @@ namespace NiumaTPC.FishNet
                 state.ActionTick,
                 state.ActionDirection);
 
+            MeleeAttackPresentationBridge.Apply(
+                data,
+                state.MeleeAttackSequence,
+                state.MeleeAttackStartTick,
+                state.MeleeAttackCooldownTicksRemaining,
+                state.Tick);
+
             ApplyAirborneTransition(data, state.IsGrounded, state.VerticalVelocity);
+
+            _landingPresentation.Apply(
+                data,
+                _player.Config.JumpAndLanding,
+                state.IsGrounded,
+                state.LandingSequence,
+                state.LastLandingFallHeight);
 
             ApplyDoubleJumpTransition(data, state.HasPerformedDoubleJumpInAir);
             /*
@@ -1052,40 +1132,28 @@ namespace NiumaTPC.FishNet
         }
 
         /// <summary>
-        /// 根据前后接地状态生成一次性跳跃、离地、落地和下落意图。
-        /// 远端副本不会运行本地 GameplayParameterProcessor，
-        /// 因此这些事实必须由服务器状态快照推导。
+        /// 根据接地变化生成离地与跳跃意图，并更新持续下落状态
+        /// 落地事件由落地表现桥识别，不在这里根据接地边沿重复生成
         /// </summary>
-        /// <param name="data"></param>
-        /// <param name="nextIsGrounded"></param>
-        /// <param name="nextVerticalVelocity"></param>
         private void ApplyAirborneTransition(
             PlayerRuntimeData data,
             bool nextIsGrounded,
             float nextVerticalVelocity)
         {
-            bool wasGrounded = data.IsGrounded;
+            bool justLeftGround = data.IsGrounded && !nextIsGrounded;
 
-            bool justLeftGround = wasGrounded && !nextIsGrounded;
-
-            bool justLanded = !wasGrounded && nextIsGrounded;
-
-            data.JustLeftGround = justLeftGround;
-            data.JustLanded = justLanded;
-
-            if (justLeftGround && nextVerticalVelocity > 0f)
+            // 同一帧可能推进多个 Tick，保留尚未被状态机处理的离地标记
+            if (justLeftGround)
             {
-                data.WantsToJump = true;
+                data.JustLeftGround = true;
+
+                if (nextVerticalVelocity > 0f)
+                {
+                    data.WantsToJump = true;
+                }
             }
 
-            if (nextIsGrounded)
-            {
-                data.WantsToFall = false;
-            }
-            else
-            {
-                data.WantsToFall = nextVerticalVelocity < _player.Config.Core.FallVerticalVelocityThreshold;
-            }
+            data.WantsToFall = !nextIsGrounded && nextVerticalVelocity < _player.Config.Core.FallVerticalVelocityThreshold;
         }
 
         /// <summary>
@@ -1151,6 +1219,13 @@ namespace NiumaTPC.FishNet
                 presentationState.ActionTick,
                 presentationState.ActionDirection);
 
+            MeleeAttackPresentationBridge.Apply(
+                data,
+                presentationState.MeleeAttackSequence,
+                presentationState.MeleeAttackStartTick,
+                presentationState.MeleeAttackCooldownTicksRemaining,
+                presentationState.Tick);
+
             /*
              * 记录上一个速度档位。
              * PlayerStopState 会使用它选择对应的停止动画。
@@ -1166,6 +1241,14 @@ namespace NiumaTPC.FishNet
             data.CurrentSpeed = presentationState.Speed;
 
             ApplyAirborneTransition(data, presentationState.IsGrounded, presentationState.VerticalVelocity);
+
+            _landingPresentation.Apply(
+                data,
+                _player.Config.JumpAndLanding,
+                presentationState.IsGrounded,
+                presentationState.LandingSequence,
+                presentationState.LastLandingFallHeight);
+
             ApplyDoubleJumpTransition(data, presentationState.HasPerformedDoubleJumpInAir);
             data.IsGrounded = presentationState.IsGrounded;
             data.HasPerformedDoubleJumpInAir = presentationState.HasPerformedDoubleJumpInAir;

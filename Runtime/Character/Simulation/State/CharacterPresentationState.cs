@@ -79,10 +79,25 @@ namespace NiumaTPC.Character.Simulation
         public CharacterActionDirection ActionDirection;
 
         /// <summary>
+        /// 服务器确认的最近近战攻击序号
+        /// </summary>
+        public uint MeleeAttackSequence;
+
+        /// <summary>
+        /// 最近一次近战攻击开始 Tick
+        /// </summary>
+        public uint MeleeAttackStartTick;
+
+        /// <summary>
+        /// 最近一次近战攻击剩余冷却 Tick
+        /// </summary>
+        public uint MeleeAttackCooldownTicksRemaining;
+
+        /// <summary>
         /// 服务器确认的当前翻越类型
         /// </summary>
         public VaultType VaultType;
-        
+
         /// <summary>
         /// 当前翻越已经执行Tick数
         /// </summary>
@@ -104,6 +119,16 @@ namespace NiumaTPC.Character.Simulation
         /// 当前是否处于着地状态。
         /// </summary>
         public bool IsGrounded;
+
+        /// <summary>
+        /// 最近一次落地的序号，供表现层识别并去重落地事件
+        /// </summary>
+        public uint LandingSequence;
+
+        /// <summary>
+        /// 最近一次落地的落差，供表现层按配置选择落地动画
+        /// </summary>
+        public float LastLandingFallHeight;
 
         /// <summary>
         /// 本轮滞空是否已经消费二段跳。
@@ -138,8 +163,13 @@ namespace NiumaTPC.Character.Simulation
             VaultWallNormal = simulationState.VaultWallNormal;
             VaultLedgePoint = simulationState.VaultLedgePoint;
             ActionDirection = simulationState.ActionDirection;
+            MeleeAttackSequence = simulationState.MeleeAttackSequence;
+            MeleeAttackStartTick = simulationState.MeleeAttackStartTick;
+            MeleeAttackCooldownTicksRemaining = simulationState.MeleeAttackCooldownTicksRemaining;
             MoveDirection = simulationState.LastMoveDirection;
             IsGrounded = simulationState.IsGrounded;
+            LandingSequence = simulationState.LandingSequence;
+            LastLandingFallHeight = simulationState.LastLandingFallHeight;
             HasPerformedDoubleJumpInAir = simulationState.HasPerformedDoubleJumpInAir;
             Speed = simulationState.SmoothSpeed;
         }

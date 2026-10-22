@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace NiumaTPC.Item
 {
     /// <summary>
@@ -9,5 +11,10 @@ namespace NiumaTPC.Item
         /// <param name="expectedItem">本次表现对应的本地物品实例</param>
         /// <param name="applyRecoil">是否影响本地玩家视角</param>
         bool TryPlayFire(ItemInstance expectedItem, bool applyRecoil);
+
+        /// <summary>
+        /// 校验装备实例和装备代次并取得视觉弹的发射起点
+        /// </summary>
+        bool TryGetFirePresentationOrigin(ItemInstance expectedItem,uint equipmentRevision,out Vector3 origin);
     }
 }

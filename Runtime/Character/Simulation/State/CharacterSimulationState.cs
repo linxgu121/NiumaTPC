@@ -168,6 +168,22 @@ namespace NiumaTPC.Character.Simulation
         public bool PendingSlideJump;
 
         /// <summary>
+        /// 已成立的近战攻击序号
+        /// 每次攻击成立时递增，用于预测、校正和表现去重
+        /// </summary>
+        public uint MeleeAttackSequence;
+
+        /// <summary>
+        /// 最近一次成立的近战攻击开始 Tick
+        /// </summary>
+        public uint MeleeAttackStartTick;
+
+        /// <summary>
+        /// 距离下一次允许攻击还剩多少个固定 Tick
+        /// </summary>
+        public uint MeleeAttackCooldownTicksRemaining;
+
+        /// <summary>
         /// 当前近战吸附的可回滚运行状态
         /// 包含锁定目标位置、位移预算和已执行 Tick
         /// </summary>
@@ -254,6 +270,9 @@ namespace NiumaTPC.Character.Simulation
             ActionDirection = actionDirection;
             SlideSpeed = slideSpeed;
             PendingSlideJump = pendingSlideJump;
+            MeleeAttackSequence = 0u;
+            MeleeAttackStartTick = 0u;
+            MeleeAttackCooldownTicksRemaining = 0u;
             MeleeAdsorption = default;
             SmoothSpeed = smoothSpeed;
             SpeedSmoothVelocity = speedSmoothVelocity;

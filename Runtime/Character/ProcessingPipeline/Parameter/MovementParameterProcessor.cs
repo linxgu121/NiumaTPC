@@ -20,10 +20,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
         private float _currentAnimBlendY;
         private float _yBlendVelocity;
 
-        // 下落距离计算状态 追踪本次空中过程的最高点
-        private float _apexY;
-        private bool _wasGroundedLastFrame;
-
         // 记录上一次瞄准状态
         private bool _lastAiming = false;
 
@@ -39,8 +35,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             _currentAnimBlendY = 0f;
             _yBlendVelocity = 0f;
 
-            _apexY = _playerTransform.position.y;
-            _wasGroundedLastFrame = _data.IsGrounded;
         }
 
         /// <summary>
@@ -52,11 +46,6 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
         {
             UpdateDesiredLocalMoveAngleFromWorldDir();
             UpdateDirectionBlend();
-        }
-
-        public void UpdateGameplay()
-        {
-            UpdateFallHeight();
         }
 
         /// <summary>
@@ -133,47 +122,5 @@ namespace NiumaTPC.Character.ProcessingPipeline.Parameter
             _data.CurrentAnimBlendY = _currentAnimBlendY;
         }
 
-        /// <summary>
-        /// 下落高度、落地/离地标记
-        /// </summary>
-        private void UpdateFallHeight()
-        {
-            bool isGrounded = _data.IsGrounded;
-            float currentY = _playerTransform.position.y;
-
-            bool justLanded = !_wasGroundedLastFrame && isGrounded;
-            bool justLeftGround = _wasGroundedLastFrame && !isGrounded;
-
-            _data.JustLanded = justLanded;
-            _data.JustLeftGround = justLeftGround;
-
-            if (isGrounded)
-            {
-                _apexY = currentY;
-                if (!justLanded)
-                {
-                    _data.FallHeightLevel = 0;
-                }
-            }
-            else
-            {
-                if (justLeftGround) _apexY = currentY;
-                if (currentY > _apexY) _apexY = currentY;
-
-                float fallHeight = Mathf.Max(0f, _apexY - currentY);
-                CalculateFallHeightLevel(fallHeight);
-            }
-
-            _wasGroundedLastFrame = isGrounded;
-        }
-
-        private void CalculateFallHeightLevel(float height)
-        {
-            if (height < _config.JumpAndLanding.LandHeight_Level1) _data.FallHeightLevel = 0;
-            else if (height < _config.JumpAndLanding.LandHeight_Level2) _data.FallHeightLevel = 1;
-            else if (height < _config.JumpAndLanding.LandHeight_Level3) _data.FallHeightLevel = 2;
-            else if (height < _config.JumpAndLanding.LandHeight_Level4) _data.FallHeightLevel = 3;
-            else _data.FallHeightLevel = 4;
-        }
     }
 }

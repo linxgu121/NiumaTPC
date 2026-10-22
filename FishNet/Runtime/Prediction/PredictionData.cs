@@ -192,6 +192,21 @@ namespace NiumaTPC.FishNet.Prediction
         public bool IsGrounded;
 
         /// <summary>
+        /// 本轮滞空的最高位置 Y，校正后继续用于计算落差
+        /// </summary>
+        public float AirborneApexY;
+
+        /// <summary>
+        /// 最近一次落地的序号，0 表示尚未发生落地
+        /// </summary>
+        public uint LandingSequence;
+
+        /// <summary>
+        /// 最近一次落地的落差，单位为米
+        /// </summary>
+        public float LastLandingFallHeight;
+
+        /// <summary>
         /// 可否执行二连跳
         /// </summary>
         public bool HasPerformedDoubleJumpInAir;
@@ -239,6 +254,21 @@ namespace NiumaTPC.FishNet.Prediction
         /// 服务器确认的提前跳跃缓存
         /// </summary>
         public bool PendingSlideJump;
+
+        /// <summary>
+        /// 服务器确认的近战攻击序号
+        /// </summary>
+        public uint MeleeAttackSequence;
+
+        /// <summary>
+        /// 最近一次服务器确认的近战攻击开始 Tick
+        /// </summary>
+        public uint MeleeAttackStartTick;
+
+        /// <summary>
+        /// 服务器确认的近战攻击剩余冷却 Tick
+        /// </summary>
+        public uint MeleeAttackCooldownTicksRemaining;
 
         /// <summary>
         /// 服务器确认的近战吸附活动状态
@@ -329,6 +359,9 @@ namespace NiumaTPC.FishNet.Prediction
             StartLocomotionStateValue = (byte)state.StartLocomotionState;
             LastMoveDirection = state.LastMoveDirection;
             IsGrounded = state.IsGrounded;
+            AirborneApexY = state.AirborneApexY;
+            LandingSequence = state.LandingSequence;
+            LastLandingFallHeight = state.LastLandingFallHeight;
             HasPerformedDoubleJumpInAir = state.HasPerformedDoubleJumpInAir;
             VaultTypeValue = (byte)state.VaultType;
             VaultTick = state.VaultTick;
@@ -343,6 +376,9 @@ namespace NiumaTPC.FishNet.Prediction
             ActionDirectionValue = (byte)state.ActionDirection;
             SlideSpeed = state.SlideSpeed;
             PendingSlideJump = state.PendingSlideJump;
+            MeleeAttackSequence = state.MeleeAttackSequence;
+            MeleeAttackStartTick = state.MeleeAttackStartTick;
+            MeleeAttackCooldownTicksRemaining = state.MeleeAttackCooldownTicksRemaining;
             MeleeAdsorptionIsActive = state.MeleeAdsorption.IsActive;
             MeleeAdsorptionAttackTick = state.MeleeAdsorption.Request.AttackTick;
             MeleeAdsorptionTargetPosition = state.MeleeAdsorption.Request.TargetPosition;
@@ -402,6 +438,15 @@ namespace NiumaTPC.FishNet.Prediction
                     smoothSpeed: SmoothSpeed,
                     speedSmoothVelocity: SpeedSmoothVelocity,
                     rotationSmoothVelocity: RotationSmoothVelocity);
+                    
+            // 构造函数只提供初始化值，校正时必须恢复服务器记录的空中历史与落地结果
+            state.AirborneApexY = AirborneApexY;
+            state.LandingSequence = LandingSequence;
+            state.LastLandingFallHeight = LastLandingFallHeight;
+
+            state.MeleeAttackSequence = MeleeAttackSequence;
+            state.MeleeAttackStartTick = MeleeAttackStartTick;
+            state.MeleeAttackCooldownTicksRemaining = MeleeAttackCooldownTicksRemaining;
 
             if (MeleeAdsorptionIsActive)
             {

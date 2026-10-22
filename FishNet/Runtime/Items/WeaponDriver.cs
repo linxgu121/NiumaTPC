@@ -978,12 +978,7 @@ namespace NiumaTPC.FishNet.Items
                 _serverEquipmentRevision,
                 requestSequence);
 
-            if (!driver.TrySpawn(
-                    weapon,
-                    approvedAim,
-                    transform,
-                    requestKey,
-                    out shotId))
+            if (!driver.TrySpawn(weapon,approvedAim,transform,ObjectId,requestKey,out shotId))
             {
                 rejectReason = WeaponFireRejectReason.SpawnFailed;
                 return false;
@@ -1285,9 +1280,7 @@ namespace NiumaTPC.FishNet.Items
 
         private bool TryPlayOwnerFire(ItemInstance expectedItem)
         {
-            var equipment = _player != null
-                ? _player.EquipmentDriver
-                : null;
+            var equipment = _player != null ? _player.EquipmentDriver : null;
 
             if (!IsOwner ||
                 expectedItem == null ||
@@ -1313,6 +1306,43 @@ namespace NiumaTPC.FishNet.Items
 
         #region Owner 预测子弹
 
+        // 检查当前客户端装备并取得枪口位置与枪械汇入配置
+        internal bool TryGetFirePresentationData(
+            uint equipmentRevision,
+            out Vector3 origin,
+            out float presentationBlendTime)
+        {
+            origin = default;
+            presentationBlendTime = 0f;
+
+            if (!IsClientInitialized ||
+                equipmentRevision == 0u ||
+                _player == null ||
+                _player.EquipmentDriver == null)
+            {
+                return false;
+            }
+
+            var equipment = _player.EquipmentDriver;
+            ItemInstance currentItem = equipment.CurrentItemInstance;
+
+            if (currentItem == null || !(currentItem.BaseData is GunWeaponSO gunWeapon) ||
+                !(equipment.CurrentItemDirector is IWeaponFirePresentation presentation))
+            {
+                return false;
+            }
+
+            if (!presentation.TryGetFirePresentationOrigin(currentItem, equipmentRevision, out origin))
+            {
+                return false;
+            }
+
+            presentationBlendTime = Mathf.Max(0f, gunWeapon.MuzzlePresentationBlendTime);
+
+            return true;
+        }
+
+        // 检查Owner预测条件并使用当前枪口创建本地视觉弹
         private void TryBeginOwnerPrediction(
             ItemInstance localItem,
             WeaponFireRequest request)
@@ -1334,13 +1364,24 @@ namespace NiumaTPC.FishNet.Items
                 return;
             }
 
-            var worldDriver =
-                presenter.GetComponent<AmmunitionDriver>();
+            var worldDriver = presenter.GetComponent<AmmunitionDriver>();
 
-            if (worldDriver == null ||
-                worldDriver.NetworkManager != NetworkManager)
+            if (worldDriver == null || worldDriver.NetworkManager != NetworkManager)
             {
                 return;
+            }
+
+            // 枪口数据不可用时退回摄像机权威弹道起点
+            Vector3 presentationOrigin = aim.origin;
+            float presentationBlendTime = 0f;
+
+            if (TryGetFirePresentationData(
+                    request.EquipmentRevision,
+                    out Vector3 muzzleOrigin,
+                    out float configuredBlendTime))
+            {
+                presentationOrigin = muzzleOrigin;
+                presentationBlendTime = configuredBlendTime;
             }
 
             // 必须使用服务器同步的实例 ID
@@ -1349,7 +1390,12 @@ namespace NiumaTPC.FishNet.Items
                 request.EquipmentRevision,
                 request.RequestSequence);
 
-            if (!presenter.TryPlayPrediction(key, weapon, aim))
+            if (!presenter.TryPlayPrediction(
+                    key,
+                    weapon,
+                    aim,
+                    presentationOrigin,
+                    presentationBlendTime))
             {
                 return;
             }
@@ -1363,9 +1409,8 @@ namespace NiumaTPC.FishNet.Items
                 });
         }
 
-        private void ResolveOwnerPrediction(
-            ulong requestSequence,
-            bool accepted)
+        // 根据服务器回执移除请求跟踪，只有拒绝时立即回收预测弹
+        private void ResolveOwnerPrediction(ulong requestSequence, bool accepted)
         {
             if (!_ownerPredictedShots.TryGetValue(
                     requestSequence,
@@ -1376,13 +1421,13 @@ namespace NiumaTPC.FishNet.Items
 
             _ownerPredictedShots.Remove(requestSequence);
 
-            if (!accepted && prediction.Presenter != null)
+            // 接受后由服务器生成通知接管预测弹
+            if (accepted || prediction.Presenter == null)
             {
-                prediction.Presenter.CancelPrediction(prediction.Key);
+                return;
             }
 
-            // 接受时不再创建或认领子弹
-            // 等待弹道世界携带完整轨迹的发射广播完成认领
+            prediction.Presenter.CancelPrediction(prediction.Key);
         }
 
         private void ClearOwnerPredictions()
@@ -1397,6 +1442,7 @@ namespace NiumaTPC.FishNet.Items
 
             _ownerPredictedShots.Clear();
         }
+
 
         #endregion
 

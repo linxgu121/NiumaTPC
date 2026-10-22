@@ -21,6 +21,11 @@ namespace NiumaTPC.Item
         [Tooltip("首次确认射击时从对象池取得并挂到枪口，当前装备期间复用；留空不播放枪焰")]
         public GameObject MuzzleVFXPrefab;
 
+        [Header("弹道表现")]
+        [Tooltip("视觉子弹从枪口汇入准星权威弹道的时间，0表示直接显示在权威弹道上")]
+        [Min(0f)]
+        public float MuzzlePresentationBlendTime = 0.05f;
+
         [Header("Recoil (后坐力)")]
         [Tooltip("后坐力的俯仰角度 (向上看的角度，单位：度)")]
         public float RecoilPitchAngle = 2f;

@@ -394,13 +394,21 @@ namespace NiumaTPC.Character
             // 无论是本地拥有者还是远端观察副本，都需要每个渲染帧更新。
             MainProcessorPipeline.UpdatePresentationProcessors();
 
-            if (!_externalSimulationStateDriven)
+            // 多个 Tick 或校正重放结束后，以当前最终接地状态决定是否允许落地表现
+            // 如果角色已经再次离地，不在空中补播之前积压的落地
+            if (!RuntimeData.IsGrounded)
             {
-                // 下落、落地等参数会改变玩法状态，远端副本不能自行判断。
-                MainProcessorPipeline.UpdateGameplayParameterProcessors();
+                RuntimeData.JustLanded = false;
+                RuntimeData.FallHeightLevel = 0;
             }
 
             StateMachine.CurrentState.LogicUpdate();
+
+            // 落地拦截器和状态 Enter 已获得本帧处理机会
+            // 无论是否实际播放缓冲动画，都不能把一次性标记带到下一帧
+            RuntimeData.JustLanded = false;
+            RuntimeData.JustLeftGround = false;
+            RuntimeData.FallHeightLevel = 0;
 
             UpperBodyController.Update();
 

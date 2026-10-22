@@ -92,7 +92,44 @@ namespace NiumaTPC.Character.Simulation
 
         #endregion
 
-        #region Melee Adsorption(近战吸附)
+        #region Melee(近战)
+
+        /// <summary>
+        /// 检查当前动作与冷却是否允许开始新的近战攻击
+        /// 攻击成立与是否找到吸附目标相互独立
+        /// </summary>
+        public bool TryBeginMeleeAttack(uint attackTick, uint cooldownTicks)
+        {
+            bool hasConflictingAction =
+                _state.VaultType != VaultType.None ||
+                _state.ActionType != CharacterActionType.None;
+
+            if (hasConflictingAction ||
+                _state.MeleeAdsorption.IsActive ||
+                _state.MeleeAttackCooldownTicksRemaining > 0u ||
+                cooldownTicks == 0u)
+            {
+                return false;
+            }
+
+            _state.MeleeAttackSequence = unchecked(_state.MeleeAttackSequence + 1u);
+
+            _state.MeleeAttackStartTick = attackTick;
+            _state.MeleeAttackCooldownTicksRemaining = cooldownTicks;
+
+            return true;
+        }
+
+        /// <summary>
+        /// 每个模拟 Tick 推进一次近战攻击冷却
+        /// </summary>
+        private void AdvanceMeleeAttackCooldown()
+        {
+            if (_state.MeleeAttackCooldownTicksRemaining > 0u)
+            {
+                _state.MeleeAttackCooldownTicksRemaining--;
+            }
+        }
 
         /// <summary>
         /// 检查当前权威动作是否允许启动吸附，并冻结本次吸附数据
@@ -106,8 +143,7 @@ namespace NiumaTPC.Character.Simulation
                 _state.VaultType != VaultType.None ||
                 _state.ActionType != CharacterActionType.None;
 
-            if (_state.MeleeAdsorption.IsActive ||
-                hasConflictingAction)
+            if (_state.MeleeAdsorption.IsActive || hasConflictingAction)
             {
                 return false;
             }
@@ -221,6 +257,8 @@ namespace NiumaTPC.Character.Simulation
                     isHandsEmpty,
                     tickDeltaTime);
             }
+
+            AdvanceMeleeAttackCooldown();
 
             return _state;
         }
@@ -537,7 +575,7 @@ namespace NiumaTPC.Character.Simulation
 
             if (!Enum.IsDefined(typeof(LocomotionState), state.StartLocomotionState))
             {
-                throw new ArgumentException($"未知的起步速度档位：{state.StartLocomotionState}。",nameof(state));
+                throw new ArgumentException($"未知的起步速度档位：{state.StartLocomotionState}。", nameof(state));
             }
 
             if (!Enum.IsDefined(typeof(VaultType), state.VaultType))

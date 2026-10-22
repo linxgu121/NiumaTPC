@@ -14,6 +14,7 @@ namespace NiumaTPC.Item
         public float EquipEndTime = 0.5f;
 
         [Header("--- 近战武器独有配置 ---")]
+        [Min(0f)]
         [Tooltip("攻击冷却时间 (秒)")]
         public float AttackCooldown = 0.5f;
 
@@ -46,6 +47,33 @@ namespace NiumaTPC.Item
         public float AdsorptionMaximumTurnSpeedDegreesPerSecond = 720f;
 
         /// <summary>
+        /// 将攻击冷却时间转换成确定性的固定 Tick 数
+        /// 非法或零冷却至少保留一个 Tick
+        /// </summary>
+        public uint GetAttackCooldownTickCount(float tickDeltaTime)
+        {
+            if (float.IsNaN(tickDeltaTime) ||
+                float.IsInfinity(tickDeltaTime) ||
+                tickDeltaTime <= 0f)
+            {
+                return 1u;
+            }
+
+            float cooldown = AttackCooldown;
+
+            if (float.IsNaN(cooldown) ||
+                float.IsInfinity(cooldown) ||
+                cooldown <= 0f)
+            {
+                return 1u;
+            }
+
+            int tickCount = Mathf.Max(1,Mathf.CeilToInt(cooldown / tickDeltaTime));
+
+            return (uint)tickCount;
+        }
+
+        /// <summary>
         /// 检查武器吸附配置并烘焙固定 Tick 使用的运动参数
         /// 禁用吸附或配置非法时不创建 Profile
         /// </summary>
@@ -61,20 +89,18 @@ namespace NiumaTPC.Item
                 !IsPositiveFinite(AdsorptionMaximumSpeed) ||
                 !IsPositiveFinite(AdsorptionDurationSeconds) ||
                 !IsNonNegativeFinite(AdsorptionStoppingSurfaceGap) ||
-                !IsPositiveFinite(
-                    AdsorptionMaximumTurnSpeedDegreesPerSecond))
+                !IsPositiveFinite(AdsorptionMaximumTurnSpeedDegreesPerSecond))
             {
                 return false;
             }
 
             int durationTickCount = Mathf.Max(1, Mathf.CeilToInt(AdsorptionDurationSeconds / tickDeltaTime));
 
-            motionProfile =
-                new MeleeAdsorptionMotionProfile(
-                    AdsorptionMaximumSpeed,
-                    (uint)durationTickCount,
-                    AdsorptionStoppingSurfaceGap,
-                    AdsorptionMaximumTurnSpeedDegreesPerSecond);
+            motionProfile = new MeleeAdsorptionMotionProfile(
+                AdsorptionMaximumSpeed,
+                (uint)durationTickCount,
+                AdsorptionStoppingSurfaceGap,
+                AdsorptionMaximumTurnSpeedDegreesPerSecond);
 
             return motionProfile.IsValid;
         }

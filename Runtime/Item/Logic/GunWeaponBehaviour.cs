@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace NiumaTPC.Item
 {
-    // 步枪AK47行为 负责装备瞄准开火IK后坐力等
-    public class AK47Behaviour : MonoBehaviour, IHoldableItem, IPoolable, IWeaponFirePresentation
+    // 通用枪械行为 负责装备瞄准开火IK后坐力和枪口表现
+    public class GunWeaponBehaviour : MonoBehaviour, IHoldableItem, IPoolable, IWeaponFirePresentation
     {
         [Header("--- 表现与挂点 ---")]
         // 左手握点
@@ -19,7 +19,7 @@ namespace NiumaTPC.Item
         // 实例数据
         private ItemInstance _instance;
         // 配置
-        private GunWeaponSO _akconfig;
+        private GunWeaponSO _gunConfig;
         // 网络角色提供此接口，枪械本身不引用 FishNet
         private INetworkWeaponFireRequestSender _networkFireSender;
 
@@ -50,11 +50,11 @@ namespace NiumaTPC.Item
 
         #endregion
 
-        // 初始化实例和配置
+        // 初始化物品实例并读取枪械配置
         public void Initialize(ItemInstance instanceData)
         {
             _instance = instanceData;
-            _akconfig = instanceData?.BaseData as GunWeaponSO;
+            _gunConfig = instanceData?.BaseData as GunWeaponSO;
         }
 
         // 装备并设置IK
@@ -70,10 +70,10 @@ namespace NiumaTPC.Item
             {
                 _player.RuntimeData.LeftHandGoal = _leftHandGoal;
                 _player.RuntimeData.WantsLeftHandIK = false;
-                if (_akconfig != null)
+                if (_gunConfig != null)
                 {
                     _ikEnableScheduled = true;
-                    _ikEnableTimePoint = Time.time + _akconfig.EnableIKTime;
+                    _ikEnableTimePoint = Time.time + _gunConfig.EnableIKTime;
                 }
                 else
                 {
@@ -88,11 +88,13 @@ namespace NiumaTPC.Item
                 _player.RuntimeData.CurrentAimReference = _muzzle;
             }
 
-            float equipAnimDuration = _akconfig.EquipEndTime;
+            float equipAnimDuration = _gunConfig != null ? _gunConfig.EquipEndTime : 0f;
+
             _equipEndTime = Time.time + equipAnimDuration;
-            if (_akconfig != null && _akconfig.EquipAnim != null && _player != null)
+
+            if (_gunConfig != null && _gunConfig.EquipAnim != null && _player != null)
             {
-                _player.AnimationFacade.PlayTransition(_akconfig.EquipAnim, _akconfig.EquipAnimPlayOptions);
+                _player.AnimationFacade.PlayTransition(_gunConfig.EquipAnim, _gunConfig.EquipAnimPlayOptions);
             }
         }
 
@@ -132,9 +134,9 @@ namespace NiumaTPC.Item
                 if (Time.time >= _equipEndTime)
                 {
                     _isEquipping = false;
-                    if (_akconfig != null && _akconfig.EquipIdleAnim != null && _player != null)
+                    if (_gunConfig != null && _gunConfig.EquipIdleAnim != null && _player != null)
                     {
-                        _player.AnimationFacade.PlayTransition(_akconfig.EquipIdleAnim, _akconfig.EquipIdleAnimPlayOptions);
+                        _player.AnimationFacade.PlayTransition(_gunConfig.EquipIdleAnim, _gunConfig.EquipIdleAnimPlayOptions);
                     }
                 }
                 else
@@ -147,9 +149,9 @@ namespace NiumaTPC.Item
             {
                 if (isAiming)
                 {
-                    if (_akconfig != null && _akconfig.AimAnim != null && _player != null)
+                    if (_gunConfig != null && _gunConfig.AimAnim != null && _player != null)
                     {
-                        _player.AnimationFacade.PlayTransition(_akconfig.AimAnim, _akconfig.AnimPlayOptions);
+                        _player.AnimationFacade.PlayTransition(_gunConfig.AimAnim, _gunConfig.AnimPlayOptions);
                     }
                     if (_player != null && _player.RuntimeData != null)
                     {
@@ -159,9 +161,9 @@ namespace NiumaTPC.Item
                 }
                 else
                 {
-                    if (_akconfig != null && _akconfig.EquipIdleAnim != null && _player != null)
+                    if (_gunConfig != null && _gunConfig.EquipIdleAnim != null && _player != null)
                     {
-                        _player.AnimationFacade.PlayTransition(_akconfig.EquipIdleAnim, _akconfig.EquipIdleAnimPlayOptions);
+                        _player.AnimationFacade.PlayTransition(_gunConfig.EquipIdleAnim, _gunConfig.EquipIdleAnimPlayOptions);
                     }
                     if (_player != null && _player.RuntimeData != null)
                     {
@@ -188,17 +190,17 @@ namespace NiumaTPC.Item
 
             ReleaseMuzzle();
 
-            if (_akconfig != null)
+            if (_gunConfig != null)
             {
                 _ikDisableScheduled = true;
-                _ikDisableTimePoint = Time.time + _akconfig.DisableIKTime;
+                _ikDisableTimePoint = Time.time + _gunConfig.DisableIKTime;
             }
 
             if (_player != null && _player.RuntimeData != null && _player.RuntimeData.CurrentItem == null)
             {
-                if (_akconfig != null && _akconfig.UnEquipAnim != null)
+                if (_gunConfig != null && _gunConfig.UnEquipAnim != null)
                 {
-                    _player.AnimationFacade.PlayTransition(_akconfig.UnEquipAnim, _akconfig.UnEquipAnimPlayOptions);
+                    _player.AnimationFacade.PlayTransition(_gunConfig.UnEquipAnim, _gunConfig.UnEquipAnimPlayOptions);
                 }
             }
         }
@@ -206,7 +208,7 @@ namespace NiumaTPC.Item
         // 单机与多人均提交网络意图，冷却和实际发射由服务器处理
         private void TryFire()
         {
-            if (_isEquipping || _player == null || _akconfig == null)
+            if (_isEquipping || _player == null || _gunConfig == null)
             {
                 return;
             }
@@ -226,20 +228,12 @@ namespace NiumaTPC.Item
 
         #region 开火表现
 
+        // 校验当前装备身份并播放本次开火表现
         public bool TryPlayFire(
             ItemInstance expectedItem,
             bool applyRecoil)
         {
-            var data = _player != null ? _player.RuntimeData : null;
-
-            if (!isActiveAndEnabled ||
-                expectedItem == null ||
-                data == null ||
-                _akconfig == null ||
-                _equipmentRevision == 0u ||
-                _equipmentRevision != data.EquipmentRevision ||
-                !ReferenceEquals(_instance, expectedItem) ||
-                !ReferenceEquals(data.CurrentItem, _instance))
+            if (!IsCurrentFirePresentation(expectedItem))
             {
                 return false;
             }
@@ -247,20 +241,55 @@ namespace NiumaTPC.Item
             // 表现失败不能撤销服务器已经提交的射击
             PlayMuzzle();
 
-            if (_akconfig.ShootSound != null && _muzzle != null)
+            if (_gunConfig.ShootSound != null && _muzzle != null)
             {
                 AudioSource.PlayClipAtPoint(
-                    _akconfig.ShootSound,
+                    _gunConfig.ShootSound,
                     _muzzle.position);
             }
 
-            // 观察别人的射击时，不改变自己的摄像机
+            // 观察别人的射击时不改变自己的摄像机
             if (applyRecoil)
             {
                 ApplyRecoil();
             }
 
             return true;
+        }
+
+        // 校验装备实例和装备代次并返回视觉弹使用的枪口位置
+        public bool TryGetFirePresentationOrigin(
+            ItemInstance expectedItem,
+            uint equipmentRevision,
+            out Vector3 origin)
+        {
+            origin = default;
+
+            if (_muzzle == null ||
+                equipmentRevision == 0u ||
+                equipmentRevision != _equipmentRevision ||
+                !IsCurrentFirePresentation(expectedItem))
+            {
+                return false;
+            }
+
+            origin = _muzzle.position;
+            return true;
+        }
+
+        // 检查表现请求是否仍对应当前激活的装备实例与装备代次
+        private bool IsCurrentFirePresentation(ItemInstance expectedItem)
+        {
+            var data = _player != null ? _player.RuntimeData : null;
+
+            return isActiveAndEnabled &&
+                   expectedItem != null &&
+                   data != null &&
+                   _gunConfig != null &&
+                   _equipmentRevision != 0u &&
+                   _equipmentRevision == data.EquipmentRevision &&
+                   ReferenceEquals(_instance, expectedItem) &&
+                   ReferenceEquals(data.CurrentItem, _instance);
         }
 
         private void PlayMuzzle()
@@ -275,7 +304,7 @@ namespace NiumaTPC.Item
                 _muzzleSetupAttempted = true;
 
                 // 留空表示这把枪不需要枪焰
-                if (_akconfig.MuzzleVFXPrefab == null || _muzzle == null)
+                if (_gunConfig.MuzzleVFXPrefab == null || _muzzle == null)
                 {
                     return;
                 }
@@ -284,22 +313,18 @@ namespace NiumaTPC.Item
 
                 if (_muzzleVfxPool == null)
                 {
-                    Debug.LogWarning(
-                        "[枪械表现] 没有可用对象池，跳过枪口特效",
-                        this);
+                    Debug.LogWarning("[枪械表现] 没有可用对象池，跳过枪口特效",this);
                     return;
                 }
 
-                _muzzleVfxObject =
-                    _muzzleVfxPool.Spawn(_akconfig.MuzzleVFXPrefab);
+                _muzzleVfxObject = _muzzleVfxPool.Spawn(_gunConfig.MuzzleVFXPrefab);
 
                 if (_muzzleVfxObject == null)
                 {
                     return;
                 }
 
-                _muzzleParticles =
-                    _muzzleVfxObject.GetComponentsInChildren<ParticleSystem>(true);
+                _muzzleParticles = _muzzleVfxObject.GetComponentsInChildren<ParticleSystem>(true);
 
                 // 清除复用对象的旧粒子，再调整挂点
                 StopMuzzleParticles();
@@ -308,8 +333,7 @@ namespace NiumaTPC.Item
                 effectTransform.SetParent(_muzzle, false);
                 effectTransform.localPosition = Vector3.zero;
                 effectTransform.localRotation = Quaternion.identity;
-                effectTransform.localScale =
-                    _akconfig.MuzzleVFXPrefab.transform.localScale;
+                effectTransform.localScale = _gunConfig.MuzzleVFXPrefab.transform.localScale;
             }
 
             // 重新开始本发的短促枪焰，不让旧播放状态影响下一发
@@ -331,9 +355,7 @@ namespace NiumaTPC.Item
             {
                 if (particle != null)
                 {
-                    particle.Stop(
-                        false,
-                        ParticleSystemStopBehavior.StopEmittingAndClear);
+                    particle.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
                 }
             }
         }
@@ -370,11 +392,11 @@ namespace NiumaTPC.Item
         // 应用后坐力
         private void ApplyRecoil()
         {
-            if (_player == null || _player.RuntimeData == null || _akconfig == null) return;
-            float pitchNoise = Random.Range(-_akconfig.RecoilPitchRandomRange, _akconfig.RecoilPitchRandomRange);
-            float yawNoise = Random.Range(-_akconfig.RecoilYawRandomRange, _akconfig.RecoilYawRandomRange);
-            float finalPitch = _akconfig.RecoilPitchAngle + pitchNoise;
-            float finalYaw = _akconfig.RecoilYawAngle + yawNoise;
+            if (_player == null || _player.RuntimeData == null || _gunConfig == null) return;
+            float pitchNoise = Random.Range(-_gunConfig.RecoilPitchRandomRange, _gunConfig.RecoilPitchRandomRange);
+            float yawNoise = Random.Range(-_gunConfig.RecoilYawRandomRange, _gunConfig.RecoilYawRandomRange);
+            float finalPitch = _gunConfig.RecoilPitchAngle + pitchNoise;
+            float finalYaw = _gunConfig.RecoilYawAngle + yawNoise;
             float yawSign = Random.value > 0.5f ? 1f : -1f;
             _player.RuntimeData.ViewPitch -= finalPitch;
             _player.RuntimeData.ViewYaw += yawSign * finalYaw;
@@ -411,7 +433,7 @@ namespace NiumaTPC.Item
 
             _player = null;
             _instance = null;
-            _akconfig = null;
+            _gunConfig = null;
         }
 
         public void OnDespawned()
@@ -428,7 +450,7 @@ namespace NiumaTPC.Item
 
             _player = null;
             _instance = null;
-            _akconfig = null;
+            _gunConfig = null;
         }
 
         private void OnDisable()

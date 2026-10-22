@@ -23,8 +23,7 @@ namespace NiumaTPC.FishNet.Items
 
         [SerializeField]
         [Tooltip("普通实体碰撞体使用 Ignore；目标受击框是 Trigger 时使用 Collide")]
-        private QueryTriggerInteraction _triggerInteraction =
-            QueryTriggerInteraction.Ignore;
+        private QueryTriggerInteraction _triggerInteraction = QueryTriggerInteraction.Ignore;
 
         [SerializeField]
         [Tooltip("打印子弹命中、到期或取消结果，正式运行时可以关闭")]
@@ -35,9 +34,7 @@ namespace NiumaTPC.FishNet.Items
         #region 运行时状态
 
         // 同一个物理世界只允许一个服务器弹道驱动
-        private static readonly
-            Dictionary<PhysicsScene, AmmunitionDriver>
-            ServerWorlds = new();
+        private static readonly Dictionary<PhysicsScene, AmmunitionDriver> ServerWorlds = new();
 
         private PhysicsScene _physicsScene;
         private AmmunitionWorld _world;
@@ -47,6 +44,7 @@ namespace NiumaTPC.FishNet.Items
         {
             public string DefinitionId;
             public ShotRequestKey RequestKey;
+            public int ShooterObjectId;
         }
 
         // 保存发射时的资源与来源身份
@@ -218,6 +216,7 @@ namespace NiumaTPC.FishNet.Items
             RangedWeaponSO weapon,
             Ray approvedAim,
             Transform shooterRoot,
+            int shooterObjectId,
             ShotRequestKey requestKey,
             out ulong shotId)
         {
@@ -227,14 +226,15 @@ namespace NiumaTPC.FishNet.Items
                 weapon == null ||
                 weapon.Ammunition == null ||
                 shooterRoot == null ||
+                shooterObjectId ==
+                NetworkObject.UNSET_OBJECTID_VALUE ||
                 !requestKey.IsValid)
             {
                 return false;
             }
 
             // 不允许把另一个物理世界的射手登记到这里
-            if (shooterRoot.gameObject.scene.GetPhysicsScene() !=
-                _physicsScene)
+            if (shooterRoot.gameObject.scene.GetPhysicsScene() != _physicsScene)
             {
                 return false;
             }
@@ -268,7 +268,8 @@ namespace NiumaTPC.FishNet.Items
             _serverShots.Add(shotId, new ServerShotInfo
             {
                 DefinitionId = ammunition.DefinitionId,
-                RequestKey = requestKey
+                RequestKey = requestKey,
+                ShooterObjectId = shooterObjectId
             });
 
             return true;
@@ -294,6 +295,7 @@ namespace NiumaTPC.FishNet.Items
                 key.ServerWeaponInstanceId,
                 key.EquipmentRevision,
                 key.RequestSequence,
+                shotInfo.ShooterObjectId,
                 state.StartPosition,
                 state.Velocity,
                 state.Acceleration,
@@ -384,66 +386,45 @@ namespace NiumaTPC.FishNet.Items
 
         #region 客户端广播接收
 
-        [ObserversRpc(
-    RunLocally = false,
-    BufferLast = false,
-    ExcludeOwner = false,
-    ExcludeServer = false)]
-        private void ObserveShotSpawn(
-    ulong shotId,
-    string definitionId,
-    string serverWeaponInstanceId,
-    uint equipmentRevision,
-    ulong requestSequence,
-    Vector3 origin,
-    Vector3 initialVelocity,
-    Vector3 acceleration,
-    float lifetime,
-    uint serverTick)
+        // 根据射手网络身份从当前客户端角色副本读取枪口表现数据
+        private bool TryResolveFirePresentationData(
+            int shooterObjectId,
+            uint equipmentRevision,
+            out Vector3 origin,
+            out float presentationBlendTime)
         {
-            if (!IsClientInitialized || _presenter == null)
+            origin = default;
+            presentationBlendTime = 0f;
+
+            if (!IsClientInitialized ||
+                NetworkManager == null ||
+                shooterObjectId == NetworkObject.UNSET_OBJECTID_VALUE)
             {
-                return;
+                return false;
             }
 
-            ShotRequestKey requestKey = new(
-                serverWeaponInstanceId,
+            if (!NetworkManager.ClientManager.Objects.Spawned
+                    .TryGetValue(shooterObjectId,out NetworkObject shooterObject) || shooterObject == null || !shooterObject.TryGetComponent(out WeaponDriver weaponDriver))
+            {
+                return false;
+            }
+
+            return weaponDriver.TryGetFirePresentationData(
                 equipmentRevision,
-                requestSequence);
-
-            // Tick 可能回绕，不能直接做无符号年龄减法
-            int elapsedTicks = unchecked((int)(TimeManager.Tick - serverTick));
-
-            float initialAge = Mathf.Clamp(
-                elapsedTicks * (float)TimeManager.TickDelta,
-                0f,
-                lifetime);
-
-            _presenter.PlaySpawn(
-                shotId,
-                definitionId,
-                requestKey,
-                origin,
-                initialVelocity,
-                acceleration,
-                lifetime,
-                initialAge);
+                out origin,
+                out presentationBlendTime);
         }
 
-        [ObserversRpc(
-     RunLocally = false,
-     BufferLast = false,
-     ExcludeOwner = false,
-     ExcludeServer = false)]
+        [ObserversRpc(RunLocally = false, BufferLast = false, ExcludeOwner = false, ExcludeServer = false)]
         private void ObserveShotEnd(
-     ulong shotId,
-     string definitionId,
-     string serverWeaponInstanceId,
-     uint equipmentRevision,
-     ulong requestSequence,
-     bool hasHit,
-     Vector3 point,
-     Vector3 normal)
+            ulong shotId,
+            string definitionId,
+            string serverWeaponInstanceId,
+            uint equipmentRevision,
+            ulong requestSequence,
+            bool hasHit,
+            Vector3 point,
+            Vector3 normal)
         {
             if (!IsClientInitialized || _presenter == null)
             {
@@ -462,6 +443,59 @@ namespace NiumaTPC.FishNet.Items
                 hasHit,
                 point,
                 normal);
+        }
+
+        [ObserversRpc(RunLocally = false, BufferLast = false, ExcludeOwner = false, ExcludeServer = false)]
+        private void ObserveShotSpawn(
+            ulong shotId,
+            string definitionId,
+            string serverWeaponInstanceId,
+            uint equipmentRevision,
+            ulong requestSequence,
+            int shooterObjectId,
+            Vector3 origin,
+            Vector3 initialVelocity,
+            Vector3 acceleration,
+            float lifetime,
+            uint serverTick)
+        {
+            if (!IsClientInitialized || _presenter == null)
+            {
+                return;
+            }
+
+            ShotRequestKey requestKey = new(serverWeaponInstanceId,equipmentRevision,requestSequence);
+
+            // Tick 可能回绕，不能直接做无符号年龄减法
+            int elapsedTicks = unchecked((int)(TimeManager.Tick - serverTick));
+
+            float initialAge = Mathf.Clamp(elapsedTicks * (float)TimeManager.TickDelta, 0f, lifetime);
+
+            // 枪口不存在或远端装备尚未就绪时退回权威弹道起点
+            Vector3 presentationOrigin = origin;
+            float presentationBlendTime = 0f;
+
+            if (TryResolveFirePresentationData(
+                    shooterObjectId,
+                    equipmentRevision,
+                    out Vector3 muzzleOrigin,
+                    out float configuredBlendTime))
+            {
+                presentationOrigin = muzzleOrigin;
+                presentationBlendTime = configuredBlendTime;
+            }
+
+            _presenter.PlaySpawn(
+                shotId,
+                definitionId,
+                requestKey,
+                origin,
+                presentationOrigin,
+                presentationBlendTime,
+                initialVelocity,
+                acceleration,
+                lifetime,
+                initialAge);
         }
 
         #endregion

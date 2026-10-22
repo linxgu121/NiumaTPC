@@ -72,13 +72,5 @@ namespace NiumaTPC.Character.ProcessingPipeline
             _movementParameterProcessor.UpdatePresentation();
         }
 
-        /// <summary>
-        /// 更新可能改变玩法状态的参数。
-        /// 远端网络副本不能执行这一部分。
-        /// </summary>
-        public void UpdateGameplayParameterProcessors()
-        {
-            _movementParameterProcessor.UpdateGameplay();
-        }
     }
 }

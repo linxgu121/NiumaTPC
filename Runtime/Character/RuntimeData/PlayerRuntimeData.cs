@@ -110,6 +110,15 @@ namespace NiumaTPC.Character.RuntimeData
         /// <summary>动作开始时锁定的八方向，动作播放期间不再跟随新的移动输入改变。 </summary>
         public CharacterActionDirection SimulationActionDirection = CharacterActionDirection.Forward;
 
+        /// <summary>表现层已经接收的近战攻击序号 </summary>
+        public uint SimulationMeleeAttackSequence;
+
+        /// <summary>最近一次近战攻击开始 Tick </summary>
+        public uint SimulationMeleeAttackStartTick;
+
+        /// <summary>最近一次近战攻击剩余冷却 Tick 用于判断首次快照中的攻击是否仍然有效 </summary>
+        public uint SimulationMeleeAttackCooldownTicksRemaining;
+
         /// <summary>固定 Tick 当前翻越类型。</summary>
         public VaultType SimulationVaultType = VaultType.None;
 
@@ -130,7 +139,7 @@ namespace NiumaTPC.Character.RuntimeData
 
         /// <summary>快捷栏装备意图 -1无意图 >=0对应槽位</summary>
         public int WantsToEquipHotbarIndex = -1;
-        
+
         private ItemInstance _currentItem;
 
         /// <summary>
@@ -203,6 +212,9 @@ namespace NiumaTPC.Character.RuntimeData
         public bool WantsToFall;
         /// <summary>本帧是否想开火</summary>
         public bool WantsToFire;
+
+        /// <summary>本帧是否需要播放一次近战攻击表现 </summary>
+        public bool WantsToMeleeAttack;
 
         /// <summary>表情1意图</summary>
         public bool WantsExpression1;
@@ -347,6 +359,7 @@ namespace NiumaTPC.Character.RuntimeData
             WantsLowVault = false;
             WantsHighVault = false;
             WantsToFire = false;
+            WantsToMeleeAttack = false;
             WantsToAction = false;
 
             WantsExpression1 = false;

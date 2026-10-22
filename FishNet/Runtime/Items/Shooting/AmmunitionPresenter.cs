@@ -52,10 +52,8 @@ namespace NiumaTPC.FishNet.Items
         {
             public AmmunitionView View;
             public ulong BindingId;
-
             public ShotRequestKey RequestKey;
             public string DefinitionId;
-
             public Vector3 Origin;
             public Vector3 InitialVelocity;
             public Vector3 Acceleration;
@@ -63,6 +61,10 @@ namespace NiumaTPC.FishNet.Items
             public float Lifetime;
             public float CollisionRadius;
             public double ReceivedAt;
+            // 枪口表现偏移与服务器确认校正分别衰减
+            public Vector3 MuzzlePresentationOffset;
+            public float MuzzlePresentationBlendTime;
+            public double MuzzlePresentationStartedAt;
 
             public double PredictionDeadline;
             public Vector3 CorrectionOffset;
@@ -299,10 +301,13 @@ namespace NiumaTPC.FishNet.Items
 
         #region 本地预测弹
 
+        // 检查预测弹身份和资源并创建Owner本地飞行表现
         internal bool TryPlayPrediction(
             ShotRequestKey requestKey,
             RangedWeaponSO weapon,
-            Ray aim)
+            Ray aim,
+            Vector3 presentationOrigin,
+            float presentationBlendTime)
         {
             if (!_running ||
                 !requestKey.IsValid ||
@@ -322,10 +327,13 @@ namespace NiumaTPC.FishNet.Items
                 return false;
             }
 
+
             if (!TryCreateFlight(
                     requestKey,
                     definitionId,
                     aim.origin,
+                    presentationOrigin,
+                    presentationBlendTime,
                     aim.direction * weapon.ProjectileSpeed,
                     Physics.gravity * definition.GravityScale,
                     definition.MaxLifetime,
@@ -378,10 +386,13 @@ namespace NiumaTPC.FishNet.Items
             }
         }
 
+        // 检查表现资源和飞行容量并创建一条视觉飞行记录
         private bool TryCreateFlight(
             ShotRequestKey requestKey,
             string definitionId,
             Vector3 origin,
+            Vector3 presentationOrigin,
+            float presentationBlendTime,
             Vector3 initialVelocity,
             Vector3 acceleration,
             float lifetime,
@@ -417,6 +428,8 @@ namespace NiumaTPC.FishNet.Items
 
             _nextBindingId = checked(_nextBindingId + 1UL);
 
+            double createdAt = Time.unscaledTimeAsDouble;
+
             Flight created = new()
             {
                 View = view,
@@ -429,7 +442,10 @@ namespace NiumaTPC.FishNet.Items
                 Lifetime = lifetime,
                 CollisionRadius = definition.CollisionRadius,
                 InitialAge = initialAge,
-                ReceivedAt = Time.unscaledTimeAsDouble
+                ReceivedAt = createdAt,
+                MuzzlePresentationOffset = presentationOrigin - origin,
+                MuzzlePresentationBlendTime = Mathf.Max(0f, presentationBlendTime),
+                MuzzlePresentationStartedAt = createdAt
             };
 
             // 广播到达时子弹可能已经飞行了一段时间
@@ -445,6 +461,12 @@ namespace NiumaTPC.FishNet.Items
                 initialAge,
                 out Vector3 position,
                 out Vector3 velocity);
+
+            ApplyMuzzlePresentation(
+                created,
+                createdAt,
+                ref position,
+                ref velocity);
 
             if (!view.Bind(created.BindingId, position, velocity))
             {
@@ -482,6 +504,8 @@ namespace NiumaTPC.FishNet.Items
             string definitionId,
             ShotRequestKey requestKey,
             Vector3 origin,
+            Vector3 presentationOrigin,
+            float presentationBlendTime,
             Vector3 initialVelocity,
             Vector3 acceleration,
             float lifetime,
@@ -520,32 +544,35 @@ namespace NiumaTPC.FishNet.Items
             bool canReuse =
                 OwnsView(flight) &&
                 flight.View.isActiveAndEnabled &&
-                string.Equals(
-                    flight.DefinitionId,
-                    definitionId,
-                    StringComparison.Ordinal);
+                string.Equals(flight.DefinitionId, definitionId, StringComparison.Ordinal);
 
             if (canReuse)
             {
                 Vector3 oldDisplayPosition = flight.View.transform.position;
+
+                double confirmationTime = Time.unscaledTimeAsDouble;
 
                 flight.Origin = origin;
                 flight.InitialVelocity = initialVelocity;
                 flight.Acceleration = acceleration;
                 flight.Lifetime = lifetime;
                 flight.InitialAge = initialAge;
-                flight.ReceivedAt = Time.unscaledTimeAsDouble;
+                flight.ReceivedAt = confirmationTime;
 
                 CalculatePose(
                     flight,
                     initialAge,
                     out Vector3 authoritativePosition,
-                    out _);
+                    out Vector3 authoritativeVelocity);
 
-                // 保留确认瞬间的位置，之后逐渐消除偏差
-                // 不重新 Bind，保留已有粒子与拖尾
-                flight.CorrectionOffset =
-                    oldDisplayPosition - authoritativePosition;
+                ApplyMuzzlePresentation(
+                    flight,
+                    confirmationTime,
+                    ref authoritativePosition,
+                    ref authoritativeVelocity);
+
+                // 只保存枪口汇入之后仍然存在的网络预测误差
+                flight.CorrectionOffset = oldDisplayPosition - authoritativePosition;
             }
             else
             {
@@ -555,6 +582,8 @@ namespace NiumaTPC.FishNet.Items
                         requestKey,
                         definitionId,
                         origin,
+                        presentationOrigin,
+                        presentationBlendTime,
                         initialVelocity,
                         acceleration,
                         lifetime,
@@ -741,6 +770,12 @@ namespace NiumaTPC.FishNet.Items
                 out Vector3 position,
                 out Vector3 velocity);
 
+            ApplyMuzzlePresentation(
+                flight,
+                now,
+                ref position,
+                ref velocity);
+
             float correctionWeight = _confirmationBlendTime <= 0f
                 ? 0f
                 : 1f - Mathf.Clamp01(
@@ -764,6 +799,37 @@ namespace NiumaTPC.FishNet.Items
                 velocity);
         }
 
+        // 将视觉弹从枪口位置平滑汇入准星权威弹道
+        private static void ApplyMuzzlePresentation(
+            Flight flight,
+            double now,
+            ref Vector3 position,
+            ref Vector3 velocity)
+        {
+            float blendTime = flight.MuzzlePresentationBlendTime;
+
+            if (blendTime <= 0f ||
+                flight.MuzzlePresentationOffset.sqrMagnitude <=
+                0.000001f)
+            {
+                return;
+            }
+
+            float elapsed = Mathf.Max(0f, (float)(now - flight.MuzzlePresentationStartedAt));
+
+            if (elapsed >= blendTime)
+            {
+                return;
+            }
+
+            float weight = 1f - elapsed / blendTime;
+
+            position += flight.MuzzlePresentationOffset * weight;
+
+            // 修正视觉朝向，使模型朝向实际汇入轨迹
+            velocity -= flight.MuzzlePresentationOffset / blendTime;
+        }
+
         private static void CalculatePose(
             Flight flight,
             float age,
@@ -772,14 +838,9 @@ namespace NiumaTPC.FishNet.Items
         {
             // 与现有 AmmunitionMotion 使用相同的恒加速度公式
             // 这里只计算画面位置，不检测是否命中
-            position =
-                flight.Origin +
-                flight.InitialVelocity * age +
-                0.5f * flight.Acceleration * age * age;
+            position = flight.Origin + flight.InitialVelocity * age + 0.5f * flight.Acceleration * age * age;
 
-            velocity =
-                flight.InitialVelocity +
-                flight.Acceleration * age;
+            velocity = flight.InitialVelocity + flight.Acceleration * age;
         }
 
         #endregion
