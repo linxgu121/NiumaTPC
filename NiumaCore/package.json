@@ -1,0 +1,7 @@
+{
+  "name": "com.niuma.core",
+  "displayName": "NiumaCore",
+  "version": "1.0.0",
+  "unity": "6000.0.0",
+  "description": "Common protocol interfaces for Niuma modular game framework."
+}
