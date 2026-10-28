@@ -81,9 +81,7 @@ namespace NiumaResource
         /// 使用非 None 错误码创建失败结果
         /// 失败结果不会携带资源 Lease
         /// </summary>
-        public static ResourceLoadResult<T> Failure(
-            ResourceLoadErrorCode errorCode,
-            string errorMessage)
+        public static ResourceLoadResult<T> Failure(ResourceLoadErrorCode errorCode,string errorMessage)
         {
             if (errorCode == ResourceLoadErrorCode.None)
             {

@@ -5,6 +5,9 @@ namespace NiumaResource
     /// <summary>
     /// 资源缓存字典使用的复合键
     /// 只有地址和请求类型都相同的请求才能共享底层加载
+    ///
+    /// -------说一些设计与性能优化----------
+    /// 注意: 这里实现IEquatable<T>的目的是为了避免装箱减少GC
     /// </summary>
     internal readonly struct ResourceCacheKey : IEquatable<ResourceCacheKey>
     {
