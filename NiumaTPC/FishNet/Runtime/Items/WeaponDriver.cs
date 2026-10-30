@@ -97,6 +97,9 @@ namespace NiumaTPC.FishNet.Items
         // 当前服务器装备对应的出生槽位，-1 表示无有效槽位
         private int _ownerEquipmentSlotIndex = -1;
 
+        // 等待服务器确认的本地槽位，避免每帧重复发送同一切换请求
+        private int _lastRequestedEquipmentSlotIndex = int.MinValue;
+
         // 客户端表现去重，与服务器请求消费编号分开，避免 Host 相互影响
         private ulong _lastPresentedFireSequence;
 
@@ -144,6 +147,11 @@ namespace NiumaTPC.FishNet.Items
             }
         }
 
+        private void Update()
+        {
+            TrySubmitOwnerEquipmentSelection();
+        }
+
         public override void OnStartServer()
         {
             _lastReceivedRequestSequence = 0UL;
@@ -173,6 +181,7 @@ namespace NiumaTPC.FishNet.Items
             _lastPresentedFireSequence = 0UL;
             _lastOwnerSubmittedSequence = 0UL;
             _nextFireSubmissionTime = 0d;
+            _lastRequestedEquipmentSlotIndex = int.MinValue;
             ClearOwnerEquipmentSnapshot();
 
             if (IsOwner)
@@ -187,6 +196,7 @@ namespace NiumaTPC.FishNet.Items
             ClearOwnerPredictions();
             _lastPresentedFireSequence = 0UL;
             _lastOwnerSubmittedSequence = 0UL;
+            _lastRequestedEquipmentSlotIndex = int.MinValue;
             ClearOwnerEquipmentSnapshot();
         }
 
@@ -356,6 +366,98 @@ namespace NiumaTPC.FishNet.Items
         #region 装备快照同步
 
         /// <summary>
+        /// 检查 Owner 当前本地装备槽位并向服务器提交切换意图
+        /// 客户端只提交槽位，权威物品实例始终由服务器选择
+        /// </summary>
+        private void TrySubmitOwnerEquipmentSelection()
+        {
+            if (!IsClientInitialized ||
+                !IsOwner ||
+                _player == null ||
+                _player.RuntimeData == null ||
+                _player.InventoryController == null)
+            {
+                return;
+            }
+
+            int desiredSlotIndex = FindLocalEquipmentSlot(
+                _player.RuntimeData.CurrentItem);
+
+            if (desiredSlotIndex == _ownerEquipmentSlotIndex ||
+                desiredSlotIndex == _lastRequestedEquipmentSlotIndex)
+            {
+                return;
+            }
+
+            _lastRequestedEquipmentSlotIndex = desiredSlotIndex;
+            RequestSetEquipmentSlotServerRpc(desiredSlotIndex);
+        }
+
+        /// <summary>
+        /// 检查本地手持实例所属的快捷栏槽位
+        /// null 表示空手并返回 -1
+        /// </summary>
+        private int FindLocalEquipmentSlot(ItemInstance localItem)
+        {
+            if (localItem == null)
+            {
+                return -1;
+            }
+
+            var hotbar = _player.InventoryController.HotbarInventory;
+
+            if (hotbar == null)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < 5; i++)
+            {
+                if (ReferenceEquals(hotbar.GetAt(i), localItem))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// 校验 Owner 提交的槽位并切换服务器持有的权威装备实例
+        /// 不接受客户端传入物品 ID、实例或装备代次
+        /// </summary>
+        [ServerRpc(RequireOwnership = true, RunLocally = false)]
+        private void RequestSetEquipmentSlotServerRpc(
+            int slotIndex,
+            NetworkConnection sender = null)
+        {
+            if (!IsServerInitialized ||
+                sender == null ||
+                !sender.IsActive ||
+                sender != Owner)
+            {
+                return;
+            }
+
+            if (slotIndex == -1)
+            {
+                TrySetServerEquipment(null);
+                return;
+            }
+
+            if (_serverInitialEquipment == null ||
+                slotIndex < 0 ||
+                slotIndex >= _serverInitialEquipment.Length ||
+                _serverInitialEquipment[slotIndex] == null)
+            {
+                SendEquipmentSnapshotToOwner();
+                return;
+            }
+
+            TrySetServerEquipment(_serverInitialEquipment[slotIndex]);
+        }
+
+        /// <summary>
         /// Owner 只请求当前记录，不提交物品或装备代次
         /// </summary>
         [ServerRpc(RequireOwnership = true, RunLocally = false)]
@@ -440,6 +542,11 @@ namespace NiumaTPC.FishNet.Items
             _ownerEquipmentSlotIndex = slotIndex;
             _ownerEquipmentDefinitionId = definitionId ?? string.Empty;
 
+            if (_lastRequestedEquipmentSlotIndex == slotIndex)
+            {
+                _lastRequestedEquipmentSlotIndex = int.MinValue;
+            }
+
             ApplyOwnerAmmoSnapshot(
                 equipmentRevision,
                 ammoInMagazine,
@@ -471,6 +578,7 @@ namespace NiumaTPC.FishNet.Items
             _ownerEquipmentInstanceId = string.Empty;
             _ownerEquipmentDefinitionId = string.Empty;
             _ownerEquipmentSlotIndex = -1;
+            _lastRequestedEquipmentSlotIndex = int.MinValue;
             ResetOwnerAmmoSnapshot();
         }
 
@@ -482,7 +590,7 @@ namespace NiumaTPC.FishNet.Items
         /// 根据服务器出生槽位，核对当前本地手持实例
         /// 只解析服务器确认代次，不执行射击或切换装备
         /// </summary>
-        private bool TryGetConfirmedEquipmentRevision(
+        public bool TryGetConfirmedEquipmentRevision(
             ItemInstance localItem,
             out uint serverEquipmentRevision)
         {
@@ -1332,7 +1440,13 @@ namespace NiumaTPC.FishNet.Items
                 return false;
             }
 
-            if (!presentation.TryGetFirePresentationOrigin(currentItem, equipmentRevision, out origin))
+            /*
+             * equipmentRevision 属于服务器权威装备记录
+             * GunWeaponBehaviour 持有的是本地装备代次，两者不能直接比较
+             */
+            if (!presentation.TryGetFirePresentationOrigin(
+                    currentItem,
+                    out origin))
             {
                 return false;
             }

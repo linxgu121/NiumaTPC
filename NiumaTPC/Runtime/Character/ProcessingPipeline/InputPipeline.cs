@@ -218,6 +218,10 @@ namespace NiumaTPC.Character.ProcessingPipeline
 
             currentFrame.Processed.DodgeBufferTimer = UpdateBuffer(lastProc.DodgeBufferTimer, _rawData.WasPressed(RawInputButtons.Dodge));
 
+            bool aimPressed = _rawData.WasPressed(RawInputButtons.Aim);
+
+            currentFrame.Processed.AimBufferTimer = UpdateBuffer(lastProc.AimBufferTimer, aimPressed);
+
             currentFrame.Processed.RollBufferTimer = UpdateBuffer(lastProc.RollBufferTimer, _rawData.WasPressed(RawInputButtons.Roll));
 
             bool firePressed = _rawData.WasPressed(RawInputButtons.Fire);
@@ -267,7 +271,20 @@ namespace NiumaTPC.Character.ProcessingPipeline
         public void ConsumeNumber4Pressed() { var f = _inputData.currentFrameData; f.Processed.Number4BufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeNumber5Pressed() { var f = _inputData.currentFrameData; f.Processed.Number5BufferTimer = 0f; _inputData.currentFrameData = f; }
         public void ConsumeActionPressed() { var f = _inputData.currentFrameData; f.Processed.ActionBufferTimer = 0f; _inputData.currentFrameData = f; }
-        
+
+        /// <summary>
+        /// 消费右键按下缓存
+        /// 不清除 AimHeld 持续状态
+        /// </summary>
+        public void ConsumeAimPressed()
+        {
+            var frame = _inputData.currentFrameData;
+
+            frame.Processed.AimBufferTimer = 0f;
+
+            _inputData.currentFrameData = frame;
+        }
+
         /// <summary>
         /// 消费攻击按下缓存并同步清理旧鼠标字段
         /// </summary>

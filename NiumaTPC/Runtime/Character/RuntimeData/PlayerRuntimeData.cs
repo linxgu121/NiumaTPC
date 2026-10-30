@@ -1,3 +1,4 @@
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.Config;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Character.Event;
@@ -118,6 +119,12 @@ namespace NiumaTPC.Character.RuntimeData
 
         /// <summary>最近一次近战攻击剩余冷却 Tick 用于判断首次快照中的攻击是否仍然有效 </summary>
         public uint SimulationMeleeAttackCooldownTicksRemaining;
+
+        /// <summary>最近一次确认的近战攻击类型</summary>
+        public MeleeAttackType SimulationMeleeAttackType = MeleeAttackType.None;
+
+        /// <summary>最近一次确认的近战连招段数</summary>
+        public byte SimulationMeleeComboStepIndex;
 
         /// <summary>固定 Tick 当前翻越类型。</summary>
         public VaultType SimulationVaultType = VaultType.None;

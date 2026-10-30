@@ -1,3 +1,4 @@
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.Motion.MotionEnums;
 using UnityEngine;
 
@@ -94,6 +95,16 @@ namespace NiumaTPC.Character.Simulation
         public uint MeleeAttackCooldownTicksRemaining;
 
         /// <summary>
+        /// 最近一次近战攻击使用的攻击类型
+        /// </summary>
+        public MeleeAttackType MeleeAttackType;
+
+        /// <summary>
+        /// 最近一次近战攻击使用的连招段数
+        /// </summary>
+        public byte MeleeComboStepIndex;
+
+        /// <summary>
         /// 服务器确认的当前翻越类型
         /// </summary>
         public VaultType VaultType;
@@ -166,6 +177,8 @@ namespace NiumaTPC.Character.Simulation
             MeleeAttackSequence = simulationState.MeleeAttackSequence;
             MeleeAttackStartTick = simulationState.MeleeAttackStartTick;
             MeleeAttackCooldownTicksRemaining = simulationState.MeleeAttackCooldownTicksRemaining;
+            MeleeAttackType = simulationState.MeleeAttackType;
+            MeleeComboStepIndex = simulationState.MeleeComboStepIndex;
             MoveDirection = simulationState.LastMoveDirection;
             IsGrounded = simulationState.IsGrounded;
             LandingSequence = simulationState.LandingSequence;

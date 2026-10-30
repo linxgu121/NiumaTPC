@@ -58,6 +58,8 @@ namespace NiumaTPC.Character
 
 
         [Header("核心配置")]
+        [Tooltip("角色受到不同身体部位攻击时使用的基础倍率")]
+        public HitSpotDamageProfileSO HitSpotDamageProfile;
         public PlayerSO Config;
         public Transform PlayerCamera;
 
@@ -591,17 +593,23 @@ namespace NiumaTPC.Character
             if (UpperBodyController.StateRegistry.InitialState != null) UpperBodyController.StateMachine.Initialize(UpperBodyController.StateRegistry.InitialState);
         }
 
-        #region IDamageable 接口实现
+        #region IDamageable(IDamageable接口)
+
+        /// <summary>
+        /// 检查伤害请求并交给生命仲裁器统一处理
+        /// 命中部位倍率不会在该入口提前写入生命值
+        /// </summary>
         public void RequestDamage(in DamageRequest request)
         {
-            var health = ArbiterPipeline?.Health;
+            if (!request.IsValid) return;
+
+            HealthArbiter health = ArbiterPipeline?.Health;
             if (health == null) return;
 
             health.Enqueue(in request);
         }
 
         #endregion
-
 
     }
 }

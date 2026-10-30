@@ -13,8 +13,11 @@ namespace NiumaTPC.Item
         bool TryPlayFire(ItemInstance expectedItem, bool applyRecoil);
 
         /// <summary>
-        /// 校验装备实例和装备代次并取得视觉弹的发射起点
+        /// 校验当前本地装备实例并取得视觉弹的枪口起点
+        /// 服务器装备代次由网络武器驱动负责校验
         /// </summary>
-        bool TryGetFirePresentationOrigin(ItemInstance expectedItem,uint equipmentRevision,out Vector3 origin);
+        bool TryGetFirePresentationOrigin(
+            ItemInstance expectedItem,
+            out Vector3 origin);
     }
 }

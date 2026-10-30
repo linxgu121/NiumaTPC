@@ -1,12 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 namespace NiumaTPC.Character.State.UpperBody
 {
     /// <summary>
     /// 上半身不可以用状态
-    /// 当玩家无法操纵上半身时进入 如掉落 受击等情况 强制解除当前装备
+    /// 当翻越或翻滚等动作暂时占用整个身体时 强制解除当前装备实体
     /// </summary>
     public class UpperBodyUnavailableState : UpperBodyBaseState
     {
@@ -19,7 +15,7 @@ namespace NiumaTPC.Character.State.UpperBody
             // 强制卸下当前装备 确保玩家回复时能正确保存装备选择
             // 注意 不要重置 RuntimeData.CurrentItem
             // RuntimeData.CurrentItem 才是真正的装备装备图 装备选择
-            // Fall Unavailable 只应该在上半身暂时无法控制时清掉 不影响装备槽位的选择
+            // Unavailable 只清理当前装备实体 不修改玩家选择的装备槽位
             if (player != null && player.EquipmentDriver != null)
             {
                 player.EquipmentDriver.UnequipCurrentItem();

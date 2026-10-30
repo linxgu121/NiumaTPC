@@ -22,6 +22,7 @@ namespace NiumaResource
         #region Runtime State
 
         private GameContext _context;
+        private static NiumaResourceHost _activeHost;
         private AddressableResourceService _resourceService;
 
         /// <summary>
@@ -43,6 +44,13 @@ namespace NiumaResource
 
         #region Unity Lifecycle
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetActiveHost()
+        {
+            // 兼容编辑器关闭 Domain Reload 的运行方式
+            _activeHost = null;
+        }
+
         private void OnDestroy()
         {
             Stop();
@@ -51,6 +59,27 @@ namespace NiumaResource
         #endregion
 
         #region Public API
+
+        /// <summary>
+        /// 检查当前进程是否存在已经完成初始化的活动资源服务
+        /// 供无法直接持有 GameContext 的场景运行时组件使用
+        /// </summary>
+        public static bool TryGetActiveService(out IResourceService resourceService)
+        {
+            NiumaResourceHost activeHost = _activeHost;
+
+            if (activeHost != null &&
+                activeHost.IsStarted &&
+                activeHost._resourceService != null &&
+                activeHost._resourceService.IsInitialized)
+            {
+                resourceService = activeHost._resourceService;
+                return true;
+            }
+
+            resourceService = null;
+            return false;
+        }
 
         /// <summary>
         /// 检查 GameContext 与现有服务注册后创建并启动资源服务
@@ -62,12 +91,23 @@ namespace NiumaResource
             {
                 if (ReferenceEquals(_context, context))
                 {
+                    _activeHost = this;
                     LastError = string.Empty;
                     error = string.Empty;
                     return true;
                 }
 
                 return FailStart("NiumaResourceHost 已经绑定其他 GameContext", out error);
+            }
+
+            if (_activeHost != null && _activeHost != this)
+            {
+                if (_activeHost.IsStarted)
+                {
+                    return FailStart("当前进程已经存在其他活动的 NiumaResourceHost", out error);
+                }
+
+                _activeHost = null;
             }
 
             // 清理可能存在的未完成启动状态
@@ -98,6 +138,7 @@ namespace NiumaResource
 
                 _context = context;
                 _resourceService = resourceService;
+                _activeHost = this;
 
                 LastError = string.Empty;
                 error = string.Empty;
@@ -128,6 +169,11 @@ namespace NiumaResource
             AddressableResourceService resourceService = _resourceService;
 
             bool hadService = context != null || resourceService != null;
+
+            if (_activeHost == this)
+            {
+                _activeHost = null;
+            }
 
             // 先清空宿主状态，避免清理期间再次访问旧服务
             _context = null;

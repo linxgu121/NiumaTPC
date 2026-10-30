@@ -11,7 +11,7 @@ namespace NiumaTPC.Role
         {
             Clear();
 
-            if(catalogSO == null)
+            if (catalogSO == null)
             {
                 Debug.LogError("角色预制体初始化失败CharacterPrefabCatalogSO传入为null");
                 return false;
@@ -23,25 +23,26 @@ namespace NiumaTPC.Role
                 return false;
             }
 
-            for(int i = 0 ; i < catalogSO.Entries.Count; i++)
+            for (int i = 0; i < catalogSO.Entries.Count; i++)
             {
                 CharacterPrefabEntry entry = catalogSO.Entries[i];
 
-                if(entry == null)
+                if (entry == null)
                 {
                     Clear();
                     Debug.LogError($"角色预制体初始化失败：索引 {i} 的映射条目为空");
                     return false;
                 }
 
-                if(_entries.ContainsKey(entry.CharacterId))
+                if (_entries.ContainsKey(entry.CharacterId))
                 {
                     Clear();
                     Debug.LogError($"角色预制体初始化失败：存在重复的 CharacterId={entry.CharacterId}");
                     return false;
                 }
 
-                //两种资源允许分别配置，是否缺失在对应查询时判断
+                // 玩家预制体与预览地址允许分别配置
+                // 缺失状态在对应查询入口中判断
                 _entries.Add(entry.CharacterId, entry);
             }
 
@@ -54,12 +55,12 @@ namespace NiumaTPC.Role
         {
             prefab = null;
 
-            if(!_entries.TryGetValue(characterId, out CharacterPrefabEntry entry))
+            if (!_entries.TryGetValue(characterId, out CharacterPrefabEntry entry))
             {
                 return false;
             }
 
-            if(entry.PlayerPrefab == null)
+            if (entry.PlayerPrefab == null)
             {
                 return false;
             }
@@ -68,21 +69,25 @@ namespace NiumaTPC.Role
             return true;
         }
 
-        public bool TryGetPreviewPrefab(ushort characterId, out GameObject prefab)
+        /// <summary>
+        /// 检查角色映射是否存在有效预览地址并返回标准化结果
+        /// 地址为空或只有空格时不允许提交给资源服务
+        /// </summary>
+        public bool TryGetPreviewAddress(ushort characterId,out string address)
         {
-            prefab = null;
+            address = string.Empty;
 
-            if (!_entries.TryGetValue(characterId, out CharacterPrefabEntry entry))
+            if (!_entries.TryGetValue(characterId,out CharacterPrefabEntry entry))
             {
                 return false;
             }
 
-            if (entry.PreviewPrefab == null)
+            if (string.IsNullOrWhiteSpace(entry.PreviewAddress))
             {
                 return false;
             }
 
-            prefab = entry.PreviewPrefab;
+            address = entry.PreviewAddress.Trim();
             return true;
         }
 
@@ -93,6 +98,6 @@ namespace NiumaTPC.Role
         {
             _entries.Clear();
         }
-    
+
     }
 }

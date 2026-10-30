@@ -163,6 +163,7 @@ namespace NiumaTPC.Character.RuntimeData
         public float JumpBufferTimer;
         public float DodgeBufferTimer;
         public float RollBufferTimer;
+        public float AimBufferTimer;
         public float FireBufferTimer;
         public float Expression1BufferTimer;
         public float Expression2BufferTimer;
@@ -182,6 +183,7 @@ namespace NiumaTPC.Character.RuntimeData
         public bool JumpPressed => JumpBufferTimer > 0f;
         public bool DodgePressed => DodgeBufferTimer > 0f;
         public bool RollPressed => RollBufferTimer > 0f;
+        public bool AimPressed => AimBufferTimer > 0f;
         public bool FirePressed => FireBufferTimer > 0f;
         public bool Expression1Pressed => Expression1BufferTimer > 0f;
         public bool Expression2Pressed => Expression2BufferTimer > 0f;

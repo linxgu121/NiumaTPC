@@ -1,3 +1,4 @@
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.Simulation;
 using UnityEngine;
 
@@ -7,23 +8,32 @@ namespace NiumaTPC.Item
     /// 近战武器基类：定义近战武器的基础属性和动画配置。
     /// 继承自 EquippableItemSO，添加近战特定的动画和参数。
     /// </summary>
-    public abstract class MeleeWeaponSO : EquippableItemSO
+    [CreateAssetMenu(fileName = "NewMeleeWeaponSO", menuName = "NiumaTPC/Items/Weapons/Melee")]
+    public class MeleeWeaponSO : EquippableItemSO
     {
         [Header("--- 拔出硬直 ---")]
         [Tooltip("拔出动画允许退出时间（秒）")]
         public float EquipEndTime = 0.5f;
 
-        [Header("--- 近战武器独有配置 ---")]
-        [Min(0f)]
-        [Tooltip("攻击冷却时间 (秒)")]
-        public float AttackCooldown = 0.5f;
+        [Header("--- 近战连招 ---")]
 
-        [Tooltip("是否启用 IK（近战通常不需要）")]
-        public bool EnableIK = false;
+        [Tooltip("左键轻击使用的连招配置")]
+        public MeleeComboSO LightCombo;
+
+        [Tooltip("右键重击使用的连招配置")]
+        public MeleeComboSO HeavyCombo;
+
+        [Header("--- 近战武器独有配置 ---")]
+        [Tooltip("双手武器是否使用左手辅助握持IK，单手武器关闭")]
+        public bool EnableIK;
+
+        [Min(0f)]
+        [Tooltip("从装备动画开始到启用左手辅助握持IK的等待时间")]
+        public float EnableIKTime = 0.4f;
 
         [Header("--- 近战吸附 ---")]
 
-        [Tooltip("是否允许该武器的当前基础攻击触发近战吸附")]
+        [Tooltip("是否允许该武器的近战攻击触发吸附")]
         public bool EnableAdsorption = true;
 
         [Min(0.01f)]
@@ -45,33 +55,6 @@ namespace NiumaTPC.Item
         [Min(0.01f)]
         [Tooltip("吸附期间每秒允许修正的最大朝向角度")]
         public float AdsorptionMaximumTurnSpeedDegreesPerSecond = 720f;
-
-        /// <summary>
-        /// 将攻击冷却时间转换成确定性的固定 Tick 数
-        /// 非法或零冷却至少保留一个 Tick
-        /// </summary>
-        public uint GetAttackCooldownTickCount(float tickDeltaTime)
-        {
-            if (float.IsNaN(tickDeltaTime) ||
-                float.IsInfinity(tickDeltaTime) ||
-                tickDeltaTime <= 0f)
-            {
-                return 1u;
-            }
-
-            float cooldown = AttackCooldown;
-
-            if (float.IsNaN(cooldown) ||
-                float.IsInfinity(cooldown) ||
-                cooldown <= 0f)
-            {
-                return 1u;
-            }
-
-            int tickCount = Mathf.Max(1,Mathf.CeilToInt(cooldown / tickDeltaTime));
-
-            return (uint)tickCount;
-        }
 
         /// <summary>
         /// 检查武器吸附配置并烘焙固定 Tick 使用的运动参数
@@ -103,6 +86,20 @@ namespace NiumaTPC.Item
                 AdsorptionMaximumTurnSpeedDegreesPerSecond);
 
             return motionProfile.IsValid;
+        }
+
+        /// <summary>
+        /// 根据攻击通道返回该武器对应的连招配置
+        /// 未知攻击类型不提供连招
+        /// </summary>
+        public MeleeComboSO GetCombo(MeleeAttackType attackType)
+        {
+            return attackType switch
+            {
+                MeleeAttackType.Light => LightCombo,
+                MeleeAttackType.Heavy => HeavyCombo,
+                _ => null
+            };
         }
 
         /// <summary>

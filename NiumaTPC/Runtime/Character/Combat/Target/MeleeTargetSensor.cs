@@ -13,7 +13,7 @@ namespace NiumaTPC.Character.Combat
     [DisallowMultipleComponent]
     [RequireComponent(typeof(SphereCollider))]
     [RequireComponent(typeof(Rigidbody))]
-    public sealed class MeleeTargetSensor : MonoBehaviour,ICandidateProvider<IMeleeTarget>
+    public sealed class MeleeTargetSensor : MonoBehaviour, ICandidateProvider<IMeleeTarget>
     {
         #region Inspector
 
@@ -55,11 +55,25 @@ namespace NiumaTPC.Character.Combat
         }
 
         /// <summary>
+        /// 更新候选感知半径并同步到SphereCollider
+        /// 非法数值不会覆盖当前配置
+        /// </summary>
+        public void SetDetectionRadius(float radius)
+        {
+            if (float.IsNaN(radius) || float.IsInfinity(radius))
+            {
+                return;
+            }
+
+            detectionRadius = Mathf.Max(0.1f, radius);
+            CacheAndConfigureComponents();
+        }
+
+        /// <summary>
         /// 将当前范围内的整名角色目标复制到调用方缓冲区
         /// 本方法不负责过滤死亡、角度或障碍物
         /// </summary>
-        public int CopyCandidates(
-            List<IMeleeTarget> destination)
+        public int CopyCandidates(List<IMeleeTarget> destination)
         {
             if (destination == null)
             {
@@ -200,7 +214,7 @@ namespace NiumaTPC.Character.Combat
                 return null;
             }
 
-            MeleeCharacterTarget target =other.GetComponentInParent<MeleeCharacterTarget>();
+            MeleeCharacterTarget target = other.GetComponentInParent<MeleeCharacterTarget>();
 
             if (target == null ||
                 target == _ownerTarget)
@@ -213,7 +227,7 @@ namespace NiumaTPC.Character.Combat
 
         private bool ContainsTargetLayer(int layer)
         {
-            return (targetLayers.value &(1 << layer)) != 0;
+            return (targetLayers.value & (1 << layer)) != 0;
         }
 
         private void RemoveDestroyedTargets()

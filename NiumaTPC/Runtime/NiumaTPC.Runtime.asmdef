@@ -1,20 +1,23 @@
 {
-  "name": "NiumaTPC.Runtime",
-  "references": [
-    "Kybernetik.Animancer",
-    "Unity.InputSystem",
-    "Cinemachine",
-    "Unity.Animation.Rigging",
-    "RootMotion.FinalIK",
-    "Unity.RenderPipelines.Universal.Runtime",
-    "NiumaCore.Runtime"
-  ],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": false,
-  "precompiledReferences": [],
-  "autoReferenced": true,
-  "defineConstraints": [],
-  "versionDefines": []
+    "name": "NiumaTPC.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "Kybernetik.Animancer",
+        "Unity.InputSystem",
+        "Cinemachine",
+        "Unity.Animation.Rigging",
+        "RootMotion.FinalIK",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "NiumaCore.Runtime",
+        "NiumaResource.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

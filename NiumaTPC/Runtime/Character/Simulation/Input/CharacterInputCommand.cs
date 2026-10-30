@@ -27,7 +27,9 @@ namespace NiumaTPC.Character.Simulation
 
         Aim = 1 << 6,
 
-        MeleeAttack = 1 << 7
+        MeleeLightAttack = 1 << 7,
+
+        MeleeHeavyAttack = 1 << 8
     }
 
     /// <summary>
@@ -81,7 +83,6 @@ namespace NiumaTPC.Character.Simulation
         {
             return (Buttons & button) != 0;
         }
-
 
 
     }

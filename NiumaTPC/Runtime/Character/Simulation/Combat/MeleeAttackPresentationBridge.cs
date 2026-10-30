@@ -1,3 +1,4 @@
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.RuntimeData;
 
 namespace NiumaTPC.Character.Simulation
@@ -10,11 +11,17 @@ namespace NiumaTPC.Character.Simulation
     {
         #region Public API
 
+        /// <summary>
+        /// 将确认的攻击序号、类型和段数写入表现黑板
+        /// 只有新的有效攻击才产生一次性播放意图
+        /// </summary>
         public static void Apply(
             PlayerRuntimeData data,
             uint nextSequence,
             uint nextStartTick,
             uint nextCooldownTicksRemaining,
+            MeleeAttackType nextAttackType,
+            byte nextComboStepIndex,
             uint currentTick)
         {
             if (data == null)
@@ -30,6 +37,10 @@ namespace NiumaTPC.Character.Simulation
 
             data.SimulationMeleeAttackCooldownTicksRemaining = nextCooldownTicksRemaining;
 
+            data.SimulationMeleeAttackType = nextAttackType;
+
+            data.SimulationMeleeComboStepIndex = nextComboStepIndex;
+
             if (!sequenceChanged)
             {
                 return;
@@ -41,7 +52,11 @@ namespace NiumaTPC.Character.Simulation
              */
             bool isRecentAttack = nextCooldownTicksRemaining > 0u || nextStartTick == currentTick;
 
-            if (isRecentAttack)
+            bool hasValidAttackType =
+                nextAttackType == MeleeAttackType.Light ||
+                nextAttackType == MeleeAttackType.Heavy;
+
+            if (isRecentAttack && hasValidAttackType)
             {
                 data.WantsToMeleeAttack = true;
             }

@@ -1,0 +1,19 @@
+{
+    "name": "NiumaResource.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:cf209dea28ac16f46a4fd065550aef05",
+        "GUID:69448af7b92c7f342b298e06a37122aa"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -42,9 +42,9 @@ namespace NiumaTPC.Character.Core.Driver
             {
                 var prefab = CurrentItemData.Prefab;
 
-                if (SimpleObjectPoolSystem.Shared != null)
+                if (ObjectPoolSystem.Shared != null)
                 {
-                    _currentWeaponInstance = SimpleObjectPoolSystem.Shared.Spawn(prefab);
+                    _currentWeaponInstance = ObjectPoolSystem.Shared.Spawn(prefab);
                     _currentWeaponInstance.transform.SetParent(_player.WeaponContainer, false);
                     _currentWeaponInstance.transform.localPosition = Vector3.zero;
                     _currentWeaponInstance.transform.localRotation = Quaternion.identity;
@@ -79,9 +79,9 @@ namespace NiumaTPC.Character.Core.Driver
         {
              if (_currentWeaponInstance != null)
             {
-                if (SimpleObjectPoolSystem.Shared != null)
+                if (ObjectPoolSystem.Shared != null)
                 {
-                    SimpleObjectPoolSystem.Shared.Despawn(_currentWeaponInstance);
+                    ObjectPoolSystem.Shared.Despawn(_currentWeaponInstance);
                 }
                 else
                 {

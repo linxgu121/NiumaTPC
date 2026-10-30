@@ -189,16 +189,19 @@ namespace NiumaTPC.Role
             return _prefabCatalog.TryGetPlayerPrefab(characterId, out prefab);
         }
 
-        public bool TryGetPreviewPrefab(ushort characterId, out GameObject prefab)
+        /// <summary>
+        /// 检查角色模块状态并查询角色预览的 Addressables 地址
+        /// </summary>
+        public bool TryGetPreviewAddress(ushort characterId,out string address)
         {
-            prefab = null;
+            address = string.Empty;
 
             if (!IsStarted || _prefabCatalog == null)
             {
                 return false;
             }
 
-            return _prefabCatalog.TryGetPreviewPrefab(characterId, out prefab);
+            return _prefabCatalog.TryGetPreviewAddress(characterId,out address);
         }
 
         #endregion

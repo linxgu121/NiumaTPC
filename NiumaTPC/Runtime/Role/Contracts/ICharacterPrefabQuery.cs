@@ -13,8 +13,9 @@ namespace NiumaTPC.Role
         bool TryGetPlayerPrefab(ushort characterId, out GameObject prefab);
 
         /// <summary>
-        /// 查询展示角色预制体
+        /// 查询角色预览使用的稳定 Addressables 地址
+        /// 空地址或只有空格时返回失败
         /// </summary>
-        bool TryGetPreviewPrefab(ushort characterId, out GameObject prefab);
+        bool TryGetPreviewAddress(ushort characterId,out string address);
     }
 }

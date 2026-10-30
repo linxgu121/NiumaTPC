@@ -6,7 +6,7 @@ using UnityEngine;
 namespace NiumaTPC.Character.State.Core.Interceptors
 {
     // 上半身进入不可用拦截器 
-    // 当下半身处于翻越 下落 翻滚等状态时 强制上半身进入不可用状态 禁用控制权
+    // 当下半身处于翻越或翻滚等强制全身动作时 暂时禁用上半身控制权
     [CreateAssetMenu(fileName = "EnterUnavailableInterceptor", menuName = "NiumaTPC/Player/Interceptors/UpperBody/EnterUnavailable")]
     public class EnterUnavailableInterceptorSO : UpperBodyInterceptorSO
     {
@@ -15,7 +15,7 @@ namespace NiumaTPC.Character.State.Core.Interceptors
             nextState = null;
 
             // 1. 如果当前已经在 Unavailable 状态 不要重复进入
-            if(currentState != null && currentState is UpperBodyUnavailableState)
+            if (currentState != null && currentState is UpperBodyUnavailableState)
             {
                 return false;
             }
@@ -23,8 +23,9 @@ namespace NiumaTPC.Character.State.Core.Interceptors
             // 2. 获取下半身的当前状态 判断是否需要禁用上半身
             var playerbasestate = player.StateMachine.CurrentState;
 
-            // 3. 进行判断 如果是 Vault Fall Roll 状态 禁用上半身
-            if (playerbasestate is PlayerVaultState || playerbasestate is PlayerFallState || playerbasestate is PlayerRollState)
+            //
+            // 3. 翻越和翻滚会暂时占用整个身体 跳跃与下落仍然保留持械状态
+            if (playerbasestate is PlayerVaultState || playerbasestate is PlayerRollState)
             {
                 // 获取不可用 Unavailable 状态
                 nextState = player.UpperBodyController.StateRegistry.GetState<UpperBodyUnavailableState>();

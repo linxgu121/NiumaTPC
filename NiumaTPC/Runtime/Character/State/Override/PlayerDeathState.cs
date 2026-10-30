@@ -65,9 +65,9 @@ namespace NiumaTPC.Character.State.Override
         /// </summary>
         private void TryRespawnViaPool()
         {
-            if (SimpleObjectPoolSystem.Shared != null)
+            if (ObjectPoolSystem.Shared != null)
             {
-                SimpleObjectPoolSystem.Shared.Despawn(player.gameObject);
+                ObjectPoolSystem.Shared.Despawn(player.gameObject);
             }
             else
             {

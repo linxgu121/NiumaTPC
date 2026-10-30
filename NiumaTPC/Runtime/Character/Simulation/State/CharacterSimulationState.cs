@@ -1,3 +1,4 @@
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.Motion.MotionEnums;
 using UnityEngine;
 
@@ -184,6 +185,30 @@ namespace NiumaTPC.Character.Simulation
         public uint MeleeAttackCooldownTicksRemaining;
 
         /// <summary>
+        /// 最近一次成立攻击使用的攻击类型
+        /// 参与预测、回滚和观察者表现同步
+        /// </summary>
+        public MeleeAttackType MeleeAttackType;
+
+        /// <summary>
+        /// 最近一次成立攻击使用的连招段数
+        /// 由固定 Tick 决定 表现层不能自行递增
+        /// </summary>
+        public byte MeleeComboStepIndex;
+
+        /// <summary>
+        /// 当前连招继续衔接下一段还剩多少个固定 Tick
+        /// 归零后下一次攻击重新从第一段开始
+        /// </summary>
+        public uint MeleeComboWindowTicksRemaining;
+
+        /// <summary>
+        /// 当前连招使用的权威攻击来源修订号
+        /// 武器使用装备修订号，普通怪物使用稳定攻击配置编号
+        /// </summary>
+        public uint MeleeAttackSourceRevision;
+
+        /// <summary>
         /// 当前近战吸附的可回滚运行状态
         /// 包含锁定目标位置、位移预算和已执行 Tick
         /// </summary>
@@ -273,6 +298,10 @@ namespace NiumaTPC.Character.Simulation
             MeleeAttackSequence = 0u;
             MeleeAttackStartTick = 0u;
             MeleeAttackCooldownTicksRemaining = 0u;
+            MeleeAttackType = MeleeAttackType.None;
+            MeleeComboStepIndex = 0;
+            MeleeComboWindowTicksRemaining = 0u;
+            MeleeAttackSourceRevision = 0u;
             MeleeAdsorption = default;
             SmoothSpeed = smoothSpeed;
             SpeedSmoothVelocity = speedSmoothVelocity;

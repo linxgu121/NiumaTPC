@@ -11,8 +11,9 @@ using FishNet.Connection;
 using FishNet.Object;
 using NiumaTPC.Character.Traversal;
 using NiumaTPC.Character.Combat;
-using NiumaTPC.Item;
-using NiumaTPC.FishNet.Items;
+using NiumaTPC.FishNet.Combat;
+using NiumaTPC.Character.Input.AI;
+using NiumaTPC.FishNet.Enemy;
 
 namespace NiumaTPC.FishNet
 {
@@ -42,6 +43,12 @@ namespace NiumaTPC.FishNet
         [Tooltip("当前网络角色的近战选敌组件，未绑定时自动获取")]
         private MeleeTargetingController _meleeTargeting;
 
+        [Header("服务器近战判定")]
+
+        [SerializeField]
+        [Tooltip("服务器近战命中处理器，在 Hurtbox Layers 中选择 DamageHurtbox Layer")]
+        private ServerMeleeHitProcessor _serverMeleeHitProcessor = new ServerMeleeHitProcessor();
+
         [Header("观察者表现同步")]
         [SerializeField]
         [Min(1)]
@@ -63,7 +70,9 @@ namespace NiumaTPC.FishNet
 
         private CharacterInputCommandBuilder _commandBuilder;
 
-        private WeaponDriver _weaponDriver;
+        private IMeleeAttackSource _meleeAttackSource;
+
+        private ServerEnemyControlBridge _enemyControlBridge;
 
         private CharacterSimulationRunner _runner;
 
@@ -147,7 +156,7 @@ namespace NiumaTPC.FishNet
 
         #endregion
 
-        #region Unity Lifecycle(Unity的生命周期)
+        #region Unity Lifecycle(Unity生命周期)
 
         private void Awake()
         {
@@ -161,7 +170,13 @@ namespace NiumaTPC.FishNet
                 _meleeTargeting = GetComponent<MeleeTargetingController>();
             }
 
-            _weaponDriver = GetComponent<WeaponDriver>();
+            _meleeAttackSource = GetComponent<IMeleeAttackSource>();
+            _enemyControlBridge = GetComponent<ServerEnemyControlBridge>();
+
+            if (_serverMeleeHitProcessor == null)
+            {
+                _serverMeleeHitProcessor = new ServerMeleeHitProcessor();
+            }
 
             /*
              * Tick：
@@ -209,8 +224,20 @@ namespace NiumaTPC.FishNet
         {
             base.OnStartServer();
 
+            _serverMeleeHitProcessor.Reset();
+
             _serverSimulationState = default;
             _hasServerSimulationState = false;
+
+            /*
+             * OnStartNetwork与OnStartServer的组件回调顺序不应影响AI输入判定
+             * 服务器初始化完成后重新应用一次输入控制权
+            */
+            if (_networkSimulationActive)
+            {
+                ReleaseInputOwnership();
+                ApplyInputOwnership();
+            }
         }
 
         public override void OnStopServer()
@@ -242,8 +269,8 @@ namespace NiumaTPC.FishNet
         #region Input Ownership(输入所有权)
 
         /// <summary>
-        /// 只有本地拥有者可以让 NiumaTPC 从设备采集输入。
-        /// 服务器副本和观察者副本只消费 FishNet 提供的 Replicate 数据。
+        /// 根据本地Owner、服务器AI和观察者身份分配输入采集权
+        /// 服务器AI只允许在固定Tick采样输入
         /// </summary>
         private void ApplyInputOwnership()
         {
@@ -256,19 +283,23 @@ namespace NiumaTPC.FishNet
             _externalStateDrivenBeforeNetwork = _player.IsExternalSimulationStateDriven;
 
             bool hasLocalInputAuthority = Owner.IsLocalClient;
+            bool hasServerEnemyInputAuthority = HasServerEnemyInputAuthority();
 
-            _networkBlockedInput = !hasLocalInputAuthority;
-
+            /*
+             * 本地玩家由渲染帧读取设备输入
+             * 服务器AI由FishNet固定Tick读取EnemyInputSource
+             * 纯观察者完全禁止产生输入
+             */
+            _networkBlockedInput = !hasLocalInputAuthority && !hasServerEnemyInputAuthority;
             _networkAppliedExternalStateDrive = !hasLocalInputAuthority;
 
             if (_networkBlockedInput)
             {
                 _player.SetInputBlocked(true, clearBufferedInput: true);
+            }
 
-                /*
-                 * 远端副本不运行本地输入翻译器，
-                 * 其移动黑板由 FishNet 模拟结果写入。
-                 */
+            if (_networkAppliedExternalStateDrive)
+            {
                 _player.SetExternalSimulationStateDriven(true, clearLocalIntent: false);
             }
 
@@ -278,9 +309,9 @@ namespace NiumaTPC.FishNet
                 $"[NiumaFishNet] 输入所有权：" +
                 $"ObjectId={ObjectId}, " +
                 $"LocalOwner={hasLocalInputAuthority}, " +
-                $"InputBlocked={_player.IsInputBlocked}," +
-                $"ExternalStateDriven=" +
-                $"{_player.IsExternalSimulationStateDriven}",
+                $"ServerEnemy={hasServerEnemyInputAuthority}, " +
+                $"InputBlocked={_player.IsInputBlocked}, " +
+                $"ExternalStateDriven={_player.IsExternalSimulationStateDriven}",
                 this);
         }
 
@@ -291,18 +322,18 @@ namespace NiumaTPC.FishNet
                 return;
             }
 
-            if (_player != null && _networkBlockedInput)
+            if (_player != null)
             {
-                if (_player != null && _networkAppliedExternalStateDrive)
+                if (_networkAppliedExternalStateDrive)
                 {
-                    _player.SetExternalSimulationStateDriven(
-                        _externalStateDrivenBeforeNetwork,
-                        clearLocalIntent: false);
+                    _player.SetExternalSimulationStateDriven(_externalStateDrivenBeforeNetwork, clearLocalIntent: false);
                 }
-                // 仅撤销网络层施加的状态，保留进入网络前已有的阻断。
-                _player.SetInputBlocked(
-                    _inputWasBlockedBeforeNetwork,
-                    clearBufferedInput: false);
+
+                if (_networkBlockedInput)
+                {
+                    // 只撤销网络层施加的阻断，保留网络接管前的输入状态
+                    _player.SetInputBlocked(_inputWasBlockedBeforeNetwork, clearBufferedInput: false);
+                }
             }
 
             _inputOwnershipApplied = false;
@@ -312,9 +343,21 @@ namespace NiumaTPC.FishNet
             _networkAppliedExternalStateDrive = false;
         }
 
+        /// <summary>
+        /// 检查当前对象是否为服务器控制且正确绑定EnemyInputSource的敌人
+        /// 仅存在EnemyBrain但仍使用玩家输入源时不能获得AI输入权
+        /// </summary>
+        private bool HasServerEnemyInputAuthority()
+        {
+            return IsServerInitialized &&
+                   _enemyControlBridge != null &&
+                   _player != null &&
+                   _player.InputSourceRef is EnemyInputSource;
+        }
+
         #endregion
 
-        #region FishNet Tick
+        #region FishNet Tick(FishNet固定Tick)
 
         protected override void TimeManager_OnTick()
         {
@@ -326,16 +369,14 @@ namespace NiumaTPC.FishNet
             PrintTickHeartbeat();
 
             /*
-            *
-            * 1. 拥有者构造 CharacterInputCommand。
-            * 2. 调用 FishNet Replicate。
-            * 3. 客户端与服务器执行同一个模拟器。
-            */
-
-            ReplicateData data = BuildReplicateData();
+             * 玩家Owner读取渲染帧已经处理好的设备输入
+             * 服务器敌人在当前固定Tick生成并采样AI输入
+             * 两者最终都进入同一个Replicate与CharacterSimulationRunner
+             */
+            bool preparedServerEnemyInput = TryPrepareServerEnemyInput();
+            ReplicateData data = BuildReplicateData(preparedServerEnemyInput);
 
             PerformReplicate(data);
-
         }
 
         protected override void TimeManager_OnPostTick()
@@ -358,11 +399,41 @@ namespace NiumaTPC.FishNet
         #region Input Construction(输入构建)
 
         /// <summary>
-        /// 只有本地拥有者读取当前设备输入
+        /// 检查服务器敌人输入权并在当前固定Tick生成、采样AI输入
+        /// 纯客户端和玩家对象不能进入该流程
         /// </summary>
-        private ReplicateData BuildReplicateData()
+        private bool TryPrepareServerEnemyInput()
         {
-            if (!IsOwner ||
+            if (!HasServerEnemyInputAuthority() ||
+                !_enemyControlBridge.IsServerControlActive ||
+                _player.InputPipeline == null)
+            {
+                return false;
+            }
+
+            uint serverTick = TimeManager.LocalTick;
+            float tickDeltaTime = (float)TimeManager.TickDelta;
+
+            if (!_enemyControlBridge.TryRunServerTick(serverTick, tickDeltaTime))
+            {
+                return false;
+            }
+
+            /*
+             * 敌人的帧级Update已被ExternalSimulationStateDriven关闭
+             * 因此这里只有一次输入采样，不会和渲染帧重复执行
+             */
+            _player.InputPipeline.Update();
+            return true;
+        }
+
+        /// <summary>
+        /// 为本地Owner或服务器权威敌人构建当前Tick的模拟输入
+        /// 观察客户端不能自行构造角色命令
+        /// </summary>
+        private ReplicateData BuildReplicateData(bool allowServerEnemyInput)
+        {
+            if ((!IsOwner && !allowServerEnemyInput) ||
                 _commandBuilder == null ||
                 _player.InputPipeline == null ||
                 _player.RuntimeData == null)
@@ -370,8 +441,7 @@ namespace NiumaTPC.FishNet
                 return default;
             }
 
-            ProcessedInputData input =
-                _player.InputPipeline.Current.currentFrameData.Processed;
+            ProcessedInputData input = _player.InputPipeline.Current.currentFrameData.Processed;
 
             // 新命令读取本地视角输入源
             // 不读取会被历史重放覆盖的 Authority 朝向
@@ -421,6 +491,7 @@ namespace NiumaTPC.FishNet
 
         /// <summary>
         /// 为近战攻击写入按钮状态和预测使用的冻结目标快照
+        /// 当前攻击来源不存在时保留远程武器原有的瞄准与开火输入
         /// </summary>
         private void BuildMeleeReplicateInput(
             in ProcessedInputData input,
@@ -433,43 +504,96 @@ namespace NiumaTPC.FishNet
             targetPosition = Vector3.zero;
             targetCollisionRadius = 0f;
 
-            if (!input.FirePressed)
+            bool lightAttackPressed = input.FirePressed;
+            bool heavyAttackPressed = input.AimPressed;
+            float tickDeltaTime = (float)TimeManager.TickDelta;
+
+            /*
+             * 所有近战来源都必须至少提供轻击定义
+             * 无法提供时说明当前角色没有激活近战攻击来源
+             */
+            if (!TryResolveMeleeAttackDefinition(
+                    MeleeAttackType.Light,
+                    tickDeltaTime,
+                    out MeleeAttackDefinition attackDefinition))
             {
                 return;
             }
 
-            ItemInstance currentItem = _player.RuntimeData.CurrentItem;
+            /*
+             * 近战来源把右键解释为重击
+             * 不能再让同一输入进入瞄准模拟
+             */
+            command.Buttons &= ~CharacterInputButtons.Aim;
 
-            MeleeWeaponSO meleeWeapon = currentItem?.BaseData as MeleeWeaponSO;
-
-            // 远程武器输入继续交给 WeaponDriver
-            if (meleeWeapon == null)
+            if (!lightAttackPressed && !heavyAttackPressed)
             {
                 return;
             }
 
-            command.Buttons |= CharacterInputButtons.MeleeAttack;
+            MeleeAttackType attackType =
+                lightAttackPressed
+                    ? MeleeAttackType.Light
+                    : MeleeAttackType.Heavy;
 
-            // 命令已经保存攻击边沿
-            // 无论是否找到吸附目标都只消费一次
-            _player.InputPipeline.ConsumeFirePressed();
+            /*
+             * 轻击定义已经取得
+             * 只有单独请求重击时才需要重新解析重击通道
+             */
+            if (attackType == MeleeAttackType.Heavy &&
+                !TryResolveMeleeAttackDefinition(
+                    attackType,
+                    tickDeltaTime,
+                    out attackDefinition))
+            {
+                // 当前来源不支持重击时消费无效边沿，避免切换装备后补出旧输入
+                _player.InputPipeline.ConsumeAimPressed();
+                return;
+            }
 
-            if (!meleeWeapon.EnableAdsorption ||
-                _meleeTargeting == null)
+            /*
+             * 攻击尚未进入衔接窗口时保留InputPipeline中的按键缓存
+             * 等冷却归零后再生成真正的网络攻击命令
+             */
+            if (_runner == null || _runner.State.MeleeAttackCooldownTicksRemaining > 0u)
+            {
+                return;
+            }
+
+            /*
+             * 同Tick同时按下时轻击优先
+             * 两个输入缓存都要消费，避免下一Tick补出一次重击
+             */
+            if (lightAttackPressed)
+            {
+                command.Buttons |= CharacterInputButtons.MeleeLightAttack;
+                _player.InputPipeline.ConsumeFirePressed();
+
+                if (heavyAttackPressed)
+                {
+                    _player.InputPipeline.ConsumeAimPressed();
+                }
+            }
+            else
+            {
+                command.Buttons |= CharacterInputButtons.MeleeHeavyAttack;
+                _player.InputPipeline.ConsumeAimPressed();
+            }
+
+            if (!attackDefinition.EnableAdsorption || _meleeTargeting == null)
             {
                 return;
             }
 
             if (!_meleeTargeting.TryCreateAdsorptionIntent(
                     command.Tick,
-                    meleeWeapon.AdsorptionMaximumTravelDistance,
+                    attackDefinition.AdsorptionMaximumTravelDistance,
                     out MeleeIntent intent))
             {
                 return;
             }
 
             Transform targetRoot = intent.Target.RootTransform;
-
             NetworkObject targetNetworkObject =
                 targetRoot != null
                     ? targetRoot.GetComponentInParent<NetworkObject>()
@@ -478,8 +602,7 @@ namespace NiumaTPC.FishNet
             // 联机吸附目标必须具有有效的网络身份
             if (targetNetworkObject == null ||
                 !targetNetworkObject.IsSpawned ||
-                targetNetworkObject.ObjectId ==
-                NetworkObject.UNSET_OBJECTID_VALUE)
+                targetNetworkObject.ObjectId == NetworkObject.UNSET_OBJECTID_VALUE)
             {
                 return;
             }
@@ -521,17 +644,29 @@ namespace NiumaTPC.FishNet
             bool isHandsEmpty = _player.RuntimeData.CurrentItem == null;
 
             float tickDeltaTime = (float)TimeManager.TickDelta;
+            bool isDead = _player.RuntimeData.IsDead || _player.RuntimeData.Arbitration.IsDead;
 
-            TryProcessMeleeAttack(in data, in command, replicateState, tickDeltaTime);
+            if (isDead)
+            {
+                _runner.CancelMeleeAttack();
+            }
+            else
+            {
+                TryProcessMeleeAttack(in data, in command, replicateState, tickDeltaTime);
+            }
 
             CharacterSimulationState state = _runner.Simulate(in command, canSprint, isHandsEmpty, tickDeltaTime);
 
-            // 只保存服务器正常推进的结果
-            // 不接受客户端预测或校正重放产生的结果
             if (IsServerInitialized && replicateState.ContainsTicked() && !replicateState.ContainsReplayed())
             {
                 _serverSimulationState = state;
                 _hasServerSimulationState = true;
+
+                /*
+                 * 只有服务器正常推进的 Tick 可以产生近战命中
+                 * 客户端预测和 FishNet 校正重放不能重复产生副作用
+                 */
+                _serverMeleeHitProcessor.Process(_player, _meleeAttackSource, in state, tickDeltaTime, ObjectId, this);
             }
 
             /*
@@ -547,8 +682,8 @@ namespace NiumaTPC.FishNet
         }
 
         /// <summary>
-        /// 检查当前 Replicate 是否包含真实攻击边沿并交给对应权威分支
-        /// 丢包补帧产生的非 Created 数据不能重复触发攻击
+        /// 检查 Replicate 是否包含唯一且真实的近战攻击边沿
+        /// 丢包补帧和同时提交两种攻击都不能成立攻击
         /// </summary>
         private bool TryProcessMeleeAttack(
             in ReplicateData data,
@@ -557,8 +692,9 @@ namespace NiumaTPC.FishNet
             float tickDeltaTime)
         {
             if (!replicateState.ContainsCreated() ||
-                !command.HasButton(
-                    CharacterInputButtons.MeleeAttack))
+                !TryResolveMeleeAttackType(
+                    in command,
+                    out MeleeAttackType attackType))
             {
                 return false;
             }
@@ -568,6 +704,7 @@ namespace NiumaTPC.FishNet
                 return TryProcessServerMeleeAttack(
                     in data,
                     in command,
+                    attackType,
                     tickDeltaTime);
             }
 
@@ -580,113 +717,133 @@ namespace NiumaTPC.FishNet
             return TryProcessOwnerMeleeAttack(
                 in data,
                 in command,
+                attackType,
                 tickDeltaTime);
         }
 
         /// <summary>
-        /// 检查 Owner 本地装备与预测冷却并成立一次近战攻击
+        /// 检查命令是否只请求了一种近战攻击并解析其攻击类型
+        /// </summary>
+        private static bool TryResolveMeleeAttackType(
+            in CharacterInputCommand command,
+            out MeleeAttackType attackType)
+        {
+            bool requestsLight = command.HasButton(CharacterInputButtons.MeleeLightAttack);
+
+            bool requestsHeavy = command.HasButton(CharacterInputButtons.MeleeHeavyAttack);
+
+            // 两者都没有或两者同时存在都不是合法攻击请求
+            if (requestsLight == requestsHeavy)
+            {
+                attackType = MeleeAttackType.None;
+                return false;
+            }
+
+            attackType = requestsLight ? MeleeAttackType.Light : MeleeAttackType.Heavy;
+
+            return true;
+        }
+
+        /// <summary>
+        /// 检查当前角色的攻击来源能否提供与请求通道一致的有效攻击定义
+        /// </summary>
+        private bool TryResolveMeleeAttackDefinition(
+            MeleeAttackType attackType,
+            float tickDeltaTime,
+            out MeleeAttackDefinition definition)
+        {
+            definition = default;
+
+            if (_meleeAttackSource == null || !_meleeAttackSource.TryGetAttackDefinition(attackType, tickDeltaTime, out definition))
+            {
+                return false;
+            }
+
+            return definition.IsValid && definition.AttackType == attackType;
+        }
+
+        /// <summary>
+        /// 检查Owner本地攻击来源与预测冷却并成立一次近战攻击
         /// 吸附失败不会撤销已经成立的挥击
         /// </summary>
         private bool TryProcessOwnerMeleeAttack(
             in ReplicateData data,
             in CharacterInputCommand command,
+            MeleeAttackType attackType,
             float tickDeltaTime)
         {
-            ItemInstance currentItem = _player.RuntimeData.CurrentItem;
-
-            MeleeWeaponSO meleeWeapon = currentItem?.BaseData as MeleeWeaponSO;
-
-            if (meleeWeapon == null)
-            {
-                return false;
-            }
-
-            uint cooldownTicks = meleeWeapon.GetAttackCooldownTickCount(tickDeltaTime);
-
-            if (!_runner.TryBeginMeleeAttack(command.Tick, cooldownTicks))
-            {
-                return false;
-            }
-
-            // 没有吸附目标仍然是一刀合法攻击
-            if (data.MeleeTargetObjectId ==
-                NetworkObject.UNSET_OBJECTID_VALUE)
-            {
-                return true;
-            }
-
-            if (!meleeWeapon.TryCreateAdsorptionMotionProfile(
+            if (!TryResolveMeleeAttackDefinition(
+                    attackType,
                     tickDeltaTime,
-                    out MeleeAdsorptionMotionProfile motionProfile))
+                    out MeleeAttackDefinition definition))
+            {
+                return false;
+            }
+
+            if (!_runner.TryBeginMeleeAttack(
+                    command.Tick,
+                    definition.AttackType,
+                    definition.Combo,
+                    definition.SourceRevision,
+                    tickDeltaTime))
+            {
+                return false;
+            }
+
+            // 没有吸附目标或当前攻击未启用吸附时，挥击仍然有效
+            if (!definition.EnableAdsorption ||
+                data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE)
             {
                 return true;
             }
 
-            var request =
-                new MeleeAdsorptionSimulationRequest(
-                    command.Tick,
-                    data.MeleeTargetPosition,
-                    data.MeleeTargetCollisionRadius,
-                    meleeWeapon.AdsorptionMaximumTravelDistance);
+            var request = new MeleeAdsorptionSimulationRequest(
+                command.Tick,
+                data.MeleeTargetPosition,
+                data.MeleeTargetCollisionRadius,
+                definition.AdsorptionMaximumTravelDistance);
 
             if (!request.IsValid)
             {
                 return true;
             }
 
+            MeleeAdsorptionMotionProfile motionProfile = definition.AdsorptionMotionProfile;
             _runner.TryBeginMeleeAdsorption(in request, in motionProfile);
-
             return true;
         }
 
         /// <summary>
-        /// 使用服务器确认装备和服务器冷却成立近战攻击
-        /// 吸附目标继续由服务器重新选择和校验
+        /// 使用服务器权威攻击来源成立近战攻击并重新校验吸附目标
+        /// 目标校验失败只取消吸附，不会取消已经成立的挥击
         /// </summary>
         private bool TryProcessServerMeleeAttack(
             in ReplicateData data,
             in CharacterInputCommand command,
+            MeleeAttackType attackType,
             float tickDeltaTime)
         {
-            if (_weaponDriver == null ||
-                !_weaponDriver.TryGetServerEquippedItem(
-                    out ItemInstance serverItem,
-                    out _))
+            if (!TryResolveMeleeAttackDefinition(
+                    attackType,
+                    tickDeltaTime,
+                    out MeleeAttackDefinition definition))
             {
                 return false;
             }
-
-            MeleeWeaponSO meleeWeapon =
-                serverItem.BaseData as MeleeWeaponSO;
-
-            if (meleeWeapon == null)
-            {
-                return false;
-            }
-
-            uint cooldownTicks =
-                meleeWeapon.GetAttackCooldownTickCount(
-                    tickDeltaTime);
 
             if (!_runner.TryBeginMeleeAttack(
                     command.Tick,
-                    cooldownTicks))
+                    definition.AttackType,
+                    definition.Combo,
+                    definition.SourceRevision,
+                    tickDeltaTime))
             {
                 return false;
             }
 
-            /*
-             * 攻击已经成立
-             * 后续任意目标问题都只会取消吸附，不会取消挥击
-             */
-            if (data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE || _meleeTargeting == null)
-            {
-                return true;
-            }
-
-            if (!meleeWeapon.TryCreateAdsorptionMotionProfile(
-                    tickDeltaTime,
-                    out MeleeAdsorptionMotionProfile motionProfile))
+            if (!definition.EnableAdsorption ||
+                data.MeleeTargetObjectId == NetworkObject.UNSET_OBJECTID_VALUE ||
+                _meleeTargeting == null)
             {
                 return true;
             }
@@ -697,14 +854,13 @@ namespace NiumaTPC.FishNet
              */
             if (!_meleeTargeting.TryCreateAdsorptionIntent(
                     command.Tick,
-                    meleeWeapon.AdsorptionMaximumTravelDistance,
+                    definition.AdsorptionMaximumTravelDistance,
                     out MeleeIntent authoritativeIntent))
             {
                 return true;
             }
 
             Transform targetRoot = authoritativeIntent.Target.RootTransform;
-
             NetworkObject targetNetworkObject =
                 targetRoot != null
                     ? targetRoot.GetComponentInParent<NetworkObject>()
@@ -712,8 +868,7 @@ namespace NiumaTPC.FishNet
 
             if (targetNetworkObject == null ||
                 !targetNetworkObject.IsSpawned ||
-                targetNetworkObject.ObjectId !=
-                data.MeleeTargetObjectId)
+                targetNetworkObject.ObjectId != data.MeleeTargetObjectId)
             {
                 return true;
             }
@@ -724,10 +879,8 @@ namespace NiumaTPC.FishNet
                 return true;
             }
 
-            _runner.TryBeginMeleeAdsorption(
-                in request,
-                in motionProfile);
-
+            MeleeAdsorptionMotionProfile motionProfile = definition.AdsorptionMotionProfile;
+            _runner.TryBeginMeleeAdsorption(in request, in motionProfile);
             return true;
         }
 
@@ -1016,9 +1169,18 @@ namespace NiumaTPC.FishNet
                 CharacterInputButtons.Walk | CharacterInputButtons.Sprint |
                 CharacterInputButtons.Jump | CharacterInputButtons.Dodge |
                 CharacterInputButtons.Roll | CharacterInputButtons.Slide |
-                CharacterInputButtons.Aim | CharacterInputButtons.MeleeAttack;
+                CharacterInputButtons.Aim | CharacterInputButtons.MeleeLightAttack |
+                CharacterInputButtons.MeleeHeavyAttack;
 
             CharacterInputButtons buttons = source.Buttons & allowedButtons;
+
+            CharacterInputButtons meleeAttackButtons = CharacterInputButtons.MeleeLightAttack | CharacterInputButtons.MeleeHeavyAttack;
+
+            // 同时声明轻击和重击属于无效命令
+            if ((buttons & meleeAttackButtons) == meleeAttackButtons)
+            {
+                buttons &= ~meleeAttackButtons;
+            }
 
             if ((buttons & CharacterInputButtons.Sprint) != 0)
             {
@@ -1089,6 +1251,8 @@ namespace NiumaTPC.FishNet
                 state.MeleeAttackSequence,
                 state.MeleeAttackStartTick,
                 state.MeleeAttackCooldownTicksRemaining,
+                state.MeleeAttackType,
+                state.MeleeComboStepIndex,
                 state.Tick);
 
             ApplyAirborneTransition(data, state.IsGrounded, state.VerticalVelocity);
@@ -1224,6 +1388,8 @@ namespace NiumaTPC.FishNet
                 presentationState.MeleeAttackSequence,
                 presentationState.MeleeAttackStartTick,
                 presentationState.MeleeAttackCooldownTicksRemaining,
+                presentationState.MeleeAttackType,
+                presentationState.MeleeComboStepIndex,
                 presentationState.Tick);
 
             /*

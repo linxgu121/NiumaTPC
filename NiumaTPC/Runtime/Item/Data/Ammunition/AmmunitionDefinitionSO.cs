@@ -1,4 +1,5 @@
 using UnityEngine;
+using NiumaResource;
 
 namespace NiumaTPC.Item
 {
@@ -6,7 +7,7 @@ namespace NiumaTPC.Item
     /// 一类子弹的静态配置
     /// 不保存具体子弹的位置、速度、剩余寿命等运行时状态
     /// </summary>
-    [CreateAssetMenu(fileName = "AmmunitionSO",menuName = "NiumaTPC/Item/Ammunition")]
+    [CreateAssetMenu(fileName = "AmmunitionSO",menuName = "NiumaTPC/Items/Ammunition")]
     public class AmmunitionDefinitionSO : ScriptableObject
     {
         [Tooltip("稳定且唯一的配置编号(像7.62、5.56等)")]
@@ -28,11 +29,13 @@ namespace NiumaTPC.Item
 
         [Header("纯表现资源")]
 
-        [Tooltip("用于挂载 ProjectileView 的视觉预制体")]
-        public GameObject VisualPrefab;
+        [AddressableAddress(typeof(GameObject))]
+        [Tooltip("飞行弹丸的 Addressables 地址，资源根节点需要挂载 AmmunitionView")]
+        public string VisualAddress = string.Empty;
 
-        [Tooltip("命中特效预制体。为空时不播放命中特效。")]
-        public GameObject ImpactPrefab;
+        [AddressableAddress(typeof(GameObject))]
+        [Tooltip("命中特效的 Addressables 地址，为空时不播放命中特效")]
+        public string ImpactAddress = string.Empty;
 
         [Tooltip("命中音效。为空时不播放。开枪音效仍由武器负责。")]
         public AudioClip ImpactSound;

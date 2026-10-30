@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using NiumaTPC.Character.RuntimeData;
 using NiumaTPC.Character.State.Override;
 using NiumaTPC.Core.Combat;
@@ -31,7 +29,7 @@ namespace NiumaTPC.Character.Arbitration.Arbiters
         /// </summary>
         internal void Enqueue(in DamageRequest request)
         {
-            if (_data.IsDead) return; // 防止鞭尸:d
+            if (_data.IsDead) return; // 防止鞭尸
 
             _damageQueue[_tail] = request;
             _tail = (_tail + 1) % _damageQueue.Length;
@@ -48,15 +46,23 @@ namespace NiumaTPC.Character.Arbitration.Arbiters
 
             while (_head != _tail)
             {
-                ref var req = ref _damageQueue[_head];
-
-                float before = _data.CurrentHealth;
-                // 结算伤害
-                _data.CurrentHealth -= req.Amount;
-
-                //Debug.Log($"Damage apply amount {req.Amount} hp {before} -> {_data.CurrentHealth}", _player);
-
+                DamageRequest request = _damageQueue[_head];
                 _head = (_head + 1) % _damageQueue.Length;
+
+                if (!request.IsValid) continue;
+
+                float hitSpotMultiplier = _player.HitSpotDamageProfile != null
+                    ? _player.HitSpotDamageProfile.GetMultiplier(request.HitSpot)
+                    : 1f;
+
+                float damageAmount = request.Amount * hitSpotMultiplier;
+
+                if (float.IsNaN(damageAmount) || float.IsInfinity(damageAmount) || damageAmount <= 0f)
+                {
+                    continue;
+                }
+
+                _data.CurrentHealth -= damageAmount;
             }
 
             // 死亡判定

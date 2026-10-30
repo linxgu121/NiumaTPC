@@ -41,7 +41,7 @@ namespace NiumaTPC.Item
 
         // 当前这次装备持有一份枪焰对象，连续开火时复用
         private GameObject _muzzleVfxObject;
-        private SimpleObjectPoolSystem _muzzleVfxPool;
+        private ObjectPoolSystem _muzzleVfxPool;
 
         private ParticleSystem[] _muzzleParticles = System.Array.Empty<ParticleSystem>();
 
@@ -257,17 +257,14 @@ namespace NiumaTPC.Item
             return true;
         }
 
-        // 校验装备实例和装备代次并返回视觉弹使用的枪口位置
+        // 校验当前装备实例并返回视觉弹使用的枪口位置
         public bool TryGetFirePresentationOrigin(
             ItemInstance expectedItem,
-            uint equipmentRevision,
             out Vector3 origin)
         {
             origin = default;
 
             if (_muzzle == null ||
-                equipmentRevision == 0u ||
-                equipmentRevision != _equipmentRevision ||
                 !IsCurrentFirePresentation(expectedItem))
             {
                 return false;
@@ -309,7 +306,7 @@ namespace NiumaTPC.Item
                     return;
                 }
 
-                _muzzleVfxPool = SimpleObjectPoolSystem.Shared;
+                _muzzleVfxPool = ObjectPoolSystem.Shared;
 
                 if (_muzzleVfxPool == null)
                 {
@@ -365,7 +362,7 @@ namespace NiumaTPC.Item
             StopMuzzleParticles();
 
             GameObject instance = _muzzleVfxObject;
-            SimpleObjectPoolSystem pool = _muzzleVfxPool;
+            ObjectPoolSystem pool = _muzzleVfxPool;
 
             // 先清空持有记录，避免停用和回收回调重复处理
             _muzzleVfxObject = null;

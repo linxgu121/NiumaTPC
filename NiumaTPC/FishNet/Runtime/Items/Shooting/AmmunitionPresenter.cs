@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using NiumaResource;
 using NiumaTPC.Core.Object;
 using NiumaTPC.Item;
 using UnityEngine;
@@ -17,8 +19,8 @@ namespace NiumaTPC.FishNet.Items
         #region Inspector
 
         [SerializeField]
-        [Tooltip("绑定场景中的 SimpleObjectPoolSystem，用于子弹和命中特效的生成与回收")]
-        private SimpleObjectPoolSystem _visualPool;
+        [Tooltip("绑定场景中的ObjectPoolSystem，用于子弹和命中特效的生成与回收")]
+        private ObjectPoolSystem _visualPool;
 
         [SerializeField]
         [Tooltip("填写本局所有可用的弹药配置，不是当前玩家携带的武器列表；DefinitionId 必须唯一")]
@@ -86,9 +88,15 @@ namespace NiumaTPC.FishNet.Items
         private readonly HashSet<ulong> _endedIds = new();
         private readonly Queue<ulong> _endedOrder = new();
 
-        private SimpleObjectPoolSystem _pool;
+        private ObjectPoolSystem _pool;
         private ulong _lastSpawnId;
         private bool _running;
+
+        // 只记录已经由当前 Presenter 取得使用权的地址池
+        private readonly HashSet<string> _preparedPoolAddresses = new(StringComparer.Ordinal);
+
+        // 异步任务完成时必须与启动它的会话版本一致
+        private int _sessionVersion;
 
         // 复用已有查询器，只查询画面遮挡，不推进逻辑子弹
         private readonly AmmunitionCollision _visualCollision = new();
@@ -116,7 +124,7 @@ namespace NiumaTPC.FishNet.Items
 
         #endregion
 
-        #region 生命周期
+        #region Unity Lifecycle(Unity 生命周期)
 
         public void BeginSession()
         {
@@ -127,51 +135,15 @@ namespace NiumaTPC.FishNet.Items
                 return;
             }
 
-            _pool = _visualPool;
-
-            if (_pool == null)
-            {
-                Debug.LogError("[网络弹道表现] 没有绑定对象池", this);
-                return;
-            }
-
-            AmmunitionDefinitionSO[] definitions = _ammunitionDefinitions ?? Array.Empty<AmmunitionDefinitionSO>();
-
-            foreach (AmmunitionDefinitionSO definition in definitions)
-            {
-                if (definition == null)
-                {
-                    continue;
-                }
-
-                string id = definition.DefinitionId;
-
-                // 这里只检查网络资源身份，不建立完整配置验证系统
-                if (string.IsNullOrWhiteSpace(id) ||
-                    _definitions.ContainsKey(id))
-                {
-                    Debug.LogError(
-                        $"[网络弹道表现] 弹药 DefinitionId 为空或重复：{id}",
-                        definition);
-
-                    EndSession();
-                    return;
-                }
-
-                _definitions.Add(id, definition);
-            }
-
-            _running = true;
-
-            if (!RegisterClientPresenter())
-            {
-                EndSession();
-            }
+            int sessionVersion = _sessionVersion;
+            _ = PrepareSessionAsync(sessionVersion);
         }
 
         public void EndSession()
         {
+            _sessionVersion = unchecked(_sessionVersion + 1);
             _running = false;
+
             UnregisterClientPresenter();
 
             _removePredictions.Clear();
@@ -199,6 +171,9 @@ namespace NiumaTPC.FishNet.Items
                 ReleaseImpact(i);
             }
 
+            // 活跃实例全部归还后才请求释放地址池
+            ReleasePreparedAddressPools();
+
             _definitions.Clear();
             _endedIds.Clear();
             _endedOrder.Clear();
@@ -218,6 +193,176 @@ namespace NiumaTPC.FishNet.Items
         private void OnDestroy()
         {
             EndSession();
+        }
+
+        #endregion
+
+        #region Session Preparation(会话准备)
+
+        private async Task PrepareSessionAsync(int sessionVersion)
+        {
+            HashSet<string> preparedAddresses =
+                new(StringComparer.Ordinal);
+
+            try
+            {
+                if (!IsSessionCurrent(sessionVersion))
+                {
+                    return;
+                }
+
+                _pool = _visualPool;
+
+                if (_pool == null)
+                {
+                    Debug.LogError("[网络弹道表现] 没有绑定 ObjectPoolSystem", this);
+
+                    EndSession();
+                    return;
+                }
+
+                if (!NiumaResourceHost.TryGetActiveService(out IResourceService resourceService))
+                {
+                    Debug.LogError("[网络弹道表现] NiumaResource 尚未完成初始化", this);
+
+                    EndSession();
+                    return;
+                }
+
+                if (!TryBuildPoolAddresses(out HashSet<string> poolAddresses))
+                {
+                    EndSession();
+                    return;
+                }
+
+                foreach (string address in poolAddresses)
+                {
+                    AddressPoolPrepareResult result = await _pool.PrepareAddressPoolAsync(address, resourceService);
+
+                    if (!result.Succeeded)
+                    {
+                        Debug.LogError(
+                            $"[网络弹道表现] 地址池准备失败 Address={result.Address}, " +
+                            $"Code={result.ErrorCode}, ResourceCode={result.ResourceErrorCode}, Message={result.ErrorMessage}",
+                            this);
+
+                        ReleaseAddressPools(preparedAddresses);
+
+                        if (IsSessionCurrent(sessionVersion))
+                            EndSession();
+
+                        return;
+                    }
+
+                    preparedAddresses.Add(address);
+
+                    // 加载期间可能已经退出战斗场景
+                    if (!IsSessionCurrent(sessionVersion))
+                    {
+                        ReleaseAddressPools(preparedAddresses);
+                        return;
+                    }
+                }
+
+                foreach (string address in preparedAddresses)
+                {
+                    _preparedPoolAddresses.Add(address);
+                }
+
+                _running = true;
+
+                if (!RegisterClientPresenter())
+                {
+                    EndSession();
+                    return;
+                }
+
+                Debug.Log($"[网络弹道表现] 地址池准备完成 Count={_preparedPoolAddresses.Count}", this);
+            }
+            catch (Exception exception)
+            {
+                ReleaseAddressPools(preparedAddresses);
+
+                if (IsSessionCurrent(sessionVersion))
+                {
+                    Debug.LogError($"[网络弹道表现] 准备会话时发生异常: {exception}", this);
+
+                    EndSession();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 检查弹药身份和必要表现地址并汇总本局需要的唯一地址
+        /// </summary>
+        private bool TryBuildPoolAddresses(out HashSet<string> poolAddresses)
+        {
+            poolAddresses = new HashSet<string>(StringComparer.Ordinal);
+            AmmunitionDefinitionSO[] definitions = _ammunitionDefinitions ?? Array.Empty<AmmunitionDefinitionSO>();
+
+            foreach (AmmunitionDefinitionSO definition in definitions)
+            {
+                if (definition == null)
+                    continue;
+
+                string id = definition.DefinitionId;
+
+                if (string.IsNullOrWhiteSpace(id) || _definitions.ContainsKey(id))
+                {
+                    Debug.LogError($"[网络弹道表现] 弹药 DefinitionId 为空或重复: {id}", definition);
+                    return false;
+                }
+
+                string visualAddress = definition.VisualAddress?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrEmpty(visualAddress))
+                {
+                    Debug.LogError($"[网络弹道表现] 弹药没有配置飞行表现地址: {id}", definition);
+                    return false;
+                }
+
+                _definitions.Add(id, definition);
+                poolAddresses.Add(visualAddress);
+
+                if (_maxActiveImpacts > 0)
+                {
+                    string impactAddress = definition.ImpactAddress?.Trim() ?? string.Empty;
+
+                    if (!string.IsNullOrEmpty(impactAddress))
+                        poolAddresses.Add(impactAddress);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 检查异步准备结果是否仍属于当前启用中的表现会话
+        /// </summary>
+        private bool IsSessionCurrent(int sessionVersion)
+        {
+            return sessionVersion == _sessionVersion &&
+                   isActiveAndEnabled;
+        }
+
+        private void ReleasePreparedAddressPools()
+        {
+            ReleaseAddressPools(_preparedPoolAddresses);
+            _preparedPoolAddresses.Clear();
+        }
+
+        private void ReleaseAddressPools(
+            IEnumerable<string> addresses)
+        {
+            if (_pool == null || addresses == null)
+            {
+                return;
+            }
+
+            foreach (string address in addresses)
+            {
+                _pool.RequestReleaseAddressPool(address, out _);
+            }
         }
 
         #endregion
@@ -381,8 +526,7 @@ namespace NiumaTPC.FishNet.Items
 
             if (_closedPredictionOrder.Count > RecentEndCapacity)
             {
-                _closedPredictions.Remove(
-                    _closedPredictionOrder.Dequeue());
+                _closedPredictions.Remove(_closedPredictionOrder.Dequeue());
             }
         }
 
@@ -404,13 +548,12 @@ namespace NiumaTPC.FishNet.Items
             if (_flights.Count + _predictions.Count >= MaxActiveFlights ||
                 initialAge >= lifetime ||
                 !TryGetDefinition(definitionId, out var definition) ||
-                definition.VisualPrefab == null)
+                string.IsNullOrWhiteSpace(definition.VisualAddress))
             {
                 return false;
             }
 
-            GameObject instance = SpawnVisual(definition.VisualPrefab);
-
+            GameObject instance = SpawnVisual(definition.VisualAddress);
             if (instance == null)
             {
                 return false;
@@ -419,7 +562,7 @@ namespace NiumaTPC.FishNet.Items
             if (!instance.TryGetComponent(out AmmunitionView view))
             {
                 Debug.LogError(
-                    "[网络弹道表现] 子弹 Prefab 根节点缺少 AmmunitionView",
+                    "[网络弹道表现] 子弹表现资源根节点缺少 AmmunitionView",
                     instance);
 
                 ReturnVisual(instance);
@@ -640,18 +783,15 @@ namespace NiumaTPC.FishNet.Items
 
             int limit = Mathf.Max(0, _maxActiveImpacts);
 
-            if (limit == 0 || definition.ImpactPrefab == null)
-            {
+            if (limit == 0 || string.IsNullOrWhiteSpace(definition.ImpactAddress))
                 return;
-            }
 
             while (_impacts.Count >= limit)
             {
                 ReleaseImpact(0);
             }
 
-            GameObject instance = SpawnVisual(definition.ImpactPrefab);
-
+            GameObject instance = SpawnVisual(definition.ImpactAddress);
             if (instance == null)
             {
                 return;
@@ -660,7 +800,7 @@ namespace NiumaTPC.FishNet.Items
             if (!instance.TryGetComponent(out AmmunitionImpactView view))
             {
                 Debug.LogError(
-                    "[网络弹道表现] 命中特效根节点缺少 AmmunitionImpactView",
+                    "[网络弹道表现]命中特效资源根节点缺少AmmunitionImpactView",
                     instance);
 
                 ReturnVisual(instance);
@@ -983,28 +1123,26 @@ namespace NiumaTPC.FishNet.Items
             return false;
         }
 
-        private GameObject SpawnVisual(GameObject prefab)
+        private GameObject SpawnVisual(string address)
         {
-            if (_pool == null)
-            {
+            if (_pool == null || string.IsNullOrWhiteSpace(address))
                 return null;
-            }
 
-            GameObject instance = _pool.Spawn(prefab);
+            string normalizedAddress = address.Trim();
 
-            if (instance == null)
+            if (!_pool.TrySpawnByAddress(normalizedAddress, out GameObject instance, out AddressPoolErrorCode errorCode))
             {
+                Debug.LogError(
+                    $"[网络弹道表现] 无法从地址池取出表现对象 Address={normalizedAddress}, Code={errorCode}",
+                    this);
+
                 return null;
             }
 
             instance.transform.SetParent(null, true);
 
             if (instance.scene != gameObject.scene)
-            {
-                SceneManager.MoveGameObjectToScene(
-                    instance,
-                    gameObject.scene);
-            }
+                SceneManager.MoveGameObjectToScene(instance, gameObject.scene);
 
             return instance;
         }

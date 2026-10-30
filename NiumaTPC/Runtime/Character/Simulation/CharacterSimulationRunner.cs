@@ -1,4 +1,5 @@
 using System;
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.Traversal;
 using UnityEngine;
@@ -95,19 +96,58 @@ namespace NiumaTPC.Character.Simulation
         #region Melee(近战)
 
         /// <summary>
-        /// 检查当前动作与冷却是否允许开始新的近战攻击
-        /// 攻击成立与是否找到吸附目标相互独立
+        /// 检查攻击类型、动作状态、攻击来源身份和连招窗口
+        /// 成立后写入可回滚的攻击类型与连招段数
         /// </summary>
-        public bool TryBeginMeleeAttack(uint attackTick, uint cooldownTicks)
+        public bool TryBeginMeleeAttack(
+            uint attackTick,
+            MeleeAttackType attackType,
+            MeleeComboSO combo,
+            uint sourceRevision,
+            float tickDeltaTime)
         {
             bool hasConflictingAction =
                 _state.VaultType != VaultType.None ||
                 _state.ActionType != CharacterActionType.None;
 
+            bool hasValidAttackType =
+                attackType != MeleeAttackType.None &&
+                Enum.IsDefined(typeof(MeleeAttackType), attackType);
+
             if (hasConflictingAction ||
                 _state.MeleeAdsorption.IsActive ||
                 _state.MeleeAttackCooldownTicksRemaining > 0u ||
-                cooldownTicks == 0u)
+                !hasValidAttackType ||
+                combo == null ||
+                sourceRevision == 0u)
+            {
+                return false;
+            }
+
+            int stepCount = combo.StepCount;
+
+            /*
+             * 只有同一把武器、同一种攻击类型且仍处于衔接窗口
+             * 才能推进到下一段
+             */
+            bool canContinueCurrentCombo =
+                _state.MeleeAttackSourceRevision == sourceRevision &&
+                _state.MeleeAttackType == attackType &&
+                _state.MeleeComboWindowTicksRemaining > 0u;
+
+            byte nextStepIndex = 0;
+
+            if (canContinueCurrentCombo && _state.MeleeComboStepIndex < stepCount - 1)
+            {
+                nextStepIndex =
+                    (byte)(_state.MeleeComboStepIndex + 1);
+            }
+
+            if (!combo.TryGetStepTiming(
+                    nextStepIndex,
+                    tickDeltaTime,
+                    out uint nextAttackWindowStartTicks,
+                    out uint nextAttackWindowEndTicks))
             {
                 return false;
             }
@@ -115,20 +155,75 @@ namespace NiumaTPC.Character.Simulation
             _state.MeleeAttackSequence = unchecked(_state.MeleeAttackSequence + 1u);
 
             _state.MeleeAttackStartTick = attackTick;
-            _state.MeleeAttackCooldownTicksRemaining = cooldownTicks;
+            _state.MeleeAttackCooldownTicksRemaining = nextAttackWindowStartTicks;
+
+            _state.MeleeAttackType = attackType;
+            _state.MeleeComboStepIndex = nextStepIndex;
+            _state.MeleeAttackSourceRevision = sourceRevision;
+
+            bool hasNextComboStep = nextStepIndex + 1 < stepCount;
+
+            /*
+             * 只有同一攻击来源、同一种攻击类型且仍处于衔接窗口
+             * 才能推进到下一段
+             */
+            _state.MeleeComboWindowTicksRemaining =
+                hasNextComboStep
+                    ? nextAttackWindowEndTicks
+                    : 0u;
 
             return true;
         }
 
         /// <summary>
-        /// 每个模拟 Tick 推进一次近战攻击冷却
+        /// 每个模拟 Tick 推进近战攻击冷却和连招衔接窗口
+        /// 强制全身动作会结束连招但不会跳过已有攻击冷却
         /// </summary>
-        private void AdvanceMeleeAttackCooldown()
+        private void AdvanceMeleeAttackState()
         {
             if (_state.MeleeAttackCooldownTicksRemaining > 0u)
             {
                 _state.MeleeAttackCooldownTicksRemaining--;
             }
+
+            if (_state.MeleeComboWindowTicksRemaining > 0u)
+            {
+                _state.MeleeComboWindowTicksRemaining--;
+            }
+
+            bool hasConflictingAction =
+                _state.VaultType != VaultType.None ||
+                _state.ActionType != CharacterActionType.None;
+
+            if (hasConflictingAction)
+            {
+                ResetMeleeComboProgression();
+            }
+        }
+
+        /// <summary>
+        /// 取消当前近战攻击、吸附和剩余攻击时间
+        /// 保留攻击序号，避免复活或回滚后重复使用旧攻击身份
+        /// </summary>
+        public void CancelMeleeAttack()
+        {
+            _state.MeleeAttackStartTick = 0u;
+            _state.MeleeAttackCooldownTicksRemaining = 0u;
+
+            ResetMeleeComboProgression();
+            CancelMeleeAdsorption();
+        }
+
+        /// <summary>
+        /// 清空当前连招推进资格
+        /// 不清除已经成立的攻击序号和剩余攻击冷却
+        /// </summary>
+        private void ResetMeleeComboProgression()
+        {
+            _state.MeleeAttackType = MeleeAttackType.None;
+            _state.MeleeComboStepIndex = 0;
+            _state.MeleeComboWindowTicksRemaining = 0u;
+            _state.MeleeAttackSourceRevision = 0u;
         }
 
         /// <summary>
@@ -258,7 +353,7 @@ namespace NiumaTPC.Character.Simulation
                     tickDeltaTime);
             }
 
-            AdvanceMeleeAttackCooldown();
+            AdvanceMeleeAttackState();
 
             return _state;
         }
@@ -618,6 +713,26 @@ namespace NiumaTPC.Character.Simulation
             if (hasStaleSlideState)
             {
                 throw new ArgumentException("未执行滑铲时，滑铲速度与缓存跳跃必须已经清空。", nameof(state));
+            }
+
+            if (!Enum.IsDefined(typeof(MeleeAttackType), state.MeleeAttackType))
+            {
+                throw new ArgumentException($"未知的近战攻击类型：{state.MeleeAttackType}", nameof(state));
+            }
+
+            bool hasComboRuntimeData =
+                state.MeleeAttackSourceRevision != 0u ||
+                state.MeleeComboStepIndex != 0 ||
+                state.MeleeComboWindowTicksRemaining > 0u;
+
+            if (state.MeleeAttackType == MeleeAttackType.None && hasComboRuntimeData)
+            {
+                throw new ArgumentException("没有近战攻击类型时不能保留连招运行数据", nameof(state));
+            }
+
+            if (state.MeleeAttackType != MeleeAttackType.None && state.MeleeAttackSourceRevision == 0u)
+            {
+                throw new ArgumentException("存在近战攻击类型时必须记录攻击来源修订号", nameof(state));
             }
 
             if (!state.MeleeAdsorption.IsValid)

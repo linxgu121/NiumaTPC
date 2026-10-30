@@ -108,6 +108,7 @@ namespace NiumaTPC.Character.Input.Player
             SampleButton(ref rawData,RawInputButtons.Number5,number5Action);
 
             SampleButton(ref rawData,RawInputButtons.Action,actionAction);
+
         }
 
         /// <summary>

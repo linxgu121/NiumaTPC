@@ -65,7 +65,7 @@ namespace NiumaTPC.Item
 
         private Rigidbody _cachedRb;
 
-        private bool UsePool => SimpleObjectPoolSystem.Shared != null;
+        private bool UsePool => ObjectPoolSystem.Shared != null;
 
         #region Pool
         public void OnSpawned()
@@ -179,9 +179,9 @@ namespace NiumaTPC.Item
                 var rot = Quaternion.LookRotation(-transform.forward, Vector3.up);
 
                 GameObject vfx;
-                if (SimpleObjectPoolSystem.Shared != null)
+                if (ObjectPoolSystem.Shared != null)
                 {
-                    vfx = SimpleObjectPoolSystem.Shared.Spawn(hitVFXPrefab);
+                    vfx = ObjectPoolSystem.Shared.Spawn(hitVFXPrefab);
                     vfx.transform.SetPositionAndRotation(hitPoint, rot);
                 }
                 else
@@ -271,7 +271,7 @@ namespace NiumaTPC.Item
         private void DespawnSelf()
         {
             if (UsePool)
-                SimpleObjectPoolSystem.Shared.Despawn(gameObject);
+                ObjectPoolSystem.Shared.Despawn(gameObject);
             else
                 Destroy(gameObject);
         }

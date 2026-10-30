@@ -1,4 +1,5 @@
 using FishNet.Object.Prediction;
+using NiumaTPC.Character.Combat;
 using NiumaTPC.Character.Motion.MotionEnums;
 using NiumaTPC.Character.Simulation;
 using UnityEngine;
@@ -271,6 +272,26 @@ namespace NiumaTPC.FishNet.Prediction
         public uint MeleeAttackCooldownTicksRemaining;
 
         /// <summary>
+        /// 服务器确认的近战攻击类型
+        /// </summary>
+        public byte MeleeAttackTypeValue;
+
+        /// <summary>
+        /// 服务器确认的近战连招段数
+        /// </summary>
+        public byte MeleeComboStepIndex;
+
+        /// <summary>
+        /// 服务器确认的连招衔接窗口
+        /// </summary>
+        public uint MeleeComboWindowTicksRemaining;
+
+        /// <summary>
+        /// 当前连招使用的权威攻击来源修订号
+        /// </summary>
+        public uint MeleeAttackSourceRevision;
+
+        /// <summary>
         /// 服务器确认的近战吸附活动状态
         /// </summary>
         public bool MeleeAdsorptionIsActive;
@@ -379,6 +400,10 @@ namespace NiumaTPC.FishNet.Prediction
             MeleeAttackSequence = state.MeleeAttackSequence;
             MeleeAttackStartTick = state.MeleeAttackStartTick;
             MeleeAttackCooldownTicksRemaining = state.MeleeAttackCooldownTicksRemaining;
+            MeleeAttackTypeValue = (byte)state.MeleeAttackType;
+            MeleeComboStepIndex = state.MeleeComboStepIndex;
+            MeleeComboWindowTicksRemaining = state.MeleeComboWindowTicksRemaining;
+            MeleeAttackSourceRevision = state.MeleeAttackSourceRevision;
             MeleeAdsorptionIsActive = state.MeleeAdsorption.IsActive;
             MeleeAdsorptionAttackTick = state.MeleeAdsorption.Request.AttackTick;
             MeleeAdsorptionTargetPosition = state.MeleeAdsorption.Request.TargetPosition;
@@ -438,7 +463,7 @@ namespace NiumaTPC.FishNet.Prediction
                     smoothSpeed: SmoothSpeed,
                     speedSmoothVelocity: SpeedSmoothVelocity,
                     rotationSmoothVelocity: RotationSmoothVelocity);
-                    
+
             // 构造函数只提供初始化值，校正时必须恢复服务器记录的空中历史与落地结果
             state.AirborneApexY = AirborneApexY;
             state.LandingSequence = LandingSequence;
@@ -447,6 +472,14 @@ namespace NiumaTPC.FishNet.Prediction
             state.MeleeAttackSequence = MeleeAttackSequence;
             state.MeleeAttackStartTick = MeleeAttackStartTick;
             state.MeleeAttackCooldownTicksRemaining = MeleeAttackCooldownTicksRemaining;
+
+            state.MeleeAttackType = (MeleeAttackType)MeleeAttackTypeValue;
+
+            state.MeleeComboStepIndex = MeleeComboStepIndex;
+
+            state.MeleeComboWindowTicksRemaining = MeleeComboWindowTicksRemaining;
+
+            state.MeleeAttackSourceRevision = MeleeAttackSourceRevision;
 
             if (MeleeAdsorptionIsActive)
             {
