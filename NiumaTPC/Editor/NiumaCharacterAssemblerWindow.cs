@@ -24,7 +24,14 @@ namespace NiumaTPC.Editor
     {
         private enum AssemblyKind
         {
+            /// <summary>
+            /// 由本地Owner输入控制的玩家角色
+            /// </summary>
             Player,
+
+            /// <summary>
+            /// 由服务器AI输入控制的敌人角色
+            /// </summary>
             Enemy
         }
 
@@ -37,15 +44,20 @@ namespace NiumaTPC.Editor
             "FishNet.Object.NetworkObject",
             "NiumaTPC.FishNet.NiumaFishNetPredictionDriver",
             "NiumaTPC.FishNet.NiumaFishNetCameraBinder",
+            "NiumaTPC.FishNet.Combat.NetworkHealthBridge",
+            "NiumaTPC.FishNet.Combat.NetworkDamageEventBridge",
             "NiumaTPC.FishNet.Items.WeaponDriver",
             "NiumaTPC.FishNet.Items.WeaponMeleeAttackSource"
         };
 
         private static readonly string[] EnemyNetworkComponentNames =
         {
-            "FishNet.Object.NetworkObject",
-            "NiumaTPC.FishNet.NiumaFishNetPredictionDriver",
-            "NiumaTPC.FishNet.Enemy.ServerEnemyControlBridge"
+           "FishNet.Object.NetworkObject",
+           "NiumaTPC.FishNet.NiumaFishNetPredictionDriver",
+           "NiumaTPC.FishNet.Combat.NetworkHealthBridge",
+           "NiumaTPC.FishNet.Combat.NetworkDamageEventBridge",
+           "NiumaTPC.FishNet.Enemy.ServerEnemyControlBridge",
+           "NiumaTPC.FishNet.Enemy.ServerEnemyDeathLifecycle"
         };
 
         #endregion

@@ -1,0 +1,14 @@
+{
+    "BasePlayerVersion": "0.2.0",
+    "HotUpdateVersion": "0.2.2",
+    "Platform": "StandaloneWindows64",
+    "RequiredHotUpdateAssemblies": [
+        {
+            "Address": "hotupdate/windows/assemblies/niuma-hotupdate-hotfix",
+            "Sha256": "ff0e2e259fb07b576b325837c48101654007048d7603a5b1a88accf09067a61d"
+        }
+    ],
+    "RequiredAotMetadataAssemblies": [],
+    "EntryAssemblyName": "NiumaHotUpdate.Hotfix",
+    "EntryTypeName": "NiumaHotUpdate.Hotfix.HotUpdateEntry"
+}

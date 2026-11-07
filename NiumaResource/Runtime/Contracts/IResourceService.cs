@@ -22,9 +22,16 @@ namespace NiumaResource
         Task<ResourceLoadResult<T>> LoadAsync<T>(string address) where T : UnityEngine.Object;
 
         /// <summary>
+        /// 根据当前已经加载的 Catalog 清理不再引用的远程 Bundle
+        /// 应在资源服务初始化完成后、业务资源开始加载前调用
+        /// </summary>
+        Task<ResourceCacheCleanupResult> CleanUnusedBundleCacheAsync();
+
+        /// <summary>
         /// 停止接受新请求并释放服务持有的全部底层资源
         /// 重复调用必须保持安全
         /// </summary>
         void Shutdown();
+
     }
 }

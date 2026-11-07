@@ -26,7 +26,7 @@ namespace NiumaTPC.Core.Combat
         /// <summary>
         /// 攻击者当前攻击序号
         /// </summary>
-        public readonly uint SourceSequence;
+        public readonly ulong SourceSequence;
 
         /// <summary>
         /// 攻击成立时使用的攻击来源修订号
@@ -46,7 +46,7 @@ namespace NiumaTPC.Core.Combat
             float amount,
             HitSpot hitSpot = HitSpot.Unknown,
             int sourceObjectId = -1,
-            uint sourceSequence = 0u,
+            ulong sourceSequence = 0UL,
             uint sourceRevision = 0u)
         {
             Amount = amount;

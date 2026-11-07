@@ -1,21 +1,16 @@
 using System;
 using NiumaTPC.Character.Event;
 using NiumaTPC.Character.State.Core;
-using NiumaTPC.Core.Object;
-using UnityEngine;
 
 namespace NiumaTPC.Character.State.Override
 {
     /// <summary>
-    /// 处理玩家死亡流程
-    /// 阻断全部控制权，3秒后自动回收/销毁对象
+    /// 处理角色死亡后的状态锁定与表现
+    /// 网络回收和玩家复活由服务器生命周期组件负责
     /// </summary>
     [Serializable]
     public sealed class PlayerDeathState : PlayerBaseState
     {
-        private float _deathTimeAt;
-        private const float RESPAWN_DELAY = 3f;
-
         public PlayerDeathState(NiumaCharacterController player) : base(player) { }
 
         protected override bool CheckInterrupts() => false;
@@ -36,17 +31,11 @@ namespace NiumaTPC.Character.State.Override
             if (clip != null)
                 AnimationFacade.PlayFullBodyAction(clip, 0.05f);
 
-            // 记录死亡时间 （用于压测场景）
-            _deathTimeAt = Time.time + RESPAWN_DELAY;
         }
 
+        // 死亡状态保持到服务器执行复活或网络回收
         protected override void UpdateStateLogic()
         {
-            // 死亡 3 秒后 触发对象池回收(暂时硬编码)
-            if (Time.time >= _deathTimeAt)
-            {
-                TryRespawnViaPool();
-            }
         }
 
         // 死亡表现状态不通过旧驱动追加重力位移
@@ -59,20 +48,5 @@ namespace NiumaTPC.Character.State.Override
             AnimationFacade.StopFullBodyAction();
         }
 
-        /// <summary>
-        /// 尝试通过对象池回收该角色实例（用于压力测试） 
-        /// 如果不使用池则退避，由外部手动销毁。
-        /// </summary>
-        private void TryRespawnViaPool()
-        {
-            if (ObjectPoolSystem.Shared != null)
-            {
-                ObjectPoolSystem.Shared.Despawn(player.gameObject);
-            }
-            else
-            {
-                UnityEngine.Object.Destroy(player.gameObject);
-            }
-        }
     }
 }

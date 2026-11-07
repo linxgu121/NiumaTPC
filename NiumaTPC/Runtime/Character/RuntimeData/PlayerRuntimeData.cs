@@ -384,5 +384,21 @@ namespace NiumaTPC.Character.RuntimeData
             // AudioController 在 Update 消费（而 ResetIntent 在 LateUpdate）
             // 若在此清理，会导致本帧刚写入的音频事件在消费前丢失
         }
+
+        /// <summary>
+        /// 重置角色重新生成时不能继承的生命与仲裁状态
+        /// </summary>
+        public void ResetForSpawn(float maxHealth, float maxStamina)
+        {
+            CurrentHealth = maxHealth;
+            CurrentStamina = maxStamina;
+            IsDead = false;
+
+            Override.Clear();
+            Arbitration.Clear();
+            ActionArbitration.Clear();
+            SfxQueue.Clear();
+            ResetIntent();
+        }
     }
 }

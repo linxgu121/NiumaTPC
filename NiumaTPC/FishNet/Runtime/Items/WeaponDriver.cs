@@ -1048,9 +1048,7 @@ namespace NiumaTPC.FishNet.Items
 
             ItemInstance item = _serverEquippedItem;
 
-            if (item == null ||
-                !(item.BaseData is RangedWeaponSO weapon) ||
-                item.WeaponState == null)
+            if (item == null || !(item.BaseData is GunWeaponSO weapon) || item.WeaponState == null)
             {
                 rejectReason = WeaponFireRejectReason.InvalidWeapon;
                 return false;

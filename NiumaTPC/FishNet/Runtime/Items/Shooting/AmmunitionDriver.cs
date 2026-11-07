@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using FishNet.Object;
 using FishNet.Utility.Template;
+using NiumaTPC.Core.Combat;
 using NiumaTPC.Item;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -45,6 +46,7 @@ namespace NiumaTPC.FishNet.Items
             public string DefinitionId;
             public ShotRequestKey RequestKey;
             public int ShooterObjectId;
+            public float BaseDamage;
         }
 
         // 保存发射时的资源与来源身份
@@ -213,7 +215,7 @@ namespace NiumaTPC.FishNet.Items
         /// 此方法不扣弹、不播放表现、不调用外部事件
         /// </summary>
         internal bool TrySpawn(
-            RangedWeaponSO weapon,
+            GunWeaponSO weapon,
             Ray approvedAim,
             Transform shooterRoot,
             int shooterObjectId,
@@ -269,7 +271,8 @@ namespace NiumaTPC.FishNet.Items
             {
                 DefinitionId = ammunition.DefinitionId,
                 RequestKey = requestKey,
-                ShooterObjectId = shooterObjectId
+                ShooterObjectId = shooterObjectId,
+                BaseDamage = weapon.BaseDamage
             });
 
             return true;
@@ -332,54 +335,72 @@ namespace NiumaTPC.FishNet.Items
         {
             AmmunitionState state = result.State;
 
-            // 清理和广播不能受日志开关影响
-            if (_serverShots.TryGetValue(
-                    state.ShotId,
-                    out ServerShotInfo shotInfo))
+            if (!_serverShots.TryGetValue(state.ShotId, out ServerShotInfo shotInfo))
             {
-                _serverShots.Remove(state.ShotId);
-
-                Vector3 point = result.HasHit
-                    ? result.Hit.point
-                    : state.Position;
-
-                Vector3 normal = result.HasHit
-                    ? result.Hit.normal
-                    : Vector3.zero;
-
-                ShotRequestKey key = shotInfo.RequestKey;
-
-                ObserveShotEnd(
-                    state.ShotId,
-                    shotInfo.DefinitionId,
-                    key.ServerWeaponInstanceId,
-                    key.EquipmentRevision,
-                    key.RequestSequence,
-                    result.HasHit,
-                    point,
-                    normal);
-            }
-
-            if (!_logEnds)
-            {
+                if (_logEnds) Debug.LogWarning($"[网络弹道] 找不到服务器子弹记录：ShotId={state.ShotId}", this);
                 return;
             }
 
-            string targetName =
-                result.HasHit && result.Hit.collider != null
-                    ? result.Hit.collider.name
-                    : "-";
+            _serverShots.Remove(state.ShotId);
+
+            if (result.HasHit)
+            {
+                ApplyHitDamage(in result, in shotInfo);
+            }
+
+            Vector3 point = result.HasHit ? result.Hit.point : state.Position;
+            Vector3 normal = result.HasHit ? result.Hit.normal : Vector3.zero;
+            ShotRequestKey key = shotInfo.RequestKey;
+
+            ObserveShotEnd(
+                state.ShotId,
+                shotInfo.DefinitionId,
+                key.ServerWeaponInstanceId,
+                key.EquipmentRevision,
+                key.RequestSequence,
+                result.HasHit,
+                point,
+                normal);
+
+            if (!_logEnds) return;
+
+            string targetName = result.HasHit && result.Hit.collider != null ? result.Hit.collider.name : "-";
 
             Debug.Log(
                 $"[网络弹道/结束] ShotId={state.ShotId}, " +
-                $"WeaponInstance={shotInfo.RequestKey.ServerWeaponInstanceId}, " +
-                $"EquipmentRevision={shotInfo.RequestKey.EquipmentRevision}, " +
-                $"Request={shotInfo.RequestKey.RequestSequence}, " +
+                $"WeaponInstance={key.ServerWeaponInstanceId}, " +
+                $"EquipmentRevision={key.EquipmentRevision}, " +
+                $"Request={key.RequestSequence}, " +
                 $"ServerTick={TimeManager.Tick}, " +
                 $"Status={state.Status}, HasHit={result.HasHit}, " +
                 $"Target={targetName}, Age={state.Age:F3}, " +
                 $"Position={state.Position}",
                 this);
+        }
+
+        /// <summary>
+        /// 将服务端确认的受击框命中提交给目标伤害管线
+        /// 墙体和没有DamageHurtbox的碰撞体只结束弹道，不产生角色伤害
+        /// </summary>
+        private static void ApplyHitDamage(in AmmunitionEndResult result, in ServerShotInfo shotInfo)
+        {
+            Collider hitCollider = result.Hit.collider;
+
+            if (hitCollider == null ||
+                !hitCollider.TryGetComponent(out DamageHurtbox hurtbox) ||
+                !hurtbox.TryGetDamageable(out IDamageable damageable))
+            {
+                return;
+            }
+
+            var request = new DamageRequest(
+                shotInfo.BaseDamage,
+                hurtbox.HitSpot,
+                shotInfo.ShooterObjectId,
+                shotInfo.RequestKey.RequestSequence,
+                shotInfo.RequestKey.EquipmentRevision);
+
+            damageable.RequestDamage(in request);
         }
 
         #endregion
@@ -404,7 +425,7 @@ namespace NiumaTPC.FishNet.Items
             }
 
             if (!NetworkManager.ClientManager.Objects.Spawned
-                    .TryGetValue(shooterObjectId,out NetworkObject shooterObject) || shooterObject == null || !shooterObject.TryGetComponent(out WeaponDriver weaponDriver))
+                    .TryGetValue(shooterObjectId, out NetworkObject shooterObject) || shooterObject == null || !shooterObject.TryGetComponent(out WeaponDriver weaponDriver))
             {
                 return false;
             }
@@ -464,7 +485,7 @@ namespace NiumaTPC.FishNet.Items
                 return;
             }
 
-            ShotRequestKey requestKey = new(serverWeaponInstanceId,equipmentRevision,requestSequence);
+            ShotRequestKey requestKey = new(serverWeaponInstanceId, equipmentRevision, requestSequence);
 
             // Tick 可能回绕，不能直接做无符号年龄减法
             int elapsedTicks = unchecked((int)(TimeManager.Tick - serverTick));

@@ -196,6 +196,9 @@ namespace NiumaTPC.FishNet
         {
             ResetPresentationSnapshotTracking();
 
+            // 网络对象首次生成或从FishNet池中复用时恢复角色运行状态
+            _player?.OnSpawned();
+
             if (!TryTakeSimulationOwnership())
             {
                 return;
@@ -215,6 +218,8 @@ namespace NiumaTPC.FishNet
 
         public override void OnStopNetwork()
         {
+            // 在网络对象销毁或进入FishNet池前清理角色持有的运行时引用
+            _player?.OnDespawned();
             ReleaseInputOwnership();
             ReleaseSimulationOwnership();
             ResetPresentationSnapshotTracking();

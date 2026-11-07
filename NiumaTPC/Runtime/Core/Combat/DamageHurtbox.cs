@@ -4,7 +4,8 @@ namespace NiumaTPC.Core.Combat
 {
     /// <summary>
     /// 角色身体部位的通用受击区域
-    /// 近战、实体子弹和射线武器均从这里读取部位与伤害倍率
+    /// 近战、实体子弹和射线武器从这里读取命中部位
+    /// 具体伤害倍率由目标角色的DamagePipeline计算
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Collider))]
@@ -18,7 +19,7 @@ namespace NiumaTPC.Core.Combat
         [Tooltip("当前碰撞体代表的身体区域")]
         private HitSpot hitSpot = HitSpot.Torso;
 
-    
+
         #endregion
 
         #region Runtime State

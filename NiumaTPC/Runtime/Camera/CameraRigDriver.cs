@@ -8,7 +8,7 @@ namespace NiumaTPC.Cameras
     // 摄像机刚体驱动 它是摄像机表现层与角色数据的桥接器
     // 负责把角色黑板中的“权威朝向(AuthorityRotation)”同步到场景中的 CameraRig
     // 并计算场景中的真实瞄准点反向写回黑板供 IK 与逻辑使用
-    
+
     // 强制极早执行，保证摄像机数据优先更新
     [DefaultExecutionOrder(-200)]
     public class CameraRigDriver : MonoBehaviour
@@ -70,7 +70,7 @@ namespace NiumaTPC.Cameras
         public NiumaCharacterController BoundPlayer => _player;
 
 
-        private readonly RaycastHit[] _raycastHits = new RaycastHit[1];
+        private readonly RaycastHit[] _raycastHits = new RaycastHit[32];
 
         private void Awake()
         {
@@ -107,7 +107,7 @@ namespace NiumaTPC.Cameras
 
         public void UnbindPlayer(NiumaCharacterController player)
         {
-            if(_player != player)
+            if (_player != player)
             {
                 return;
             }
@@ -127,7 +127,7 @@ namespace NiumaTPC.Cameras
             Transform target = _runtimeFollowTarget != null
                 ? _runtimeFollowTarget
                 : (_followTarget != null ? _followTarget : _player.transform);
-            
+
             UpdateSlideCameraOffset(data);
             transform.position = target.position + _followOffset + Vector3.up * _currentSlideCameraOffset;
 
@@ -169,20 +169,20 @@ namespace NiumaTPC.Cameras
         {
             bool shouldLowerCamera = _enableSlideCameraOffset && data != null && data.IsSliding;
 
-            float targetOffset =shouldLowerCamera ? _slideCameraHeightOffset : 0f;
-            
+            float targetOffset = shouldLowerCamera ? _slideCameraHeightOffset : 0f;
+
             /*
              * 进入时快速降低，退出时稍慢恢复，
              * 避免镜头突然弹起造成明显眩晕。
              */
-            float smoothTime = targetOffset < _currentSlideCameraOffset  ? _slideCameraEnterSmoothTime : _slideCameraExitSmoothTime;
+            float smoothTime = targetOffset < _currentSlideCameraOffset ? _slideCameraEnterSmoothTime : _slideCameraExitSmoothTime;
 
-             _currentSlideCameraOffset = Mathf.SmoothDamp(
-                _currentSlideCameraOffset, targetOffset,
-                ref _slideCameraOffsetVelocity,
-                Mathf.Max(0.01f, smoothTime),
-                float.PositiveInfinity,
-                Time.unscaledDeltaTime);
+            _currentSlideCameraOffset = Mathf.SmoothDamp(
+               _currentSlideCameraOffset, targetOffset,
+               ref _slideCameraOffsetVelocity,
+               Mathf.Max(0.01f, smoothTime),
+               float.PositiveInfinity,
+               Time.unscaledDeltaTime);
 
             // 消除接近零时长期存在的极小浮点尾差。
             if (!shouldLowerCamera && Mathf.Abs(_currentSlideCameraOffset) < 0.001f)
@@ -196,27 +196,77 @@ namespace NiumaTPC.Cameras
 
         #endregion
 
-        // 从屏幕中心发射射线 寻找实际的物理交点 并写入黑板（RuntimeData）
+        // 从屏幕中心寻找准星交点，并生成不会让AimIK贴墙折叠的表现目标
         private void CalculateAndPushAimPoint(PlayerRuntimeData data)
         {
-            // 获取屏幕正中心的射线（即准星位置）
             Ray screenRay = _mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            Vector3 finalAimPoint;
 
-            // 执行射线检测（NonAlloc）
-            int hitCount = Physics.RaycastNonAlloc(screenRay, _raycastHits, _aimRaycastDistance, _aimCollisionMask);
-            if (hitCount > 0)
+            Vector3 finalAimPoint = TryFindClosestAimHit(screenRay, out RaycastHit hit)
+                ? hit.point
+                : screenRay.GetPoint(_aimRaycastDistance);
+
+            Transform aimReference = data.CurrentAimReference;
+
+            if (aimReference != null &&
+                _player.Config != null &&
+                _player.Config.Aiming != null)
             {
-                finalAimPoint = _raycastHits[0].point;
-            }
-            else
-            {
-                finalAimPoint = screenRay.GetPoint(_aimRaycastDistance);
+                float minimumDistance = Mathf.Max(0.1f, _player.Config.Aiming.AimIkMinimumTargetDistance);
+                Vector3 referenceToTarget = finalAimPoint - aimReference.position;
+                float forwardDistance = Vector3.Dot(referenceToTarget, screenRay.direction);
+
+                if (forwardDistance < minimumDistance)
+                {
+                    float presentationDistance = Mathf.Max(minimumDistance, _player.Config.Aiming.AimPresentationDistance);
+                    finalAimPoint = screenRay.GetPoint(presentationDistance);
+                }
             }
 
-            // 将计算结果写回黑板 供角色逻辑/IK 使用
             data.TargetAimPoint = finalAimPoint;
             data.CameraLookDirection = _mainCamera.transform.forward;
+        }
+
+        /// <summary>
+        /// 查找准星射线上距离最近的有效命中并排除当前本地角色自身
+        /// </summary>
+        private bool TryFindClosestAimHit(Ray screenRay, out RaycastHit closestHit)
+        {
+            closestHit = default;
+
+            int hitCount = Physics.RaycastNonAlloc(
+                screenRay,
+                _raycastHits,
+                _aimRaycastDistance,
+                _aimCollisionMask,
+                QueryTriggerInteraction.Ignore);
+
+            Transform playerRoot = _player != null ? _player.transform : null;
+            float closestDistance = float.MaxValue;
+            bool foundHit = false;
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit candidate = _raycastHits[i];
+                Collider candidateCollider = candidate.collider;
+
+                if (candidateCollider == null) continue;
+
+                Transform candidateTransform = candidateCollider.transform;
+
+                if (playerRoot != null &&
+                    (candidateTransform == playerRoot || candidateTransform.IsChildOf(playerRoot)))
+                {
+                    continue;
+                }
+
+                if (candidate.distance >= closestDistance) continue;
+
+                closestDistance = candidate.distance;
+                closestHit = candidate;
+                foundHit = true;
+            }
+
+            return foundHit;
         }
     }
 }

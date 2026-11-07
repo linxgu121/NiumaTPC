@@ -1,6 +1,6 @@
 # 第三人称动作与网络角色控制框架
 
-框架由 **NiumaCore**、**NiumaResource** 与 **NiumaTPC** 三个模块组成。NiumaCore 提供跨模块公共协议与运行时底座，NiumaResource 定义资源加载和持有关系，NiumaTPC 将输入、角色运动、动作切换、装备和画面表现拆成独立职责。
+框架由 **NiumaCore**、**NiumaResource**、**NiumaTPC** 与 **NiumaHotUpdate** 四个模块组成。NiumaCore 提供跨模块公共协议与运行时底座，NiumaResource 管理 Addressables 资源加载、缓存和持有关系，NiumaTPC 将输入、角色运动、动作切换、装备和画面表现拆成独立职责，NiumaHotUpdate 则负责 HybridCLR 热更代码的发布、校验和运行时装载。
 
 角色核心使用输入管线、运行时黑板、分层状态机与仲裁器组织行为，并通过固定 Tick 模拟和 FishNet 适配层支持客户端预测、服务器复算与网络校正。框架覆盖移动、跳跃、翻滚、闪避、翻越、滑铲以及网络枪械射击；动画、IK、相机和音频通过 Facade、Driver 与适配接口接入。
 
@@ -11,10 +11,11 @@
 | 模块 | 定位 | 解决的问题 |
 | --- | --- | --- |
 | `NiumaCore` | 公共协议与运行时底座 | 统一模块生命周期、服务上下文、事件、认证、网络、存档和通用能力边界 |
-| `NiumaResource` | 资源生命周期契约 | 隔离业务代码与 Addressables 句柄，明确加载结果、错误分类和资源释放责任 |
+| `NiumaResource` | Addressables 资源生命周期 | 隔离业务代码与 Addressables 句柄，统一异步加载、引用租约、缓存复用、缓存清理和错误分类 |
 | `NiumaTPC` | 第三人称动作与网络角色控制 | 统一输入、固定 Tick 模拟、状态、动画表现、装备、战斗与 FishNet 权威同步 |
+| `NiumaHotUpdate` | HybridCLR 代码热更新 | 统一热更程序集编译、版本清单、SHA256 校验、Addressables 增量发布和运行时入口装载 |
 
-三个模块保持单向依赖：TPC 和其他业务模块依赖 Core 的公共协议；Resource 使用 Core 的运行时基础，并向业务层暴露独立资源契约；Core 不反向引用任何业务模块。
+模块保持单向依赖：TPC 和其他业务模块依赖 Core 的公共协议；Resource 使用 Core 的运行时基础，并向业务层暴露独立资源契约；HotUpdate 通过 Core 获取运行时上下文，通过 Resource 加载远程清单与程序集；Core 不反向引用任何业务模块。
 
 ---
 
@@ -25,7 +26,7 @@ NiumaTPC 的核心原则是把“想做什么”“实际发生了什么”和�
 - **意图与状态分离：** 输入只表达玩家或 AI 的瞬时意图，不直接修改角色状态。
 - **模拟与表现分离：** 固定 Tick 模拟决定权威位置、速度和动作结果，状态机与动画只消费结果并负责表现。
 - **配置与运行时分离：** `ScriptableObject` 负责策划配置，启动时转换为模拟层纯数据，Tick 中不直接读取资源对象。
-- **离线与联网统一：** 离线驱动器和 FishNet 驱动器提交相同的输入命令，并调用相同的模拟器。
+- **单人与联网统一：** 单人模式运行本地 Host，多人模式通过 FishNet 提交相同的输入命令并调用同一套权威模拟核心。
 - **第三方后端可替换：** 动画、IK、相机和网络通过 Facade、Driver 或适配层接入，不反向污染角色核心。
 
 这种结构让新增动作、替换输入源、切换动画或 IK 后端、接入 AI 和网络框架时，不必重新改写整套角色控制逻辑。
@@ -48,6 +49,15 @@ NiumaTPC 的核心原则是把“想做什么”“实际发生了什么”和�
 - `IResourceLease<T>` 显式表达一次资源持有关系，通过释放 Lease 结束所有权。
 - `ResourceLoadResult<T>` 使用成功 Lease 或稳定错误码表达加载结果，业务逻辑无需解析异常文本。
 - 地址与请求类型组成严格复合缓存键，避免同一地址被不同资源类型错误复用。
+- `AddressableResourceService` 统一 Addressables 初始化、异步加载、引用计数缓存、资源释放和失效 Bundle 清理。
+- `AddressableAddressAttribute` 与编辑器下拉选择器直接读取 Addressables 条目，减少手工复制地址造成的配置错误。
+
+### 代码热更新
+
+- 通过 Addressables 远程加载热更清单和 DLL Bytes，完整客户端不需要随每次业务修正重新打包。
+- 清单同时绑定基础客户端版本、热更版本、运行平台、入口类型和程序集 SHA256，拒绝不兼容或被破坏的发布内容。
+- `HotUpdateService` 完成清单校验、程序集加载、入口实例化和运行时上下文注入，并返回稳定的初始化错误码。
+- 编辑器发布工具统一完成 HybridCLR 热更程序集编译、DLL Bytes 替换、清单生成、完整基线归档和 Addressables 增量构建。
 
 ### 第三人称移动
 
@@ -83,7 +93,7 @@ NiumaTPC 的核心原则是把“想做什么”“实际发生了什么”和�
 - 服务器权威模拟和输入所有权校验。
 - FishNet `Replicate/Reconcile` 回滚校正。
 - 远端角色状态快照和动画表现同步。
-- 离线固定 Tick 与 FishNet Tick 共用角色模拟核心。
+- 本地 Host 与远程客户端共用 FishNet Tick 和角色模拟核心。
 - 摄像机跟随平滑后的图形节点，避免直接跟随固定 Tick 模拟根节点产生抖动。
 
 ### 枪械与弹道
@@ -208,6 +218,12 @@ Restore + Replay Pending Inputs
 
 `GunWeaponSO` 提供通用枪械资源，继承 `RangedWeaponSO` 的初速度、开火间隔、弹匣容量及弹药引用；`AmmunitionDefinitionSO` 提供弹药的重力、碰撞半径、寿命与视觉资源。武器运行时弹量和冷却保存在 `ItemInstance`，不是保存在可回收的枪械模型上。
 
+### 9. HybridCLR 与 Addressables 热更新
+
+热更新运行时先从远程 Catalog 获取版本清单，再校验基础 Player 版本、运行平台和程序集 SHA256。校验通过后，热更程序集才会交给 `Assembly.Load`，并通过稳定的 `IHotUpdateEntry` 契约接收 `GameContext` 与当前热更版本。
+
+编辑器发布管线区分“完整客户端基线”和“基于既有 Player 的增量内容”。完整基线保存独立的 `addressables_content_state.bin`，后续热更始终以该不可变状态为比较基准，避免把某次增量结果误当成新的客户端基线。
+
 ---
 
 ## 子系统细节
@@ -227,10 +243,11 @@ Restore + Replay Pending Inputs
 - **IK 系统：** `IKController` 统一读取 IK 数据，支持 Final IK 与 Unity Animation Rigging 适配。
 - **装备与物品：** 包含物品定义、物品实例、背包堆叠、角色库存、装备驱动和武器行为示例。
 - **音频系统：** `AudioSO`、`AudioDriver` 与 `AudioController` 以请求方式集中播放角色音效。
-- **对象池：** `SimpleObjectPoolSystem` 为物品、特效和投射物提供通用复用能力。
+- **对象池：** `ObjectPoolSystem` 为物品、特效和投射物提供 Addressables 地址池、预热、租用、归还和容量管理。
 - **编辑器工具：** 提供动画速度分析、Root Motion 提取、Warped Motion 提取和调试辅助工具。
 - **网络射击：** `WeaponDriver` 处理请求与装备身份，`AmmunitionDriver` 推进权威弹道，`AmmunitionPresenter` 处理预测弹与确认表现
 - **角色数据：** `Runtime/Role` 提供角色定义、目录查询、选角会话和预览能力，展示对象与正式角色生成分开
+- **热更新：** `NiumaHotUpdateHost` 驱动清单加载与程序集入口，发布工具负责版本校验、哈希生成、基线归档和增量内容构建
 
 ---
 
@@ -253,6 +270,7 @@ Restore + Replay Pending Inputs
 | --- | --- |
 | NiumaCore Runtime | 模块与通用运行时基础能力 |
 | Unity Addressables、Resource Manager | NiumaResource 的资源加载后端依赖 |
+| HybridCLR | IL2CPP Player 中的热更程序集编译、补充元数据与托管代码执行能力 |
 | Unity Input System | 玩家输入采集，不使用旧输入系统 |
 | Animancer | 动画外观层的分层播放、过渡、回调和事件 |
 | Cinemachine | 第三人称相机与视角管理 |
@@ -266,4 +284,4 @@ Restore + Replay Pending Inputs
 
 ## 能力边界
 
-NiumaCore 不负责具体玩法、业务 UI、数据库持久化或服务器规则。NiumaResource 当前提供资源管理协议、结果模型、错误分类和缓存键语义，不包含具体 `IResourceService` 实现、对象池或场景加载。NiumaTPC 负责角色与战斗表现，不接管账号、仓库持久化或游戏服务器之外的后端业务。
+NiumaCore 不负责具体玩法、业务 UI、数据库持久化或服务器规则。NiumaResource 负责客户端资源加载、缓存与释放，不决定玩法对象何时生成，也不接管服务器资源分配。NiumaTPC 负责角色与战斗表现，不接管账号、仓库持久化或游戏服务器之外的后端业务。NiumaHotUpdate 负责代码版本的发布与装载，不替代业务数据迁移、服务器协议兼容或完整 Player 的 AOT 结构升级。

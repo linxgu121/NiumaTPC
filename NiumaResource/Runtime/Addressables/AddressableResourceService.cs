@@ -19,6 +19,7 @@ namespace NiumaResource
         // 相同地址与资源类型共享一个底层 Addressables Handle
         private readonly Dictionary<ResourceCacheKey, AddressableResourceEntry> _entries = new Dictionary<ResourceCacheKey, AddressableResourceEntry>();
 
+        private Task _initializationTask;
         private bool _isInitialized;
         private bool _isShuttingDown;
 
@@ -36,17 +37,37 @@ namespace NiumaResource
         #region Lifecycle
 
         /// <summary>
-        /// 初始化资源服务并允许接收加载请求
-        /// 已关闭的服务实例不能重新初始化
+        /// 提前初始化 Addressables Catalog
+        /// 多个调用方并发初始化时共享同一个底层任务
         /// </summary>
-        public void Initialize()
+        public Task InitializeAsync()
         {
             if (_isShuttingDown)
             {
-                throw new InvalidOperationException("已经关闭的资源服务不能重新初始化，请创建新的服务实例");
+                return Task.FromException(
+                    new InvalidOperationException("已经关闭的资源服务不能重新初始化，请创建新的服务实例"));
             }
 
             if (_isInitialized)
+            {
+                return Task.CompletedTask;
+            }
+
+            if (_initializationTask != null)
+            {
+                return _initializationTask;
+            }
+
+            _initializationTask = InitializeCoreAsync();
+            return _initializationTask;
+        }
+
+        private async Task InitializeCoreAsync()
+        {
+            // 提前读取 Addressables Catalog，避免首次角色加载时才触发初始化
+            await Addressables.InitializeAsync().Task;
+
+            if (_isShuttingDown)
             {
                 return;
             }
@@ -93,7 +114,7 @@ namespace NiumaResource
         {
             if (_isShuttingDown)
             {
-                return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.ServiceShuttingDown,"资源服务正在关闭或已经关闭");
+                return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.ServiceShuttingDown, "资源服务正在关闭或已经关闭");
             }
 
             if (!_isInitialized)
@@ -103,7 +124,7 @@ namespace NiumaResource
 
             if (string.IsNullOrWhiteSpace(address))
             {
-                return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.InvalidAddress,"资源地址不能为空或只包含空格");
+                return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.InvalidAddress, "资源地址不能为空或只包含空格");
             }
 
             ResourceCacheKey key = new ResourceCacheKey(address, typeof(T));
@@ -127,14 +148,14 @@ namespace NiumaResource
                     // Shutdown 已经统一清理条目，无需再次减引用
                     referenceReserved = false;
 
-                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.ServiceShuttingDown,"资源加载期间服务已经关闭");
+                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.ServiceShuttingDown, "资源加载期间服务已经关闭");
                 }
 
                 if (entry.IsReleased)
                 {
                     referenceReserved = false;
 
-                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.LoadFailed,$"资源加载条目已经失效: {key}");
+                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.LoadFailed, $"资源加载条目已经失效: {key}");
                 }
 
                 if (entry.Status != AsyncOperationStatus.Succeeded)
@@ -144,7 +165,7 @@ namespace NiumaResource
                     ReleaseEntryReference(entry);
                     referenceReserved = false;
 
-                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.LoadFailed,$"资源加载失败: {key}, Error={operationError}");
+                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.LoadFailed, $"资源加载失败: {key}, Error={operationError}");
                 }
 
                 // 检查 Addressables 返回对象是否符合调用方请求类型
@@ -153,10 +174,10 @@ namespace NiumaResource
                     ReleaseEntryReference(entry);
                     referenceReserved = false;
 
-                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.InvalidAssetType,$"资源类型与请求类型不一致: {key}");
+                    return ResourceLoadResult<T>.Failure(ResourceLoadErrorCode.InvalidAssetType, $"资源类型与请求类型不一致: {key}");
                 }
 
-                var lease = new AddressableResourceLease<T>(entry,asset,ReleaseEntryReference);
+                var lease = new AddressableResourceLease<T>(entry, asset, ReleaseEntryReference);
 
                 // 预留引用的所有权已经转移给 Lease
                 referenceReserved = false;
@@ -176,6 +197,66 @@ namespace NiumaResource
             }
         }
 
+        /// <summary>
+        /// 根据当前已经加载的 Catalog 清理不再引用的远程 Bundle
+        /// 只清理磁盘缓存，不释放当前服务持有的资源 Lease
+        /// </summary>
+        public async Task<ResourceCacheCleanupResult> CleanUnusedBundleCacheAsync()
+        {
+            if (_isShuttingDown)
+            {
+                return ResourceCacheCleanupResult.Failure(
+                    ResourceCacheCleanupErrorCode.ServiceShuttingDown,
+                    "资源服务正在关闭或已经关闭");
+            }
+
+            if (!_isInitialized)
+            {
+                return ResourceCacheCleanupResult.Failure(
+                    ResourceCacheCleanupErrorCode.ServiceNotInitialized,
+                    "资源服务尚未初始化，不能确定需要保留的 Catalog");
+            }
+
+            AsyncOperationHandle<bool> cleanupHandle = default;
+
+            try
+            {
+                cleanupHandle = Addressables.CleanBundleCache();
+                bool cleanupSucceeded = await cleanupHandle.Task;
+
+                if (_isShuttingDown)
+                {
+                    return ResourceCacheCleanupResult.Failure(
+                        ResourceCacheCleanupErrorCode.ServiceShuttingDown,
+                        "缓存清理期间资源服务已经关闭");
+                }
+
+                if (cleanupHandle.Status != AsyncOperationStatus.Succeeded || !cleanupSucceeded)
+                {
+                    string operationError = cleanupHandle.OperationException?.Message ?? "Addressables 未提供底层错误信息";
+
+                    return ResourceCacheCleanupResult.Failure(
+                        ResourceCacheCleanupErrorCode.CleanupFailed,
+                        $"清理废弃 Bundle 缓存失败: {operationError}");
+                }
+
+                return ResourceCacheCleanupResult.Success();
+            }
+            catch (Exception exception)
+            {
+                return ResourceCacheCleanupResult.Failure(
+                    ResourceCacheCleanupErrorCode.CleanupFailed,
+                    $"清理废弃 Bundle 缓存发生异常: {exception.Message}");
+            }
+            finally
+            {
+                if (cleanupHandle.IsValid())
+                {
+                    Addressables.Release(cleanupHandle);
+                }
+            }
+        }
+
         #endregion
 
         #region Cache Management
@@ -186,7 +267,7 @@ namespace NiumaResource
         /// </summary>
         private AddressableResourceEntry GetOrCreateEntry<T>(ResourceCacheKey key) where T : UnityEngine.Object
         {
-            if (_entries.TryGetValue(key,out AddressableResourceEntry existingEntry))
+            if (_entries.TryGetValue(key, out AddressableResourceEntry existingEntry))
             {
                 if (!existingEntry.IsReleased)
                 {

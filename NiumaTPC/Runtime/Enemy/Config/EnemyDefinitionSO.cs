@@ -1,6 +1,6 @@
 using NiumaTPC.Enemy.Combat;
 using NiumaTPC.Enemy.Navigation;
-using NiumaTPC.Role;
+using NiumaTPC.Core.Combat;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -25,16 +25,31 @@ namespace NiumaTPC.Enemy.Config
 
         #endregion
 
-        #region Character(角色模板)
 
-        [Header("角色模板")]
+        #region Attributes(基础属性)
 
-        [Tooltip("提供该敌人的基础生命、移动速度和角色模板数据")]
-        public CharacterDefinitionSO CharacterDefinition;
+        [Header("基础属性")]
+
+        [Min(1f)]
+        [Tooltip("普通怪物的基础最大生命值")]
+        public float BaseMaxHealth = 100f;
+
+        [Min(0f)]
+        [Tooltip("普通怪物追击目标时的基础移动速度，单位米每秒")]
+        public float MoveSpeed = 2.5f;
+
+        [Min(0f)]
+        [Tooltip("普通怪物转向目标时每秒允许旋转的最大角度")]
+        public float RotationSpeed = 360f;
 
         #endregion
 
+
         #region Combat(战斗配置)
+
+        [Header("怪物防御")]
+        [Tooltip("不同身体部位受到伤害时使用的基础倍率，未设置时保持原始伤害")]
+        public HitSpotDamageProfileSO HitSpotDamageProfile;
 
         [Header("怪物攻击")]
 

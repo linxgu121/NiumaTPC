@@ -20,17 +20,18 @@ using NiumaTPC.Item;
 using UnityEngine;
 using NiumaTPC.Character.Core.Animation;
 using NiumaTPC.Core.Object;
+using NiumaTPC.Character.Combat;
 
 namespace NiumaTPC.Character
 {
     /// <summary>
-    /// 整个第三人称系统的 Root 节点唯一的 Monobehaviour 驱动源 
-    /// 不包含任何具体游戏逻辑 仅负责组件整合、内存分配与严格的时序指令分发 
-    /// 
+    /// 整个第三人称系统的 Root 节点唯一的 Monobehaviour 驱动源
+    /// 不包含任何具体游戏逻辑 仅负责组件整合、内存分配与严格的时序指令分发
+    ///
     /// - Awake: 只做一次性分配/依赖注入（对象池复用时不会重复调用）
     /// - OnSpawned: 每次从池取出时做“帧状态复位 + 重启”
     /// - OnDespawned: 每次回收时做“回调/引用清理”
-    /// 
+    ///
     /// TODO：随着框架越来越大，组件越来越多，后期对功能/模块进行分类便于管理
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
@@ -89,7 +90,11 @@ namespace NiumaTPC.Character
 
         // 核心管线
         public InputPipeline InputPipeline { get; private set; }
+        public DamagePipeline DamagePipeline { get; private set; }
         public MainProcessorPipeline MainProcessorPipeline { get; private set; }
+
+        // 装饰器
+        private HitSpotDamageModifier _hitSpotDamageModifier;
 
         //子系统控制器
         public UpperBodyController UpperBodyController { get; private set; }
@@ -118,7 +123,18 @@ namespace NiumaTPC.Character
 
         //调试用缓存
         private PlayerBaseState _lastState;
+
+        //公开事件
         public event Action OnEquipmentChanged;
+        /// <summary>
+        /// 生命仲裁完成一次有效伤害后触发
+        /// </summary>
+        public event Action<CharacterDamageInfo> OnDamageApplied;
+        /// <summary>
+        /// 角色生命归零时发出一次死亡通知
+        /// </summary>
+        public event Action<CharacterDeathInfo> OnDied;
+
 
         private bool _booted;
         // 标记初始化是否已经开始，防止初始化后再替换基础数值。
@@ -165,7 +181,7 @@ namespace NiumaTPC.Character
 
         #region 生命周期
 
-        // Awake 负责内存分配、找组件、依赖注入 
+        // Awake 负责内存分配、找组件、依赖注入
         private void Awake()
         {
             _awakeStarted = true;
@@ -235,7 +251,7 @@ namespace NiumaTPC.Character
             RuntimeData = new PlayerRuntimeData(this);
             InputData = new InputData();
 
-            // 实例化所有系统控制器与驱动器 
+            // 实例化所有系统控制器与驱动器
             StateMachine = new StateMachine();
             InterruptProcessor = new GlobalInterruptProcessor(this);
             EquipmentDriver = new EquipmentDriver(this);
@@ -243,6 +259,11 @@ namespace NiumaTPC.Character
 
             // 音频驱动器：如果没配 AudioSource 或模块，则 driver 仍可存在但会静默忽略播放请求。
             AudioDriver = new AudioDriver(transform, SfxSource, Config != null ? Config.Audio : null);
+
+            // 建立目标侧伤害计算管线并注册角色基础部位倍率
+            DamagePipeline = new DamagePipeline();
+            _hitSpotDamageModifier = new HitSpotDamageModifier(HitSpotDamageProfile);
+            DamagePipeline.Register(_hitSpotDamageModifier);
 
             // 实例化仲裁管线
             ArbiterPipeline = new ArbiterPipeline(this);
@@ -304,6 +325,9 @@ namespace NiumaTPC.Character
                 return;
             }
 
+            RuntimeData.ResetForSpawn(BaseStats.MaxHealth, Config.Core.MaxStamina);
+            ArbiterPipeline?.Health?.Reset();
+
             // 复位帧级意图，防止复用时继承上一轮输入/仲裁结果。
             RuntimeData.ResetIntent();
 
@@ -327,6 +351,31 @@ namespace NiumaTPC.Character
             if (RuntimeData != null)
             {
                 RuntimeData.Override.IsActive = false;
+            }
+
+            ResetStateMachinesForSpawn();
+        }
+
+        /// <summary>
+        /// 将死亡或动作状态恢复到角色配置的初始状态
+        /// </summary>
+        private void ResetStateMachinesForSpawn()
+        {
+            PlayerBaseState initialState = StateRegistry?.InitialState;
+            if (initialState != null && !ReferenceEquals(StateMachine.CurrentState, initialState))
+            {
+                if (StateMachine.CurrentState == null) StateMachine.Initialize(initialState);
+                else StateMachine.ChangeState(initialState);
+            }
+
+            var initialUpperBodyState = UpperBodyController?.StateRegistry?.InitialState;
+            if (initialUpperBodyState != null &&
+                !ReferenceEquals(UpperBodyController.StateMachine.CurrentState, initialUpperBodyState))
+            {
+                if (UpperBodyController.StateMachine.CurrentState == null)
+                    UpperBodyController.StateMachine.Initialize(initialUpperBodyState);
+                else
+                    UpperBodyController.StateMachine.ChangeState(initialUpperBodyState);
             }
         }
 
@@ -437,7 +486,7 @@ namespace NiumaTPC.Character
         // 为什么角色的物理位移必须放在 LateUpdate？
         // 因为我们的位移是通过 MotionDriver 去读取动画片段的NormalizedTime计算出来的
         // Unity 的生命周期中 Animator 的骨骼结算发生在 Update 之后 LateUpdate 之前
-        // 如果把 PhysicsUpdate 放在 Update 里 拿到的永远是上一帧的动画时间 导致角色的物理位置永远比动作快一帧 
+        // 如果把 PhysicsUpdate 放在 Update 里 拿到的永远是上一帧的动画时间 导致角色的物理位置永远比动作快一帧
         // 这会引发视觉上的抽搐问题 尤其是在低帧数的环境下 对那些带有转向的动画非常明显
 
         // 以上是单机版本的说法但对于整体设计与实现仍有作用，以下是网络同步版本的说法
@@ -462,6 +511,7 @@ namespace NiumaTPC.Character
 
         #endregion
 
+        #region 事件通知
 
         /// <summary>
         /// 通知装备已切换 / 改变
@@ -471,6 +521,23 @@ namespace NiumaTPC.Character
             OnEquipmentChanged?.Invoke();
         }
 
+        /// <summary>
+        /// 将生命仲裁器确认的死亡结果通知外部系统
+        /// </summary>
+        internal void NotifyDeath(in CharacterDeathInfo deathInfo)
+        {
+            OnDied?.Invoke(deathInfo);
+        }
+
+        /// <summary>
+        /// 广播已经完成生命扣除的权威伤害结果
+        /// </summary>
+        internal void NotifyDamageApplied(in CharacterDamageInfo damageInfo)
+        {
+            OnDamageApplied?.Invoke(damageInfo);
+        }
+
+        #endregion
 
         #region External Simulation State(外部模拟状态)
         /// <summary>

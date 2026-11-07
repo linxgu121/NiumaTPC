@@ -1,0 +1,18 @@
+{
+    "name": "NiumaHotUpdate.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "GUID:5be169b1a333162449c670d567b47df1",
+        "GUID:cf209dea28ac16f46a4fd065550aef05",
+        "GUID:13ba8ce62aa80c74598530029cb2d649"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
